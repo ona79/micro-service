@@ -1,0 +1,150 @@
+name: CI/CD Microservices UASZ (Build, Test & Docker Deploy)
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - test
+      - deploy
+  pull_request:
+    branches:
+      - main
+      - develop
+      - test
+      - deploy
+
+jobs:
+  # =========================================================================
+  # 1. INTÉGRATION CONTINUE : Compilation & Tests (Matrice des 10 services)
+  # =========================================================================
+  build-and-test:
+    name: Build & Test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - config-server
+          - discovery-server
+          - ms-patrimoine
+          - ms-circuit
+          - ms-evenement
+          - ms-reservation
+          - ms-utilisateur
+          - ms-notification
+          - ms-paiement
+          - api-gateway
+
+    steps:
+      - name: Checkout du code source
+        uses: actions/checkout@v4
+
+      - name: Configuration de Java 21 (Eclipse Temurin) et cache Maven
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Compilation et exécution des tests unitaires et d'intégration
+        working-directory: ./${{ matrix.service }}
+        run: |
+          chmod +x ./mvnw
+          ./mvnw -B clean test package
+
+      - name: Conservation de l'artefact JAR (${{ matrix.service }})
+        uses: actions/upload-artifact@v4
+        with:
+          name: jar-${{ matrix.service }}
+          path: ${{ matrix.service }}/target/*.jar
+          if-no-files-found: error
+
+  # =========================================================================
+  # 2. TEST D'INTÉGRATION INTER-MICROSERVICES (OpenFeign, RestTemplate, WebClient)
+  # =========================================================================
+  integration-e2e:
+    name: Test d'Intégration E2E Inter-Microservices
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/test' || github.ref == 'refs/heads/develop'
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Configuration de Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Téléchargement des JARs compilés
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Démarrage de ms-patrimoine (:3001), ms-circuit (:3002), ms-evenement (:3003), ms-reservation (:3004) et test E2E
+        run: |
+          java -jar artifacts/jar-ms-patrimoine/ms-patrimoine-0.0.1-SNAPSHOT.jar --spring.cloud.discovery.enabled=false > patrimoine.log 2>&1 &
+          java -jar artifacts/jar-ms-circuit/ms-circuit-0.0.1-SNAPSHOT.jar --spring.cloud.discovery.enabled=false > circuit.log 2>&1 &
+          java -jar artifacts/jar-ms-evenement/ms-evenement-0.0.1-SNAPSHOT.jar --spring.cloud.discovery.enabled=false > evenement.log 2>&1 &
+          java -jar artifacts/jar-ms-reservation/ms-reservation-0.0.1-SNAPSHOT.jar --spring.cloud.discovery.enabled=false > reservation.log 2>&1 &
+
+          echo "Attente du démarrage des 4 microservices..."
+          for port in 3001 3002 3003 3004; do
+            for i in {1..30}; do
+              curl -sf http://localhost:$port/actuator/health && break
+              sleep 2
+            done
+          done
+
+          echo "1. Vérification des patrimoines initiaux (:3001)"
+          curl -sf http://localhost:3001/api/patrimoines | grep -q "PAT-DKR-001"
+
+          echo "2. Vérification des 3 modes de communication TP2 (:3002 -> :3001)"
+          curl -sf http://localhost:3002/api/circuits/communication/feign/patrimoines/1 | grep -q "FEIGN"
+          curl -sf http://localhost:3002/api/circuits/communication/resttemplate/patrimoines/2 | grep -q "RESTTEMPLATE"
+          curl -sf http://localhost:3002/api/circuits/communication/webclient/patrimoines/3 | grep -q "WEBCLIENT"
+
+          echo "3. Création d'un circuit via OpenFeign (:3002 -> :3001)"
+          curl -sf -X POST http://localhost:3002/api/circuits -H "Content-Type: application/json" \
+            -d '{"nomCircuit":"Circuit CI","descriptionCircuit":"Test E2E","difficulte":"FACILE","placesMax":20,"prix":5000.0,"etapes":[{"ordre":1,"dureeVisite":60,"patrimoineId":1},{"ordre":2,"dureeVisite":45,"patrimoineId":2}]}' | grep -q '"dureeEstimee":105'
+
+          echo "4. Création d'une réservation vérifiant la disponibilité du circuit (:3004 -> :3002)"
+          curl -sf -X POST http://localhost:3004/api/reservations -H "Content-Type: application/json" \
+            -d '{"nomClient":"Test CI","emailClient":"ci@zig.univ.sn","nombrePlaces":4,"typeReservation":"CIRCUIT","circuitId":1}' | grep -q '"montantTotal":20000.0'
+
+          echo "Tous les tests d'intégration inter-microservices ont réussi !"
+
+  # =========================================================================
+  # 3. DÉPLOIEMENT CONTINU : Validation et Build des Images Docker (TP3)
+  # =========================================================================
+  docker-build:
+    name: Build Docker Images (TP3)
+    runs-on: ubuntu-latest
+    needs: [build-and-test, integration-e2e]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/deploy'
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Téléchargement des JARs compilés
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Placement des JARs dans les dossiers target/ et construction des images Docker
+        run: |
+          for s in config-server discovery-server ms-patrimoine ms-circuit ms-evenement ms-reservation ms-utilisateur ms-notification ms-paiement api-gateway; do
+            mkdir -p "$s/target"
+            cp artifacts/jar-$s/*.jar "$s/target/"
+          done
+          docker compose config -q
+          docker build -t fatylamine/patrimoines:v1 ./ms-patrimoine
+          docker build -t fatylamine/circuits:v1 ./ms-circuit
+          docker build -t fatylamine/evenements:v1 ./ms-evenement
+          docker build -t fatylamine/reservations:v1 ./ms-reservation
+          docker images | grep fatylamine

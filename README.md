@@ -15,16 +15,21 @@ git clone https://github.com/ona79/micro-service.git
 cd micro-service
 ```
 
-### b) Organisation des branches du dépôt
-Le projet est structuré autour de **4 branches** :
-- **`main`** : branche principale stable (version finale validée).
-- **`develop`** : branche de développement actif des microservices.
-- **`test`** : branche dédiée aux tests unitaires, d'intégration et de validation REST (`requests.http`).
-- **`deploy`** : branche dédiée à la conteneurisation Docker (`Dockerfile`, `docker-compose.yml`).
+### b) Organisation des branches et Conditions d'Intégration (CI/CD GitHub Actions)
+Le projet est structuré autour de **4 branches** contrôlées par le pipeline [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml) :
+- **`develop`** : déclenche la compilation Maven (Java 21 + MapStruct) des 10 microservices et les tests d'intégration E2E.
+- **`test`** : exécute les suites de tests unitaires (`JUnit 5`, `Mockito`, `@WebMvcTest`, `@SpringBootTest`) et le scénario d'intégration inter-microservices (`OpenFeign`, `RestTemplate`, `WebClient`).
+- **`deploy`** : conditionnée par la réussite des tests (`needs: [build-and-test, integration-e2e]`), valide `docker-compose.yml` et construit les images Docker (`fatylamine/patrimoines:v1`, `fatylamine/circuits:v1`, etc.).
+- **`main`** : branche principale stable qui exécute l'intégralité de la chaîne (Build + Tests Unitaires + Tests E2E + Build Docker).
 
 Pour basculer sur l'une des branches après le `git clone` :
 ```bash
 git checkout develop   # ou : git checkout test / git checkout deploy / git checkout main
+```
+
+Pour lancer localement toutes les vérifications d'intégration en une seule commande :
+```bash
+./verify-integration.sh
 ```
 
 ---
