@@ -7,7 +7,29 @@
 
 ---
 
-## 1. Cartographie des 10 Microservices
+## 1. Cloner le projet et gérer les branches Git
+
+### a) Cloner le dépôt GitHub
+```bash
+git clone https://github.com/ona79/micro-service.git
+cd micro-service
+```
+
+### b) Organisation des branches du dépôt
+Le projet est structuré autour de **4 branches** :
+- **`main`** : branche principale stable (version finale validée).
+- **`develop`** : branche de développement actif des microservices.
+- **`test`** : branche dédiée aux tests unitaires, d'intégration et de validation REST (`requests.http`).
+- **`deploy`** : branche dédiée à la conteneurisation Docker (`Dockerfile`, `docker-compose.yml`).
+
+Pour basculer sur l'une des branches après le `git clone` :
+```bash
+git checkout develop   # ou : git checkout test / git checkout deploy / git checkout main
+```
+
+---
+
+## 2. Cartographie des 10 Microservices
 
 | Microservice | Port | Base de données H2 | Rôle & Appels inter-services |
 |---|---|---|---|
@@ -24,18 +46,26 @@
 
 ---
 
-## 2. Compilation et Tests (Maven)
+## 3. Compilation et Lancement (Maven)
 
-Dans chaque dossier de microservice :
+Prérequis : **Java 21** installé. Dans le dossier du microservice souhaité (ex. `ms-patrimoine`) :
 
 ```bash
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./mvnw clean package
-JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./mvnw spring-boot:run
+cd ms-patrimoine
+./mvnw clean package
+./mvnw spring-boot:run
+```
+
+Pour compiler tous les microservices d'un seul coup depuis la racine :
+```bash
+for s in config-server discovery-server ms-patrimoine ms-circuit ms-evenement ms-reservation ms-utilisateur ms-notification ms-paiement api-gateway; do
+  (cd "$s" && ./mvnw clean package -DskipTests)
+done
 ```
 
 ---
 
-## 3. Endpoints REST principaux (via API Gateway `:8080` ou en direct)
+## 4. Endpoints REST principaux (via API Gateway `:8080` ou en direct)
 
 - **Patrimoines (`:3001`)** : `GET/POST /api/patrimoines`, `GET/PUT/DELETE /api/patrimoines/{id}`
 - **Circuits (`:3002`)** : `GET/POST /api/circuits`, `GET/PUT/DELETE /api/circuits/{id}`
@@ -51,11 +81,14 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./mvnw spring-boot:run
 
 ---
 
-## 4. Dockerisation (TP 3)
+## 5. Dockerisation (TP 3)
+
+*(Assurez-vous d'avoir compilé les `.jar` avec `./mvnw clean package -DskipTests` avant de construire les images Docker).*
 
 ### a) Image individuelle (exemple `ms-patrimoine`)
 ```bash
 cd ms-patrimoine
+./mvnw clean package -DskipTests
 docker build -t fatylamine/patrimoines:v1 .
 docker run -p 3001:3001 fatylamine/patrimoines:v1
 ```
@@ -64,4 +97,3 @@ docker run -p 3001:3001 fatylamine/patrimoines:v1
 ```bash
 docker compose up --build
 ```
-
