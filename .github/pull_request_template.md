@@ -17,3 +17,4 @@ Décrivez brièvement les modifications apportées dans cette Pull Request.
 - [ ] Tests unitaires et MVC au vert (`./mvnw test`)
 - [ ] Tests d'intégration inter-microservices (`OpenFeign` / `RestTemplate` / `WebClient`)
 - [ ] `Dockerfile` et `docker-compose.yml` valides
+
