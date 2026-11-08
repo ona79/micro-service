@@ -1,0 +1,256 @@
+/* ==========================================================================
+   GLOBAL.CSS — Styles généraux utilisant exclusivement les variables de tokens.css
+   ========================================================================== */
+
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: var(--font-family-base);
+  font-size: 16px;
+  color: var(--color-text-main);
+  background-color: var(--color-bg-page);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-bg-page);
+  color: var(--color-text-main);
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+a {
+  color: var(--color-green-dark);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--color-green-deeper);
+}
+
+h1, h2, h3, h4 {
+  color: var(--color-text-main);
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+p {
+  margin-bottom: var(--space-4);
+}
+
+p:last-child {
+  margin-bottom: 0;
+}
+
+/* Conteneur principal centré */
+.container {
+  width: 100%;
+  max-width: var(--container-max-width);
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+
+/* Espacement vertical d'une page */
+.page-section {
+  padding: var(--space-6) 0 var(--space-10);
+}
+
+/* En-tête de rubrique (pages de liste) */
+.page-header {
+  margin-bottom: var(--space-6);
+  padding: var(--space-6);
+  background: var(--gradient-soft-green);
+  border: 1px solid var(--color-green-light);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.page-header__title {
+  font-size: var(--font-size-2xl);
+  color: var(--color-green-deeper);
+  margin-bottom: var(--space-2);
+}
+
+.page-header__subtitle {
+  font-size: var(--font-size-md);
+  color: var(--color-text-secondary);
+}
+
+/* Grille de cartes responsive (3 colonnes sur grand écran, 2 sur tablette, 1 sur mobile) */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-6);
+}
+
+/* Badges doux */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background-color: var(--color-bg-soft-green);
+  color: var(--color-green-deeper);
+  border: 1px solid var(--color-green-main);
+}
+
+.badge--warm {
+  background-color: var(--color-accent-sand);
+  color: var(--color-accent-warm-text);
+  border-color: var(--color-accent-warm);
+}
+
+.badge--memorial {
+  background-color: var(--color-memorial-bg);
+  color: var(--color-memorial-text);
+  border-color: var(--color-memorial-border);
+}
+
+/* Section "À voir aussi" en bas des pages de détail */
+.related-section {
+  margin-top: var(--space-10);
+  padding-top: var(--space-8);
+  border-top: 2px solid var(--color-border);
+}
+
+.related-section__title {
+  font-size: var(--font-size-xl);
+  margin-bottom: var(--space-5);
+  color: var(--color-green-deeper);
+}
+
+/* Mise en page article de détail (2 colonnes : texte principal + encadré infos pratiques) */
+.detail-layout {
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  gap: var(--space-8);
+  align-items: start;
+}
+
+.detail-header {
+  margin-bottom: var(--space-5);
+}
+
+.detail-header__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.detail-header__title {
+  font-size: var(--font-size-2xl);
+  color: var(--color-text-main);
+}
+
+.detail-media {
+  margin-bottom: var(--space-6);
+}
+
+.detail-media__image {
+  width: 100%;
+  height: 420px;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--color-border);
+}
+
+.detail-media__caption {
+  margin-top: var(--space-2);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-style: italic;
+  text-align: center;
+}
+
+.detail-body {
+  background: var(--color-bg-surface);
+  padding: var(--space-6);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+
+.detail-body h2 {
+  font-size: var(--font-size-lg);
+  color: var(--color-green-deeper);
+  margin-top: var(--space-5);
+  margin-bottom: var(--space-3);
+}
+
+.detail-body h2:first-child {
+  margin-top: 0;
+}
+
+.detail-body p {
+  font-size: var(--font-size-md);
+  color: var(--color-text-secondary);
+  line-height: 1.8;
+}
+
+/* Encadré spécial de recueillement (ex. Mémorial du Joola) */
+.memorial-notice {
+  background-color: var(--color-memorial-bg);
+  border-left: 4px solid var(--color-memorial-border);
+  color: var(--color-memorial-text);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-5);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 920px) {
+  .detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-media__image {
+    height: 280px;
+  }
+}
+
+@media (max-width: 600px) {
+  .container {
+    padding: 0 var(--space-4);
+  }
+
+  .page-header {
+    padding: var(--space-5);
+  }
+
+  .page-header__title {
+    font-size: var(--font-size-xl);
+  }
+
+  .cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+

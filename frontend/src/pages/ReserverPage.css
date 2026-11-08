@@ -1,0 +1,111 @@
+.reserver-layout {
+  display: grid;
+  grid-template-columns: 440px 1fr;
+  gap: var(--space-8);
+  align-items: start;
+}
+
+.reserver-form-card {
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-card);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-md);
+}
+
+.reserver-card-title {
+  font-size: var(--font-size-lg);
+  color: var(--color-green-deeper);
+  margin-bottom: var(--space-4);
+}
+
+.reserver-submit-btn {
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+.reserver-success {
+  background-color: var(--color-success-bg);
+  border: 1px solid var(--color-success-border);
+  color: var(--color-success-text);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+  font-size: var(--font-size-sm);
+}
+
+.reserver-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.reservations-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.reservation-item {
+  background-color: var(--color-bg-surface);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-card);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+
+.reservation-item--annulee {
+  background-color: var(--color-memorial-bg);
+  border-color: var(--color-memorial-border);
+  opacity: 0.85;
+}
+
+.reservation-item__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.reservation-item__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.reservation-item__date {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.reservation-item__title {
+  font-size: var(--font-size-md);
+  margin-bottom: var(--space-3);
+}
+
+.reservation-item__details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.reservation-item__actions {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 960px) {
+  .reserver-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
