@@ -1,4 +1,4 @@
-name: CI/CD Microservices UASZ (Build, Test & Docker Deploy)
+name: CI/CD & Verification Pull Request (UASZ Microservices)
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
       - test
       - deploy
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     branches:
       - main
       - develop
@@ -16,7 +17,32 @@ on:
 
 jobs:
   # =========================================================================
-  # 1. INTÉGRATION CONTINUE : Compilation & Tests (Matrice des 10 services)
+  # 0. CONTRÔLE DU FLUX DE PULL REQUEST (develop -> test -> deploy -> main)
+  # =========================================================================
+  pr-branch-policy:
+    name: Vérification de la politique de branches (PR Gate)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Vérification de la branche source et de la branche cible
+        run: |
+          SOURCE="${{ github.head_ref }}"
+          TARGET="${{ github.base_ref }}"
+          echo "Pull Request détectée : $SOURCE -> $TARGET"
+
+          if [ "$TARGET" = "test" ] && [ "$SOURCE" != "develop" ]; then
+            echo "::warning::Recommandation : la branche 'test' reçoit normalement les PR depuis 'develop' (reçu depuis '$SOURCE')."
+          fi
+          if [ "$TARGET" = "deploy" ] && [ "$SOURCE" != "test" ] && [ "$SOURCE" != "develop" ]; then
+            echo "::warning::Recommandation : la branche 'deploy' reçoit normalement les PR depuis 'test' (reçu depuis '$SOURCE')."
+          fi
+          if [ "$TARGET" = "main" ] && [ "$SOURCE" != "deploy" ] && [ "$SOURCE" != "test" ] && [ "$SOURCE" != "develop" ]; then
+            echo "::warning::Recommandation : la branche 'main' reçoit normalement les PR validées depuis 'deploy' ou 'test'."
+          fi
+
+  # =========================================================================
+  # 1. INTÉGRATION CONTINUE : Compilation & Tests Unitaires (10 services)
+  #    S'exécute sur TOUS les push ET TOUTES les Pull Requests
   # =========================================================================
   build-and-test:
     name: Build & Test (${{ matrix.service }})
@@ -47,7 +73,7 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Compilation et exécution des tests unitaires et d'intégration
+      - name: Compilation, MapStruct et Tests unitaires (${{ matrix.service }})
         working-directory: ./${{ matrix.service }}
         run: |
           chmod +x ./mvnw
@@ -62,12 +88,12 @@ jobs:
 
   # =========================================================================
   # 2. TEST D'INTÉGRATION INTER-MICROSERVICES (OpenFeign, RestTemplate, WebClient)
+  #    S'exécute sur PR ET sur push (develop, test, deploy, main)
   # =========================================================================
   integration-e2e:
     name: Test d'Intégration E2E Inter-Microservices
     runs-on: ubuntu-latest
     needs: build-and-test
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/test' || github.ref == 'refs/heads/develop'
 
     steps:
       - name: Checkout du code
@@ -120,12 +146,16 @@ jobs:
 
   # =========================================================================
   # 3. DÉPLOIEMENT CONTINU : Validation et Build des Images Docker (TP3)
+  #    S'exécute sur push ET sur Pull Request ciblant deploy ou main
   # =========================================================================
   docker-build:
     name: Build Docker Images (TP3)
     runs-on: ubuntu-latest
     needs: [build-and-test, integration-e2e]
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/deploy'
+    if: >
+      github.ref == 'refs/heads/main' ||
+      github.ref == 'refs/heads/deploy' ||
+      (github.event_name == 'pull_request' && (github.base_ref == 'main' || github.base_ref == 'deploy'))
 
     steps:
       - name: Checkout du code
@@ -148,3 +178,20 @@ jobs:
           docker build -t fatylamine/evenements:v1 ./ms-evenement
           docker build -t fatylamine/reservations:v1 ./ms-reservation
           docker images | grep fatylamine
+
+  # =========================================================================
+  # 4. STATUT GLOBAL DE VALIDATION DE LA PULL REQUEST (Status Check unique)
+  # =========================================================================
+  pr-validation-gate:
+    name: Validation Finale PR (All Checks Passed)
+    runs-on: ubuntu-latest
+    needs: [build-and-test, integration-e2e]
+    if: always()
+    steps:
+      - name: Vérification du statut des jobs obligatoires
+        run: |
+          if [ "${{ needs.build-and-test.result }}" != "success" ] || [ "${{ needs.integration-e2e.result }}" != "success" ]; then
+            echo "Échec des conditions d'intégration : la Pull Request ne peut pas être fusionnée."
+            exit 1
+          fi
+          echo "Toutes les conditions d'intégration de la Pull Request sont validées !"
