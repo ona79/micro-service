@@ -1,0 +1,53 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    discovery:
+      enabled: ${DISCOVERY_ENABLED:true}
+    gateway:
+      server:
+        webmvc:
+          routes:
+            - id: ms-patrimoine
+              uri: ${PATRIMOINE_URL:http://localhost:3001}
+              predicates:
+                - Path=/api/patrimoines/**
+            - id: ms-circuit
+              uri: ${CIRCUIT_URL:http://localhost:3002}
+              predicates:
+                - Path=/api/circuits/**
+            - id: ms-evenement
+              uri: ${EVENEMENT_URL:http://localhost:3003}
+              predicates:
+                - Path=/api/evenements/**
+            - id: ms-reservation
+              uri: ${RESERVATION_URL:http://localhost:3004}
+              predicates:
+                - Path=/api/reservations/**
+            - id: ms-utilisateur
+              uri: ${UTILISATEUR_URL:http://localhost:3005}
+              predicates:
+                - Path=/api/utilisateurs/**
+            - id: ms-paiement
+              uri: ${PAIEMENT_URL:http://localhost:3006}
+              predicates:
+                - Path=/api/paiements/**
+            - id: ms-notification
+              uri: ${NOTIFICATION_URL:http://localhost:3007}
+              predicates:
+                - Path=/api/notifications/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}

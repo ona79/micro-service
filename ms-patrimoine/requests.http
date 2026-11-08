@@ -1,0 +1,79 @@
+### Variables
+@baseUrl = http://localhost:3001/api/patrimoines
+
+### 1. POST - Création d'un patrimoine (attendu : 201 Created)
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+  "nomPatrimoine": "Maison de l'Esclave",
+  "codePatrimoine": "PAT-001",
+  "descriptionPatrimoine": "Monument historique situé sur l'île de Gorée.",
+  "historiquePatrimoine": "Construite vers 1776, inscrite au patrimoine mondial de l'UNESCO en 1978.",
+  "adressePatrimoine": "Île de Gorée, Dakar",
+  "capacitePatrimoine": 150,
+  "latitudePatrimoine": 14.6672,
+  "longitudePatrimoine": -17.3990
+}
+
+### 2. GET - Liste des patrimoines (attendu : 200 OK)
+GET {{baseUrl}}
+
+### 3. GET - Patrimoine par id (attendu : 200 OK)
+GET {{baseUrl}}/1
+
+### 4. PUT - Modification du patrimoine 1 (attendu : 200 OK)
+PUT {{baseUrl}}/1
+Content-Type: application/json
+
+{
+  "nomPatrimoine": "Maison de l'Esclave",
+  "codePatrimoine": "PAT-001",
+  "descriptionPatrimoine": "Monument historique situé sur l'île de Gorée.",
+  "historiquePatrimoine": "Construite vers 1776, inscrite au patrimoine mondial de l'UNESCO en 1978.",
+  "adressePatrimoine": "Île de Gorée, Dakar",
+  "capacitePatrimoine": 200,
+  "latitudePatrimoine": 14.6672,
+  "longitudePatrimoine": -17.3990
+}
+
+### 5. DELETE - Suppression du patrimoine 1 (attendu : 204 No Content)
+DELETE {{baseUrl}}/1
+
+### 6. GET - Vérification après suppression (attendu : 404 Not Found)
+GET {{baseUrl}}/1
+
+### 7. GET - Erreur : id inexistant (attendu : 404 Not Found, {"erreur": "..."})
+GET {{baseUrl}}/999
+
+
+### 8. POST - Validation : nom/code vides, capacité négative (attendu : 400, {"erreur": "..."})
+POST {{baseUrl}}
+Content-Type: application/json
+
+{
+  "nomPatrimoine": "",
+  "codePatrimoine": "",
+  "capacitePatrimoine": -1
+}
+
+### 9. POST - JSON mal formé (attendu : 400)
+POST {{baseUrl}}
+Content-Type: application/json
+
+{ ceci n'est pas du json
+
+### 10. GET - Id non numérique (attendu : 400)
+GET {{baseUrl}}/abc
+
+### 11. PUT - Id inexistant (attendu : 404)
+PUT {{baseUrl}}/999
+Content-Type: application/json
+
+{
+  "nomPatrimoine": "Inexistant",
+  "codePatrimoine": "PAT-999"
+}
+
+### 12. Actuator - Santé du service (attendu : 200, {"status":"UP"})
+GET http://localhost:3001/actuator/health

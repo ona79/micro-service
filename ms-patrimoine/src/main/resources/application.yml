@@ -1,0 +1,36 @@
+server:
+  port: 3001
+
+spring:
+  application:
+    name: patrimoine
+  datasource:
+    url: 'jdbc:h2:mem:patrimoinedb'
+  h2:
+    console:
+      enabled: true
+  jackson:
+    deserialization:
+      # Jackson 3 (Boot 4) rejette par défaut un int/float absent du JSON ; on le met à 0
+      fail-on-null-for-primitives: false
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+  cloud:
+    config:
+      enabled: false
+    discovery:
+      enabled: ${DISCOVERY_ENABLED:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}

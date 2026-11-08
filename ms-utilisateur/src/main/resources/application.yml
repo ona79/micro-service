@@ -1,0 +1,35 @@
+server:
+  port: 3005
+
+spring:
+  application:
+    name: utilisateur
+  datasource:
+    url: 'jdbc:h2:mem:utilisateurdb'
+  h2:
+    console:
+      enabled: true
+  jackson:
+    deserialization:
+      fail-on-null-for-primitives: false
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+  cloud:
+    config:
+      enabled: false
+    discovery:
+      enabled: ${DISCOVERY_ENABLED:true}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}

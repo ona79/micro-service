@@ -1,0 +1,54 @@
+### Variables
+@reservationUrl = http://localhost:3004/api/reservations
+
+### 1. POST - Réserver 5 places sur le circuit 1 (vérifie auprès de ms-circuit :3002) -> 201 Created
+POST {{reservationUrl}}
+Content-Type: application/json
+
+{
+  "nomClient": "Moussa Diop",
+  "emailClient": "moussa.diop@zig.univ.sn",
+  "telephoneClient": "+221771234567",
+  "nombrePlaces": 5,
+  "typeReservation": "CIRCUIT",
+  "circuitId": 1
+}
+
+### 2. POST - Réserver 4 places sur l'événement 1 (vérifie auprès de ms-evenement :3003) -> 201 Created
+POST {{reservationUrl}}
+Content-Type: application/json
+
+{
+  "nomClient": "Fatou Ndiaye",
+  "emailClient": "fatou.ndiaye@zig.univ.sn",
+  "telephoneClient": "+221781112233",
+  "nombrePlaces": 4,
+  "typeReservation": "EVENEMENT",
+  "evenementId": 1
+}
+
+### 3. GET - Liste de toutes les réservations (200 OK)
+GET {{reservationUrl}}
+
+### 4. GET - Détail de la réservation 1 enrichi avec le CircuitDto via OpenFeign (200 OK)
+GET {{reservationUrl}}/1
+
+### 5. POST - Erreur : dépassement de la capacité restante du circuit 1 (400 Bad Request)
+POST {{reservationUrl}}
+Content-Type: application/json
+
+{
+  "nomClient": "Groupe Scolaire",
+  "emailClient": "ecole@zig.univ.sn",
+  "telephoneClient": "+221770000000",
+  "nombrePlaces": 100,
+  "typeReservation": "CIRCUIT",
+  "circuitId": 1
+}
+
+### 6. PUT - Annulation de la réservation 1 (libère les 5 places) -> 200 OK
+PUT {{reservationUrl}}/1/annuler
+
+### 7. DELETE - Suppression de la réservation 1 (204 No Content)
+DELETE {{reservationUrl}}/1
+

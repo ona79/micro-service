@@ -1,0 +1,45 @@
+server:
+  port: 3002
+
+spring:
+  application:
+    name: circuit
+  datasource:
+    url: 'jdbc:h2:mem:circuitdb'
+  h2:
+    console:
+      enabled: true
+  jackson:
+    deserialization:
+      fail-on-null-for-primitives: false
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+  cloud:
+    config:
+      enabled: false
+    discovery:
+      enabled: ${DISCOVERY_ENABLED:true}
+    openfeign:
+      client:
+        config:
+          default:
+            connect-timeout: 2000
+            read-timeout: 5000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+
+# URL de ms-patrimoine utilisée par le client Feign (surchargée en Docker via PATRIMOINE_URL)
+patrimoine:
+  url: http://localhost:3001
+
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}

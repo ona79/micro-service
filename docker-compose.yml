@@ -1,0 +1,106 @@
+services:
+  config-server:
+    build: ./config-server
+    image: fatylamine/config-server:v1
+    container_name: config-server
+    ports:
+      - "8888:8888"
+
+  discovery-server:
+    build: ./discovery-server
+    image: fatylamine/discovery-server:v1
+    container_name: discovery-server
+    ports:
+      - "8761:8761"
+
+  ms-patrimoine:
+    build: ./ms-patrimoine
+    image: fatylamine/patrimoines:v1
+    container_name: ms-patrimoine
+    ports:
+      - "3001:3001"
+
+  ms-circuit:
+    build: ./ms-circuit
+    image: fatylamine/circuits:v1
+    container_name: ms-circuit
+    ports:
+      - "3002:3002"
+    environment:
+      - PATRIMOINE_URL=http://ms-patrimoine:3001
+    depends_on:
+      - ms-patrimoine
+
+  ms-evenement:
+    build: ./ms-evenement
+    image: fatylamine/evenements:v1
+    container_name: ms-evenement
+    ports:
+      - "3003:3003"
+    environment:
+      - PATRIMOINE_URL=http://ms-patrimoine:3001
+    depends_on:
+      - ms-patrimoine
+
+  ms-reservation:
+    build: ./ms-reservation
+    image: fatylamine/reservations:v1
+    container_name: ms-reservation
+    ports:
+      - "3004:3004"
+    environment:
+      - CIRCUIT_URL=http://ms-circuit:3002
+      - EVENEMENT_URL=http://ms-evenement:3003
+    depends_on:
+      - ms-circuit
+      - ms-evenement
+
+  ms-utilisateur:
+    build: ./ms-utilisateur
+    image: fatylamine/utilisateurs:v1
+    container_name: ms-utilisateur
+    ports:
+      - "3005:3005"
+
+  ms-notification:
+    build: ./ms-notification
+    image: fatylamine/notifications:v1
+    container_name: ms-notification
+    ports:
+      - "3007:3007"
+
+  ms-paiement:
+    build: ./ms-paiement
+    image: fatylamine/paiements:v1
+    container_name: ms-paiement
+    ports:
+      - "3006:3006"
+    environment:
+      - RESERVATION_URL=http://ms-reservation:3004
+      - NOTIFICATION_URL=http://ms-notification:3007
+    depends_on:
+      - ms-reservation
+      - ms-notification
+
+  api-gateway:
+    build: ./api-gateway
+    image: fatylamine/api-gateway:v1
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - PATRIMOINE_URL=http://ms-patrimoine:3001
+      - CIRCUIT_URL=http://ms-circuit:3002
+      - EVENEMENT_URL=http://ms-evenement:3003
+      - RESERVATION_URL=http://ms-reservation:3004
+      - UTILISATEUR_URL=http://ms-utilisateur:3005
+      - PAIEMENT_URL=http://ms-paiement:3006
+      - NOTIFICATION_URL=http://ms-notification:3007
+    depends_on:
+      - ms-patrimoine
+      - ms-circuit
+      - ms-evenement
+      - ms-reservation
+      - ms-utilisateur
+      - ms-paiement
+      - ms-notification

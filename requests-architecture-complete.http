@@ -1,0 +1,82 @@
+### =========================================================================
+### SCÉNARIO COMPLET VIA L'API GATEWAY (port 8080) OU EN DIRECT (3001..3007)
+### =========================================================================
+@gateway = http://localhost:8080
+
+### 1. Inscription d'un touriste via ms-utilisateur (:3005 via Gateway :8080)
+POST {{gateway}}/api/utilisateurs
+Content-Type: application/json
+
+{
+  "nom": "Diop",
+  "prenom": "Moussa",
+  "email": "moussa.diop@zig.univ.sn",
+  "motDePasse": "Passer123!",
+  "telephone": "+221771234567",
+  "role": "TOURISTE"
+}
+
+### 2. Connexion de l'utilisateur
+POST {{gateway}}/api/utilisateurs/connexion
+Content-Type: application/json
+
+{
+  "email": "moussa.diop@zig.univ.sn",
+  "motDePasse": "Passer123!"
+}
+
+### 3. Création d'un patrimoine via ms-patrimoine (:3001 via Gateway :8080)
+POST {{gateway}}/api/patrimoines
+Content-Type: application/json
+
+{
+  "nomPatrimoine": "Cathédrale Saint-Antoine de Padoue",
+  "codePatrimoine": "PAT-ZIG-01",
+  "descriptionPatrimoine": "Édifice historique emblématique de Ziguinchor.",
+  "historiquePatrimoine": "Construite à l'époque coloniale au coeur de Ziguinchor.",
+  "adressePatrimoine": "Centre-ville, Ziguinchor",
+  "capacitePatrimoine": 300,
+  "latitudePatrimoine": 12.5833,
+  "longitudePatrimoine": -16.2719
+}
+
+### 4. Consultation des circuits via ms-circuit (:3002 via Gateway :8080)
+GET {{gateway}}/api/circuits
+
+### 5. Consultation des événements via ms-evenement (:3003 via Gateway :8080)
+GET {{gateway}}/api/evenements
+
+### 6. Création d'une réservation via ms-reservation (:3004 via Gateway :8080)
+POST {{gateway}}/api/reservations
+Content-Type: application/json
+
+{
+  "nomClient": "Moussa Diop",
+  "emailClient": "moussa.diop@zig.univ.sn",
+  "telephoneClient": "+221771234567",
+  "nombrePlaces": 2,
+  "typeReservation": "EVENEMENT",
+  "evenementId": 1
+}
+
+### 7. Paiement de la réservation 2 via ms-paiement (:3006 -> appelle ms-reservation:3004 + ms-notification:3007)
+POST {{gateway}}/api/paiements
+Content-Type: application/json
+
+{
+  "reservationId": 2,
+  "modePaiement": "WAVE"
+}
+
+### 8. Vérification des notifications envoyées automatiquement (:3007 via Gateway :8080)
+GET {{gateway}}/api/notifications
+
+
+### 9. Démonstration TP2 — Communication inter-microservices via OpenFeign
+GET {{gateway}}/api/circuits/communication/feign/patrimoines/1
+
+### 10. Démonstration TP2 — Communication inter-microservices via RestTemplate
+GET {{gateway}}/api/circuits/communication/resttemplate/patrimoines/2
+
+### 11. Démonstration TP2 — Communication inter-microservices via WebClient
+GET {{gateway}}/api/circuits/communication/webclient/patrimoines/3
