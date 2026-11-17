@@ -24,13 +24,17 @@ public class SessionTokenService {
     public static final String COOKIE_NAME = "PATRIMOINE_SESSION";
     private static final String HMAC_ALGO = "HmacSHA256";
     private static final long DEFAULT_TTL_SECONDS = 8 * 3600L; // 8 heures
+    private static final int MIN_SECRET_BYTES = 32;
 
     private final byte[] secretKey;
     private final Set<String> revokedTokenIds = ConcurrentHashMap.newKeySet();
 
     public SessionTokenService(
-            @Value("${security.session.secret:PatrimoineSenegalUaszSecretKey2026HmacSha256!}") String secret
+            @Value("${security.session.secret}") String secret
     ) {
+        if (secret == null || secret.trim().isEmpty() || secret.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException("Le secret HMAC de session doit être configuré et comporter au moins 32 octets (256 bits d'entropie).");
+        }
         this.secretKey = secret.getBytes(StandardCharsets.UTF_8);
     }
 
