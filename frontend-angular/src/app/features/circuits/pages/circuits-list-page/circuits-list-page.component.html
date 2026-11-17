@@ -1,0 +1,198 @@
+<div class="page-section">
+  <div class="container">
+    <header class="editorial-header">
+      <p class="editorial-header__eyebrow">Carnet d'itinéraires</p>
+      <h1 class="editorial-header__title">Circuits &amp; Parcours Touristiques</h1>
+      <p class="editorial-header__subtitle">
+        Suivez des parcours thématiques reliant plusieurs sites patrimoniaux, avec durée
+        de visite et distance géographique calculées automatiquement.
+      </p>
+    </header>
+
+    <section class="filter-panel" aria-label="Filtres des circuits">
+      <div class="filter-panel__grid">
+        <div class="filter-field filter-field--wide">
+          <label for="cir-search" class="filter-field__label">
+            Recherche par nom ou description
+          </label>
+          <div class="search-wrap">
+            <svg lucideSearch [size]="16" class="search-wrap__icon" aria-hidden="true"></svg>
+            <input
+              id="cir-search"
+              type="search"
+              class="filter-input filter-input--icon"
+              placeholder="Ex: Casamance, Gorée, Dakar..."
+              [ngModel]="search()"
+              (ngModelChange)="search.set($event)"
+            />
+          </div>
+        </div>
+
+        <div class="filter-field">
+          <label for="cir-diff" class="filter-field__label">Difficulté</label>
+          <select
+            id="cir-diff"
+            class="filter-input"
+            [ngModel]="difficulte()"
+            (ngModelChange)="difficulte.set($event)"
+          >
+            <option value="">Toutes les difficultés</option>
+            <option value="FACILE">Facile</option>
+            <option value="MOYEN">Modéré (Moyen)</option>
+            <option value="DIFFICILE">Sportif (Difficile)</option>
+          </select>
+        </div>
+
+        <div class="filter-field">
+          <label for="cir-duree" class="filter-field__label">Durée max (min)</label>
+          <input
+            id="cir-duree"
+            type="number"
+            min="0"
+            step="30"
+            class="filter-input"
+            placeholder="Ex: 240"
+            [ngModel]="dureeMax()"
+            (ngModelChange)="dureeMax.set($event)"
+          />
+        </div>
+
+        <div class="filter-field">
+          <label for="cir-dist" class="filter-field__label">Distance max (km)</label>
+          <input
+            id="cir-dist"
+            type="number"
+            min="0"
+            step="10"
+            class="filter-input"
+            placeholder="Ex: 300"
+            [ngModel]="distanceMax()"
+            (ngModelChange)="distanceMax.set($event)"
+          />
+        </div>
+      </div>
+
+      <div class="filter-panel__footer">
+        <p class="filter-panel__count tabular-nums">
+          <strong>{{ filteredCircuits().length }}</strong>
+          circuit{{ filteredCircuits().length > 1 ? 's' : '' }}
+          @if (store.items().length !== filteredCircuits().length) {
+            <span> sur {{ store.items().length }}</span>
+          }
+        </p>
+        @if (search() || difficulte() || dureeMax() || distanceMax()) {
+          <button type="button" class="btn-reset" (click)="resetFilters()">
+            Réinitialiser les filtres
+          </button>
+        }
+      </div>
+    </section>
+
+    @if (store.loading() && store.items().length === 0) {
+      <app-ui-skeleton-grid [count]="2" variant="rows" label="Chargement des circuits..." />
+    } @else if (store.error() && store.items().length === 0) {
+      <app-ui-error-banner
+        title="Erreur lors du chargement des circuits"
+        [message]="store.error()"
+        [showRetry]="true"
+        (retry)="store.reload()"
+      />
+    } @else if (filteredCircuits().length === 0) {
+      <app-ui-empty-state
+        title="Aucun circuit disponible"
+        description="Aucun circuit ne correspond aux filtres sélectionnés ou aucun parcours n'a encore été créé."
+        actionLabel="Réinitialiser les filtres"
+        [hasAction]="true"
+        (action)="resetFilters()"
+      />
+    } @else {
+      <div class="routes-list">
+        @for (circuit of filteredCircuits(); track circuit.id) {
+          @let stops = getOrderedStops(circuit);
+          @let firstPat = getFirstPatrimoine(circuit);
+          <article class="route-card">
+            <a [routerLink]="['/circuits', circuit.id]" class="route-card__media">
+              <app-ui-patrimoine-image
+                [codePatrimoine]="firstPat?.codePatrimoine"
+                [nomPatrimoine]="firstPat?.nomPatrimoine ?? circuit.nomCircuit"
+              />
+            </a>
+
+            <div class="route-card__body">
+              <div class="route-card__top">
+                <div class="route-card__badges">
+                  <span class="ui-badge ui-badge--ochre">
+                    {{ circuit.difficulte | difficulteLabel }}
+                  </span>
+                  <span class="ui-badge tabular-nums">
+                    {{ stops.length }} étape{{ stops.length > 1 ? 's' : '' }}
+                  </span>
+                </div>
+                <span class="route-card__price tabular-nums">
+                  {{ circuit.prix | fcfaPrice }}
+                </span>
+              </div>
+
+              <h2 class="route-card__title">
+                <a [routerLink]="['/circuits', circuit.id]">{{ circuit.nomCircuit }}</a>
+              </h2>
+
+              <p class="route-card__desc">
+                {{
+                  circuit.descriptionCircuit ||
+                    'Parcours touristique reliant plusieurs sites patrimoniaux majeurs.'
+                }}
+              </p>
+
+              @if (stops.length > 0) {
+                <ol class="stop-chain" aria-label="Aperçu des étapes">
+                  @for (stop of stops; track stop.id || stop.ordre) {
+                    <li class="stop-chain__item">
+                      <span class="stop-chain__num">{{ stop.ordre }}</span>
+                      <span>{{ getStopLabel(stop.patrimoineId, stop.patrimoine) }}</span>
+                    </li>
+                  }
+                </ol>
+              }
+
+              <div class="route-card__footer">
+                <div class="route-metrics tabular-nums">
+                  <span>
+                    <svg lucideClock [size]="15" aria-hidden="true"></svg>
+                    {{ circuit.dureeEstimee | durationMinutes }}
+                  </span>
+                  <span>
+                    <svg lucideRoute [size]="15" aria-hidden="true"></svg>
+                    {{ circuit.distanceTotale || 0 }} km
+                  </span>
+                  <span>
+                    <svg lucideUsers [size]="15" aria-hidden="true"></svg>
+                    {{ circuit.placesMax }} places max
+                  </span>
+                </div>
+
+                <div class="route-actions">
+                  <a
+                    [routerLink]="['/circuits', circuit.id]"
+                    class="route-btn route-btn--secondary"
+                  >
+                    <span>Voir l’itinéraire</span>
+                    <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
+                  </a>
+                  <a
+                    routerLink="/reserver"
+                    [queryParams]="{ type: 'CIRCUIT', circuitId: circuit.id }"
+                    class="route-btn route-btn--primary"
+                  >
+                    <svg lucideTicket [size]="15" aria-hidden="true"></svg>
+                    <span>Réserver</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  </div>
+</div>

@@ -1,0 +1,83 @@
+import { Routes } from '@angular/router';
+import { MainLayoutComponent } from './core/layout/main-layout/main-layout.component';
+
+export const routes: Routes = [
+  {
+    path: '',
+    component: MainLayoutComponent,
+    children: [
+      {
+        path: '',
+        title: 'Accueil',
+        loadComponent: () =>
+          import('./features/home/pages/home-page/home-page.component').then(
+            (m) => m.HomePageComponent
+          ),
+      },
+      {
+        path: 'patrimoines',
+        title: 'Sites & Monuments Patrimoniaux',
+        loadComponent: () =>
+          import(
+            './features/patrimoines/pages/patrimoines-list-page/patrimoines-list-page.component'
+          ).then((m) => m.PatrimoinesListPageComponent),
+      },
+      {
+        path: 'patrimoines/:id',
+        title: 'Fiche Patrimoine',
+        loadComponent: () =>
+          import(
+            './features/patrimoines/pages/patrimoine-detail-page/patrimoine-detail-page.component'
+          ).then((m) => m.PatrimoineDetailPageComponent),
+      },
+      {
+        path: 'circuits',
+        title: 'Circuits Touristiques',
+        loadComponent: () =>
+          import(
+            './features/circuits/pages/circuits-list-page/circuits-list-page.component'
+          ).then((m) => m.CircuitsListPageComponent),
+      },
+      {
+        path: 'circuits/:id',
+        title: 'Détail du Circuit',
+        loadComponent: () =>
+          import(
+            './features/circuits/pages/circuit-detail-page/circuit-detail-page.component'
+          ).then((m) => m.CircuitDetailPageComponent),
+      },
+      {
+        path: 'evenements',
+        title: 'Agenda Culturel',
+        loadComponent: () =>
+          import(
+            './features/evenements/pages/evenements-list-page/evenements-list-page.component'
+          ).then((m) => m.EvenementsListPageComponent),
+      },
+      {
+        path: 'evenements/:id',
+        title: 'Détail de l’Événement',
+        loadComponent: () =>
+          import(
+            './features/evenements/pages/evenement-detail-page/evenement-detail-page.component'
+          ).then((m) => m.EvenementDetailPageComponent),
+      },
+      {
+        path: 'reserver',
+        title: 'Réserver une Visite',
+        loadComponent: () =>
+          import(
+            './features/reservations/pages/reserver-page/reserver-page.component'
+          ).then((m) => m.ReserverPageComponent),
+      },
+      {
+        path: '**',
+        title: 'Page introuvable',
+        loadComponent: () =>
+          import('./core/layout/not-found-page/not-found-page.component').then(
+            (m) => m.NotFoundPageComponent
+          ),
+      },
+    ],
+  },
+];

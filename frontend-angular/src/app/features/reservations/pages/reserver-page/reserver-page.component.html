@@ -1,0 +1,370 @@
+<div class="page-section">
+  <div class="container">
+    <header class="editorial-header">
+      <p class="editorial-header__eyebrow">Comptoir de réservation</p>
+      <h1 class="editorial-header__title">Réserver une Visite ou un Événement</h1>
+      <p class="editorial-header__subtitle">
+        Réservez vos places pour un circuit touristique ou un événement culturel et
+        gérez les réservations enregistrées en temps réel.
+      </p>
+    </header>
+
+    <div class="desk-layout">
+      <!-- Colonne gauche : Configurateur de réservation -->
+      <section class="booking-card" aria-labelledby="booking-form-title">
+        <h2 id="booking-form-title" class="booking-card__title">Nouvelle réservation</h2>
+
+        <app-ui-error-banner
+          title="Réservation refusée"
+          [message]="reservationStore.submitError()"
+        />
+
+        @if (lastCreated(); as created) {
+          <div class="booking-success" role="status">
+            <div class="booking-success__icon" aria-hidden="true">
+              <svg lucideCheck [size]="18"></svg>
+            </div>
+            <div>
+              <strong>Confirmation :</strong> Réservation #{{ created.id }} enregistrée
+              pour {{ created.nomClient }} ({{ created.nombrePlaces }} place(s), montant :
+              <span class="tabular-nums">{{ created.montantTotal | fcfaPrice }}</span
+              >).
+            </div>
+          </div>
+        }
+
+        <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
+          <div class="form-group">
+            <span class="form-label">Type de réservation *</span>
+            <div
+              ngToolbar
+              orientation="horizontal"
+              class="segmented-toggle"
+              aria-label="Choisir le type de réservation"
+            >
+              <button
+                type="button"
+                ngToolbarWidget
+                class="segmented-toggle__btn"
+                [class.segmented-toggle__btn--active]="selectedType() === 'CIRCUIT'"
+                [attr.aria-pressed]="selectedType() === 'CIRCUIT'"
+                (click)="setTypeReservation('CIRCUIT')"
+              >
+                Circuit touristique
+              </button>
+              <button
+                type="button"
+                ngToolbarWidget
+                class="segmented-toggle__btn"
+                [class.segmented-toggle__btn--active]="selectedType() === 'EVENEMENT'"
+                [attr.aria-pressed]="selectedType() === 'EVENEMENT'"
+                (click)="setTypeReservation('EVENEMENT')"
+              >
+                Événement culturel
+              </button>
+            </div>
+          </div>
+
+          @if (selectedType() === 'CIRCUIT') {
+            <div class="form-group">
+              <label for="circuitId" class="form-label">Circuit choisi *</label>
+              <select
+                id="circuitId"
+                formControlName="circuitId"
+                class="form-control"
+                [class.form-control--invalid]="submittedAttempt() && !hasTargetSelection()"
+              >
+                <option value="">-- Sélectionner un circuit --</option>
+                @for (cir of circuitStore.items(); track cir.id) {
+                  <option [value]="cir.id">
+                    {{ cir.nomCircuit }} ({{ cir.prix | fcfaPrice }} — max
+                    {{ cir.placesMax }} places)
+                  </option>
+                }
+              </select>
+              @if (circuitStore.items().length === 0 && !circuitStore.loading()) {
+                <span class="form-help">Aucun circuit enregistré dans ms-circuit.</span>
+              }
+              @if (submittedAttempt() && !hasTargetSelection()) {
+                <span class="form-error">Veuillez sélectionner un circuit.</span>
+              }
+            </div>
+          } @else {
+            <div class="form-group">
+              <label for="evenementId" class="form-label">Événement choisi *</label>
+              <select
+                id="evenementId"
+                formControlName="evenementId"
+                class="form-control"
+                [class.form-control--invalid]="submittedAttempt() && !hasTargetSelection()"
+              >
+                <option value="">-- Sélectionner un événement --</option>
+                @for (ev of evenementStore.items(); track ev.id) {
+                  <option [value]="ev.id">
+                    {{ ev.nomEvenement }} ({{ ev.prix | fcfaPrice }} — max
+                    {{ ev.capaciteMax }} places)
+                  </option>
+                }
+              </select>
+              @if (evenementStore.items().length === 0 && !evenementStore.loading()) {
+                <span class="form-help">Aucun événement enregistré dans ms-evenement.</span>
+              }
+              @if (submittedAttempt() && !hasTargetSelection()) {
+                <span class="form-error">Veuillez sélectionner un événement.</span>
+              }
+            </div>
+          }
+
+          <div class="form-group">
+            <label for="nomClient" class="form-label">Nom complet du visiteur *</label>
+            <input
+              id="nomClient"
+              type="text"
+              formControlName="nomClient"
+              placeholder="Ex: Aminata Diallo"
+              class="form-control"
+              [class.form-control--invalid]="isInvalid('nomClient')"
+            />
+            @if (isInvalid('nomClient')) {
+              <span class="form-error">
+                Le nom complet est obligatoire (2 caractères minimum).
+              </span>
+            }
+          </div>
+
+          <div class="form-row-2">
+            <div class="form-group">
+              <label for="emailClient" class="form-label">Adresse e-mail *</label>
+              <input
+                id="emailClient"
+                type="email"
+                formControlName="emailClient"
+                placeholder="Ex: aminata@uasz.sn"
+                class="form-control"
+                [class.form-control--invalid]="isInvalid('emailClient')"
+              />
+              @if (isInvalid('emailClient')) {
+                <span class="form-error">Veuillez saisir une adresse e-mail valide.</span>
+              }
+            </div>
+
+            <div class="form-group">
+              <label for="telephoneClient" class="form-label">Téléphone</label>
+              <input
+                id="telephoneClient"
+                type="tel"
+                formControlName="telephoneClient"
+                placeholder="Ex: +221 77 000 00 00"
+                class="form-control"
+              />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="nombrePlaces" class="form-label">Nombre de places *</label>
+            <input
+              id="nombrePlaces"
+              type="number"
+              min="1"
+              step="1"
+              formControlName="nombrePlaces"
+              class="form-control"
+              [class.form-control--invalid]="isInvalid('nombrePlaces')"
+            />
+            @if (isInvalid('nombrePlaces')) {
+              <span class="form-error">
+                Indiquez un nombre entier de places supérieur ou égal à 1.
+              </span>
+            }
+          </div>
+
+          @if (estimatedTotal() !== null) {
+            <div class="estimate-box">
+              <span>Estimation du montant total</span>
+              <strong class="tabular-nums">{{ estimatedTotal() | fcfaPrice }}</strong>
+            </div>
+          }
+
+          <button
+            type="submit"
+            class="submit-btn"
+            [disabled]="reservationStore.submitting()"
+          >
+            <svg lucideTicket [size]="17" aria-hidden="true"></svg>
+            <span>
+              {{
+                reservationStore.submitting()
+                  ? 'Enregistrement en cours...'
+                  : 'Confirmer la réservation'
+              }}
+            </span>
+          </button>
+        </form>
+      </section>
+
+      <!-- Colonne droite : Registre des réservations -->
+      <section class="ledger-section" aria-labelledby="ledger-title">
+        <div class="ledger-header">
+          <h2 id="ledger-title" class="booking-card__title tabular-nums">
+            Registre des réservations ({{ reservationStore.items().length }})
+          </h2>
+          <button type="button" class="refresh-btn" (click)="refreshAll()">
+            <svg lucideRefreshCw [size]="14" aria-hidden="true"></svg>
+            <span>Actualiser</span>
+          </button>
+        </div>
+
+        <app-ui-error-banner
+          title="Erreur lors de l’annulation"
+          [message]="reservationStore.cancelError()"
+        />
+
+        <div class="ledger-toolbar">
+          <div class="ledger-search-wrap">
+            <svg lucideSearch [size]="15" class="ledger-search-wrap__icon" aria-hidden="true"></svg>
+            <input
+              type="search"
+              aria-label="Filtrer les réservations"
+              placeholder="Filtrer par visiteur, email, #id..."
+              class="ledger-search"
+              [ngModel]="ledgerSearch()"
+              (ngModelChange)="ledgerSearch.set($event)"
+            />
+          </div>
+
+          <div
+            ngToolbar
+            orientation="horizontal"
+            class="status-tabs"
+            aria-label="Filtrer par statut"
+          >
+            <button
+              type="button"
+              ngToolbarWidget
+              class="status-tab"
+              [class.status-tab--active]="statusFilter() === 'ALL'"
+              (click)="statusFilter.set('ALL')"
+            >
+              Toutes
+            </button>
+            <button
+              type="button"
+              ngToolbarWidget
+              class="status-tab"
+              [class.status-tab--active]="statusFilter() === 'CONFIRMEE'"
+              (click)="statusFilter.set('CONFIRMEE')"
+            >
+              Confirmées
+            </button>
+            <button
+              type="button"
+              ngToolbarWidget
+              class="status-tab"
+              [class.status-tab--active]="statusFilter() === 'ANNULEE'"
+              (click)="statusFilter.set('ANNULEE')"
+            >
+              Annulées
+            </button>
+          </div>
+        </div>
+
+        @if (reservationStore.loading() && reservationStore.items().length === 0) {
+          <app-ui-skeleton-grid [count]="2" variant="rows" label="Chargement des réservations..." />
+        } @else if (reservationStore.listError() && reservationStore.items().length === 0) {
+          <app-ui-error-banner
+            title="Erreur de chargement des réservations"
+            [message]="reservationStore.listError()"
+            [showRetry]="true"
+            (retry)="refreshAll()"
+          />
+        } @else if (filteredReservations().length === 0) {
+          <app-ui-empty-state
+            title="Aucune réservation correspondante"
+            description="Utilisez le formulaire ci-contre pour enregistrer une réservation ou modifiez vos filtres d'affichage."
+          />
+        } @else {
+          <div class="ledger-list">
+            @for (res of filteredReservations(); track res.id) {
+              @let isAnnulee = res.statut === 'ANNULEE';
+              <article
+                class="res-item"
+                [class.res-item--annulee]="isAnnulee"
+              >
+                <div class="res-item__top">
+                  <div class="res-item__badges">
+                    <span class="ui-badge tabular-nums">#{{ res.id }}</span>
+                    <span
+                      class="ui-badge"
+                      [class.ui-badge--ochre]="res.typeReservation === 'CIRCUIT'"
+                    >
+                      {{ res.typeReservation === 'CIRCUIT' ? 'Circuit' : 'Événement' }}
+                    </span>
+                    <span
+                      class="ui-badge"
+                      [class.ui-badge--memorial]="isAnnulee"
+                    >
+                      {{ res.statut }}
+                    </span>
+                  </div>
+                  <span class="res-item__date">{{ res.dateReservation | dateFr }}</span>
+                </div>
+
+                <h3 class="res-item__title">
+                  @if (res.typeReservation === 'CIRCUIT' && res.circuitId) {
+                    <a [routerLink]="['/circuits', res.circuitId]">
+                      {{ resolveCircuitName(res) }}
+                    </a>
+                  } @else if (res.evenementId) {
+                    <a [routerLink]="['/evenements', res.evenementId]">
+                      {{ resolveEvenementName(res) }}
+                    </a>
+                  } @else {
+                    Réservation #{{ res.id }}
+                  }
+                </h3>
+
+                <dl class="res-item__meta">
+                  <div>
+                    <dt>Visiteur</dt>
+                    <dd>{{ res.nomClient }} ({{ res.emailClient }})</dd>
+                  </div>
+                  @if (res.telephoneClient) {
+                    <div>
+                      <dt>Téléphone</dt>
+                      <dd class="tabular-nums">{{ res.telephoneClient }}</dd>
+                    </div>
+                  }
+                  <div>
+                    <dt>Places</dt>
+                    <dd class="tabular-nums">{{ res.nombrePlaces }}</dd>
+                  </div>
+                  <div>
+                    <dt>Montant total</dt>
+                    <dd class="tabular-nums">{{ res.montantTotal | fcfaPrice }}</dd>
+                  </div>
+                </dl>
+
+                @if (!isAnnulee) {
+                  <div class="res-item__actions">
+                    <button
+                      type="button"
+                      class="cancel-btn"
+                      [disabled]="reservationStore.cancelingId() === res.id"
+                      (click)="requestCancellation(res)"
+                    >
+                      {{
+                        reservationStore.cancelingId() === res.id
+                          ? 'Annulation...'
+                          : 'Annuler la réservation'
+                      }}
+                    </button>
+                  </div>
+                }
+              </article>
+            }
+          </div>
+        }
+      </section>
+    </div>
+  </div>
+</div>

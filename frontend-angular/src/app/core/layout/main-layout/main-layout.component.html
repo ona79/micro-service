@@ -1,0 +1,164 @@
+<a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+<div class="app-shell">
+  <header class="topbar">
+    <div class="container topbar__inner">
+      <a routerLink="/" class="brand" (click)="closeMenu()">
+        <span class="brand__emblem" aria-hidden="true">
+          <svg lucideCompass [size]="22"></svg>
+        </span>
+        <span class="brand__text">
+          <span class="brand__name">{{ config.siteName }}</span>
+          <span class="brand__tagline">{{ config.siteSubtitle }}</span>
+        </span>
+      </a>
+
+      <nav class="nav-desktop" aria-label="Navigation principale">
+        <ul class="nav-list">
+          @for (item of navItems; track item.to) {
+            <li>
+              <a
+                [routerLink]="item.to"
+                routerLinkActive="nav-link--active"
+                [routerLinkActiveOptions]="{ exact: item.exact }"
+                class="nav-link"
+              >
+                {{ item.label }}
+              </a>
+            </li>
+          }
+        </ul>
+      </nav>
+
+      <div class="topbar__actions">
+        <form class="header-search" role="search" (ngSubmit)="submitSearch()">
+          <label for="header-search-input" class="sr-only">Rechercher un patrimoine</label>
+          <input
+            id="header-search-input"
+            type="search"
+            name="headerSearch"
+            [(ngModel)]="searchQuery"
+            placeholder="Gorée, Ziguinchor..."
+            class="header-search__input"
+          />
+          <button
+            type="submit"
+            class="header-search__btn"
+            aria-label="Lancer la recherche de patrimoine"
+          >
+            <svg lucideSearch [size]="16" aria-hidden="true"></svg>
+          </button>
+        </form>
+
+        <a routerLink="/reserver" routerLinkActive="cta-reserve--active" class="cta-reserve">
+          <svg lucideTicket [size]="16" aria-hidden="true"></svg>
+          <span>Réserver</span>
+        </a>
+
+        <button
+          type="button"
+          class="burger-btn"
+          [attr.aria-expanded]="menuOpen()"
+          aria-controls="mobile-navigation"
+          aria-label="Ouvrir ou fermer le menu de navigation"
+          (click)="toggleMenu()"
+        >
+          @if (menuOpen()) {
+            <svg lucideX [size]="20" aria-hidden="true"></svg>
+          } @else {
+            <svg lucideMenu [size]="20" aria-hidden="true"></svg>
+          }
+        </button>
+      </div>
+    </div>
+
+    @if (menuOpen()) {
+      <div id="mobile-navigation" class="mobile-drawer">
+        <div class="container mobile-drawer__inner">
+          <form class="mobile-search" role="search" (ngSubmit)="submitSearch()">
+            <label for="mobile-search-input" class="sr-only">Rechercher un patrimoine</label>
+            <input
+              id="mobile-search-input"
+              type="search"
+              name="mobileSearch"
+              [(ngModel)]="searchQuery"
+              placeholder="Rechercher un site, une ville..."
+              class="mobile-search__input"
+            />
+            <button type="submit" class="mobile-search__btn">Rechercher</button>
+          </form>
+
+          <nav aria-label="Navigation mobile">
+            <ul class="mobile-nav-list">
+              @for (item of navItems; track item.to) {
+                <li>
+                  <a
+                    [routerLink]="item.to"
+                    routerLinkActive="mobile-nav-link--active"
+                    [routerLinkActiveOptions]="{ exact: item.exact }"
+                    class="mobile-nav-link"
+                    (click)="closeMenu()"
+                  >
+                    {{ item.label }}
+                  </a>
+                </li>
+              }
+              <li>
+                <a
+                  routerLink="/reserver"
+                  routerLinkActive="mobile-nav-link--active"
+                  class="mobile-nav-link mobile-nav-link--cta"
+                  (click)="closeMenu()"
+                >
+                  Réserver une visite ou un événement
+                </a>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      </div>
+    }
+  </header>
+
+  <main id="main-content" class="app-main" tabindex="-1">
+    <router-outlet />
+  </main>
+
+  <footer class="site-footer">
+    <div class="container site-footer__grid">
+      <div class="site-footer__brand">
+        <h2 class="site-footer__title">{{ config.siteName }}</h2>
+        <p class="site-footer__desc">
+          {{ config.siteSlogan }}. Une plateforme dédiée à la découverte des sites
+          historiques, des itinéraires culturels et de l'agenda patrimonial du Sénégal.
+        </p>
+      </div>
+
+      <div>
+        <h3 class="site-footer__heading">Explorer</h3>
+        <ul class="site-footer__links">
+          @for (item of navItems; track item.to) {
+            <li>
+              <a [routerLink]="item.to">{{ item.label }}</a>
+            </li>
+          }
+          <li>
+            <a routerLink="/reserver">Réserver</a>
+          </li>
+        </ul>
+      </div>
+
+      <div>
+        <h3 class="site-footer__heading">Cadre académique</h3>
+        <p class="site-footer__meta-strong">{{ config.universite.nom }}</p>
+        <p class="site-footer__meta">{{ config.universite.cours }}</p>
+      </div>
+    </div>
+
+    <div class="site-footer__bottom">
+      <div class="container site-footer__bottom-inner">
+        <span>{{ config.siteName }} — Architecture Microservices Spring Boot &amp; Angular</span>
+      </div>
+    </div>
+  </footer>
+</div>
