@@ -5,19 +5,19 @@ services:
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=${POSTGRES_ROOT_PASSWORD:-postgres_root_pass_2026!}
-      - PATRIMOINE_DB_PASSWORD=${PATRIMOINE_DB_PASSWORD:-patrimoine_pass_2026!}
-      - CIRCUIT_DB_PASSWORD=${CIRCUIT_DB_PASSWORD:-circuit_pass_2026!}
-      - EVENEMENT_DB_PASSWORD=${EVENEMENT_DB_PASSWORD:-evenement_pass_2026!}
-      - RESERVATION_DB_PASSWORD=${RESERVATION_DB_PASSWORD:-reservation_pass_2026!}
-      - UTILISATEUR_DB_PASSWORD=${UTILISATEUR_DB_PASSWORD:-utilisateur_pass_2026!}
-      - PAIEMENT_DB_PASSWORD=${PAIEMENT_DB_PASSWORD:-paiement_pass_2026!}
-      - NOTIFICATION_DB_PASSWORD=${NOTIFICATION_DB_PASSWORD:-notification_pass_2026!}
+      - "POSTGRES_PASSWORD=${POSTGRES_ROOT_PASSWORD:?Erreur_POSTGRES_ROOT_PASSWORD_obligatoire}"
+      - "PATRIMOINE_DB_PASSWORD=${PATRIMOINE_DB_PASSWORD:?Erreur_PATRIMOINE_DB_PASSWORD_obligatoire}"
+      - "CIRCUIT_DB_PASSWORD=${CIRCUIT_DB_PASSWORD:?Erreur_CIRCUIT_DB_PASSWORD_obligatoire}"
+      - "EVENEMENT_DB_PASSWORD=${EVENEMENT_DB_PASSWORD:?Erreur_EVENEMENT_DB_PASSWORD_obligatoire}"
+      - "RESERVATION_DB_PASSWORD=${RESERVATION_DB_PASSWORD:?Erreur_RESERVATION_DB_PASSWORD_obligatoire}"
+      - "UTILISATEUR_DB_PASSWORD=${UTILISATEUR_DB_PASSWORD:?Erreur_UTILISATEUR_DB_PASSWORD_obligatoire}"
+      - "PAIEMENT_DB_PASSWORD=${PAIEMENT_DB_PASSWORD:?Erreur_PAIEMENT_DB_PASSWORD_obligatoire}"
+      - "NOTIFICATION_DB_PASSWORD=${NOTIFICATION_DB_PASSWORD:?Erreur_NOTIFICATION_DB_PASSWORD_obligatoire}"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./docker/postgres/init-multi-postgres.sh:/docker-entrypoint-initdb.d/init-multi-postgres.sh:ro
     networks:
-      - internal-net
+      - data-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 3s
@@ -28,11 +28,8 @@ services:
     build: ./discovery-server
     image: fatylamine/discovery-server:v1
     container_name: discovery-server
-    ports:
-      - "8761:8761"
     networks:
-      - internal-net
-      - public-net
+      - app-net
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:8761/actuator/health || exit 1"]
       interval: 5s
@@ -49,10 +46,11 @@ services:
       - DB_PORT=5432
       - DB_NAME=patrimoine_db
       - DB_USER=patrimoine_user
-      - DB_PASSWORD=${PATRIMOINE_DB_PASSWORD:-patrimoine_pass_2026!}
+      - "DB_PASSWORD=${PATRIMOINE_DB_PASSWORD:?Erreur_PATRIMOINE_DB_PASSWORD_obligatoire}"
       - EUREKA_URI=http://discovery-server:8761/eureka
     networks:
-      - internal-net
+      - app-net
+      - data-net
     depends_on:
       postgres:
         condition: service_healthy
@@ -69,10 +67,11 @@ services:
       - DB_PORT=5432
       - DB_NAME=circuit_db
       - DB_USER=circuit_user
-      - DB_PASSWORD=${CIRCUIT_DB_PASSWORD:-circuit_pass_2026!}
+      - "DB_PASSWORD=${CIRCUIT_DB_PASSWORD:?Erreur_CIRCUIT_DB_PASSWORD_obligatoire}"
       - EUREKA_URI=http://discovery-server:8761/eureka
     networks:
-      - internal-net
+      - app-net
+      - data-net
     depends_on:
       postgres:
         condition: service_healthy
@@ -91,10 +90,11 @@ services:
       - DB_PORT=5432
       - DB_NAME=evenement_db
       - DB_USER=evenement_user
-      - DB_PASSWORD=${EVENEMENT_DB_PASSWORD:-evenement_pass_2026!}
+      - "DB_PASSWORD=${EVENEMENT_DB_PASSWORD:?Erreur_EVENEMENT_DB_PASSWORD_obligatoire}"
       - EUREKA_URI=http://discovery-server:8761/eureka
     networks:
-      - internal-net
+      - app-net
+      - data-net
     depends_on:
       postgres:
         condition: service_healthy
@@ -113,10 +113,11 @@ services:
       - DB_PORT=5432
       - DB_NAME=reservation_db
       - DB_USER=reservation_user
-      - DB_PASSWORD=${RESERVATION_DB_PASSWORD:-reservation_pass_2026!}
+      - "DB_PASSWORD=${RESERVATION_DB_PASSWORD:?Erreur_RESERVATION_DB_PASSWORD_obligatoire}"
       - EUREKA_URI=http://discovery-server:8761/eureka
     networks:
-      - internal-net
+      - app-net
+      - data-net
     depends_on:
       postgres:
         condition: service_healthy
@@ -137,11 +138,12 @@ services:
       - DB_PORT=5432
       - DB_NAME=utilisateur_db
       - DB_USER=utilisateur_user
-      - DB_PASSWORD=${UTILISATEUR_DB_PASSWORD:-utilisateur_pass_2026!}
+      - "DB_PASSWORD=${UTILISATEUR_DB_PASSWORD:?Erreur_UTILISATEUR_DB_PASSWORD_obligatoire}"
       - EUREKA_URI=http://discovery-server:8761/eureka
-      - SECURITY_SESSION_SECRET=${SECURITY_SESSION_SECRET:-PatrimoineSenegalUaszSecretKey2026HmacSha256!}
+      - "SECURITY_SESSION_SECRET=${SECURITY_SESSION_SECRET:?Erreur_SECURITY_SESSION_SECRET_obligatoire}"
     networks:
-      - internal-net
+      - app-net
+      - data-net
     depends_on:
       postgres:
         condition: service_healthy
@@ -158,10 +160,11 @@ services:
       - DB_PORT=5432
       - DB_NAME=notification_db
       - DB_USER=notification_user
-      - DB_PASSWORD=${NOTIFICATION_DB_PASSWORD:-notification_pass_2026!}
+      - "DB_PASSWORD=${NOTIFICATION_DB_PASSWORD:?Erreur_NOTIFICATION_DB_PASSWORD_obligatoire}"
       - EUREKA_URI=http://discovery-server:8761/eureka
     networks:
-      - internal-net
+      - app-net
+      - data-net
     depends_on:
       postgres:
         condition: service_healthy
@@ -178,10 +181,11 @@ services:
       - DB_PORT=5432
       - DB_NAME=paiement_db
       - DB_USER=paiement_user
-      - DB_PASSWORD=${PAIEMENT_DB_PASSWORD:-paiement_pass_2026!}
+      - "DB_PASSWORD=${PAIEMENT_DB_PASSWORD:?Erreur_PAIEMENT_DB_PASSWORD_obligatoire}"
       - EUREKA_URI=http://discovery-server:8761/eureka
     networks:
-      - internal-net
+      - app-net
+      - data-net
     depends_on:
       postgres:
         condition: service_healthy
@@ -196,15 +200,12 @@ services:
     build: ./api-gateway
     image: fatylamine/api-gateway:v1
     container_name: api-gateway
-    ports:
-      - "8090:8090"
     environment:
       - PORT=8090
       - EUREKA_URI=http://discovery-server:8761/eureka
-      - SECURITY_SESSION_SECRET=${SECURITY_SESSION_SECRET:-PatrimoineSenegalUaszSecretKey2026HmacSha256!}
+      - "SECURITY_SESSION_SECRET=${SECURITY_SESSION_SECRET:?Erreur_SECURITY_SESSION_SECRET_obligatoire}"
     networks:
-      - internal-net
-      - public-net
+      - app-net
     depends_on:
       - ms-patrimoine
       - ms-circuit
@@ -221,16 +222,20 @@ services:
     ports:
       - "80:80"
     networks:
-      - internal-net
-      - public-net
+      - edge-net
+      - app-net
     depends_on:
       - api-gateway
 
 networks:
-  internal-net:
+  edge-net:
     driver: bridge
-  public-net:
+  app-net:
     driver: bridge
+    internal: true
+  data-net:
+    driver: bridge
+    internal: true
 
 volumes:
   postgres-data:

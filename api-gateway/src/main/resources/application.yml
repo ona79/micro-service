@@ -44,8 +44,10 @@ management:
   endpoints:
     web:
       exposure:
-        include: '*'
-
+        include: 'health,info'
+  endpoint:
+    health:
+      show-details: when_authorized
 
 eureka:
   client:
@@ -54,4 +56,21 @@ eureka:
 
 security:
   session:
-    secret: ${SECURITY_SESSION_SECRET:PatrimoineSenegalUaszSecretKey2026HmacSha256!}
+    secret: ${SECURITY_SESSION_SECRET:dev-secret-key-patrimoine-casamance-uasz-32bytes!}
+
+---
+# Profil PROD : Secrets obligatoires et Actuator durci
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: 'health,info'
+
+security:
+  session:
+    secret: ${SECURITY_SESSION_SECRET:?Variable obligatoire SECURITY_SESSION_SECRET manquante pour la production (min 32 octets)}

@@ -23,12 +23,15 @@ management:
   endpoints:
     web:
       exposure:
-        include: '*'
+        include: 'health,info'
+  endpoint:
+    health:
+      show-details: when_authorized
 
 reservation:
-  url: ${RESERVATION_URL:http://localhost:3004}
+  url: ${RESERVATION_URL:}
 notification:
-  url: ${NOTIFICATION_URL:http://localhost:3007}
+  url: ${NOTIFICATION_URL:}
 
 eureka:
   client:
@@ -83,7 +86,7 @@ spring:
   datasource:
     url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:paiement_db}
     username: ${DB_USER:paiement_user}
-    password: ${DB_PASSWORD:paiement_pass_2026!}
+    password: ${DB_PASSWORD:?Variable obligatoire DB_PASSWORD non definie}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -94,5 +97,11 @@ spring:
     show-sql: false
   flyway:
     enabled: true
-    baseline-on-migrate: true
+    baseline-on-migrate: false
     locations: classpath:db/migration
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: 'health,info'
