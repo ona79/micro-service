@@ -3,22 +3,13 @@ server:
 
 spring:
   application:
-    name: evenement
-  datasource:
-    url: 'jdbc:h2:mem:evenementdb'
-  h2:
-    console:
-      enabled: true
+    name: ms-evenement
+  profiles:
+    default: dev
   jackson:
     deserialization:
       fail-on-null-for-primitives: false
-  jpa:
-    show-sql: true
-    hibernate:
-      ddl-auto: update
   cloud:
-    config:
-      enabled: false
     discovery:
       enabled: ${DISCOVERY_ENABLED:true}
     openfeign:
@@ -35,10 +26,71 @@ management:
         include: '*'
 
 patrimoine:
-  url: http://localhost:3001
-
+  url: ${PATRIMOINE_URL:http://localhost:3001}
 
 eureka:
   client:
     service-url:
       defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}
+
+---
+# Profil DEV : H2 en mémoire pour le développement local
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:h2:mem:evenementdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ''
+  h2:
+    console:
+      enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  flyway:
+    enabled: false
+
+---
+# Profil TEST : H2 en mémoire pour les tests unitaires et intégration CI
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:h2:mem:evenementdb_test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ''
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  flyway:
+    enabled: false
+
+---
+# Profil PROD : PostgreSQL avec migrations Flyway et validation Hibernate
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:evenement_db}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration

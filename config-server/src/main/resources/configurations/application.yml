@@ -1,7 +1,0 @@
-# Configuration partagée servie par config-server (profil native)
-management:
-  endpoints:
-    web:
-      exposure:
-        include: '*'
-
