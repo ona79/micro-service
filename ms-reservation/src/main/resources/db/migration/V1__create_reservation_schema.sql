@@ -1,13 +1,13 @@
 -- =============================================================================
--- Migration V1 : Création du schéma de ms-reservation (PostgreSQL)
+-- Migration V1 : Création du schéma DDL de ms-reservation (PostgreSQL)
 -- =============================================================================
 
-CREATE TABLE IF NOT EXISTS reservation (
+CREATE TABLE reservation (
     id BIGSERIAL PRIMARY KEY,
     nom_client VARCHAR(255) NOT NULL,
     email_client VARCHAR(255) NOT NULL,
     telephone_client VARCHAR(255),
-    nombre_places INT NOT NULL,
+    nombre_places INTEGER NOT NULL,
     date_reservation TIMESTAMP NOT NULL,
     type_reservation VARCHAR(50) NOT NULL,
     statut VARCHAR(50) NOT NULL,
@@ -16,6 +16,6 @@ CREATE TABLE IF NOT EXISTS reservation (
     evenement_id BIGINT
 );
 
-CREATE INDEX IF NOT EXISTS idx_reservation_circuit_id ON reservation(circuit_id);
-CREATE INDEX IF NOT EXISTS idx_reservation_evenement_id ON reservation(evenement_id);
-CREATE INDEX IF NOT EXISTS idx_reservation_email ON reservation(email_client);
+CREATE INDEX idx_reservation_circuit_id ON reservation(circuit_id);
+CREATE INDEX idx_reservation_evenement_id ON reservation(evenement_id);
+CREATE INDEX idx_reservation_email ON reservation(email_client);

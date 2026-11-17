@@ -12,31 +12,31 @@ spring:
         webmvc:
           routes:
             - id: ms-patrimoine
-              uri: ${PATRIMOINE_URL:http://localhost:3001}
+              uri: ${PATRIMOINE_URL:lb://ms-patrimoine}
               predicates:
                 - Path=/api/patrimoines/**
             - id: ms-circuit
-              uri: ${CIRCUIT_URL:http://localhost:3002}
+              uri: ${CIRCUIT_URL:lb://ms-circuit}
               predicates:
                 - Path=/api/circuits/**
             - id: ms-evenement
-              uri: ${EVENEMENT_URL:http://localhost:3003}
+              uri: ${EVENEMENT_URL:lb://ms-evenement}
               predicates:
                 - Path=/api/evenements/**
             - id: ms-reservation
-              uri: ${RESERVATION_URL:http://localhost:3004}
+              uri: ${RESERVATION_URL:lb://ms-reservation}
               predicates:
                 - Path=/api/reservations/**
             - id: ms-utilisateur
-              uri: ${UTILISATEUR_URL:http://localhost:3005}
+              uri: ${UTILISATEUR_URL:lb://ms-utilisateur}
               predicates:
                 - Path=/api/utilisateurs/**
             - id: ms-paiement
-              uri: ${PAIEMENT_URL:http://localhost:3006}
+              uri: ${PAIEMENT_URL:lb://ms-paiement}
               predicates:
                 - Path=/api/paiements/**
             - id: ms-notification
-              uri: ${NOTIFICATION_URL:http://localhost:3007}
+              uri: ${NOTIFICATION_URL:lb://ms-notification}
               predicates:
                 - Path=/api/notifications/**
 
@@ -51,3 +51,7 @@ eureka:
   client:
     service-url:
       defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}
+
+security:
+  session:
+    secret: ${SECURITY_SESSION_SECRET:PatrimoineSenegalUaszSecretKey2026HmacSha256!}

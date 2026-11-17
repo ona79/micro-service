@@ -1,8 +1,8 @@
 -- =============================================================================
--- Migration V1 : Création du schéma de ms-paiement (PostgreSQL)
+-- Migration V1 : Création du schéma DDL de ms-paiement (PostgreSQL)
 -- =============================================================================
 
-CREATE TABLE IF NOT EXISTS paiement (
+CREATE TABLE paiement (
     id BIGSERIAL PRIMARY KEY,
     reference_transaction VARCHAR(255) NOT NULL UNIQUE,
     reservation_id BIGINT NOT NULL,
@@ -12,5 +12,5 @@ CREATE TABLE IF NOT EXISTS paiement (
     date_paiement TIMESTAMP NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_paiement_reference ON paiement(reference_transaction);
-CREATE INDEX IF NOT EXISTS idx_paiement_reservation_id ON paiement(reservation_id);
+CREATE INDEX idx_paiement_reference ON paiement(reference_transaction);
+CREATE INDEX idx_paiement_reservation_id ON paiement(reservation_id);

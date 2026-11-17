@@ -5,7 +5,14 @@ services:
     environment:
       - POSTGRES_DB=postgres
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_ROOT_PASSWORD:-postgres_root_pass_2026!}
+      - PATRIMOINE_DB_PASSWORD=${PATRIMOINE_DB_PASSWORD:-patrimoine_pass_2026!}
+      - CIRCUIT_DB_PASSWORD=${CIRCUIT_DB_PASSWORD:-circuit_pass_2026!}
+      - EVENEMENT_DB_PASSWORD=${EVENEMENT_DB_PASSWORD:-evenement_pass_2026!}
+      - RESERVATION_DB_PASSWORD=${RESERVATION_DB_PASSWORD:-reservation_pass_2026!}
+      - UTILISATEUR_DB_PASSWORD=${UTILISATEUR_DB_PASSWORD:-utilisateur_pass_2026!}
+      - PAIEMENT_DB_PASSWORD=${PAIEMENT_DB_PASSWORD:-paiement_pass_2026!}
+      - NOTIFICATION_DB_PASSWORD=${NOTIFICATION_DB_PASSWORD:-notification_pass_2026!}
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./docker/postgres/init-multi-postgres.sh:/docker-entrypoint-initdb.d/init-multi-postgres.sh:ro
@@ -13,9 +20,9 @@ services:
       - internal-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      interval: 3s
+      timeout: 3s
+      retries: 10
 
   discovery-server:
     build: ./discovery-server
@@ -26,6 +33,11 @@ services:
     networks:
       - internal-net
       - public-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8761/actuator/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   ms-patrimoine:
     build: ./ms-patrimoine
@@ -36,8 +48,8 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_NAME=patrimoine_db
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
+      - DB_USER=patrimoine_user
+      - DB_PASSWORD=${PATRIMOINE_DB_PASSWORD:-patrimoine_pass_2026!}
       - EUREKA_URI=http://discovery-server:8761/eureka
     networks:
       - internal-net
@@ -56,9 +68,8 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_NAME=circuit_db
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - PATRIMOINE_URL=http://ms-patrimoine:3001
+      - DB_USER=circuit_user
+      - DB_PASSWORD=${CIRCUIT_DB_PASSWORD:-circuit_pass_2026!}
       - EUREKA_URI=http://discovery-server:8761/eureka
     networks:
       - internal-net
@@ -79,9 +90,8 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_NAME=evenement_db
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - PATRIMOINE_URL=http://ms-patrimoine:3001
+      - DB_USER=evenement_user
+      - DB_PASSWORD=${EVENEMENT_DB_PASSWORD:-evenement_pass_2026!}
       - EUREKA_URI=http://discovery-server:8761/eureka
     networks:
       - internal-net
@@ -102,10 +112,8 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_NAME=reservation_db
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - CIRCUIT_URL=http://ms-circuit:3002
-      - EVENEMENT_URL=http://ms-evenement:3003
+      - DB_USER=reservation_user
+      - DB_PASSWORD=${RESERVATION_DB_PASSWORD:-reservation_pass_2026!}
       - EUREKA_URI=http://discovery-server:8761/eureka
     networks:
       - internal-net
@@ -128,9 +136,10 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_NAME=utilisateur_db
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
+      - DB_USER=utilisateur_user
+      - DB_PASSWORD=${UTILISATEUR_DB_PASSWORD:-utilisateur_pass_2026!}
       - EUREKA_URI=http://discovery-server:8761/eureka
+      - SECURITY_SESSION_SECRET=${SECURITY_SESSION_SECRET:-PatrimoineSenegalUaszSecretKey2026HmacSha256!}
     networks:
       - internal-net
     depends_on:
@@ -148,8 +157,8 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_NAME=notification_db
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
+      - DB_USER=notification_user
+      - DB_PASSWORD=${NOTIFICATION_DB_PASSWORD:-notification_pass_2026!}
       - EUREKA_URI=http://discovery-server:8761/eureka
     networks:
       - internal-net
@@ -168,10 +177,8 @@ services:
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_NAME=paiement_db
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - RESERVATION_URL=http://ms-reservation:3004
-      - NOTIFICATION_URL=http://ms-notification:3007
+      - DB_USER=paiement_user
+      - DB_PASSWORD=${PAIEMENT_DB_PASSWORD:-paiement_pass_2026!}
       - EUREKA_URI=http://discovery-server:8761/eureka
     networks:
       - internal-net
@@ -193,14 +200,8 @@ services:
       - "8090:8090"
     environment:
       - PORT=8090
-      - PATRIMOINE_URL=http://ms-patrimoine:3001
-      - CIRCUIT_URL=http://ms-circuit:3002
-      - EVENEMENT_URL=http://ms-evenement:3003
-      - RESERVATION_URL=http://ms-reservation:3004
-      - UTILISATEUR_URL=http://ms-utilisateur:3005
-      - PAIEMENT_URL=http://ms-paiement:3006
-      - NOTIFICATION_URL=http://ms-notification:3007
       - EUREKA_URI=http://discovery-server:8761/eureka
+      - SECURITY_SESSION_SECRET=${SECURITY_SESSION_SECRET:-PatrimoineSenegalUaszSecretKey2026HmacSha256!}
     networks:
       - internal-net
       - public-net

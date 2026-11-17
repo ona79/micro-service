@@ -1,5 +1,5 @@
 -- =============================================================================
--- Migration V2 : Données de référence pour ms-circuit
+-- Migration V2 : Données de référence pour ms-circuit (Circuits Casamance)
 -- =============================================================================
 
 INSERT INTO circuit (id, nom_circuit, description_circuit, difficulte, duree_estimee, distance_totale, places_max, prix)
@@ -25,12 +25,14 @@ VALUES
     15000.0
 );
 
-SELECT setval('circuit_id_seq', (SELECT MAX(id) FROM circuit));
+SELECT setval(pg_get_serial_sequence('circuit', 'id'), (SELECT MAX(id) FROM circuit));
 
-INSERT INTO etape (ordre, duree_visite, patrimoine_id, circuit_id)
+INSERT INTO etape (id, ordre, duree_visite, patrimoine_id, circuit_id)
 VALUES
-(1, 60, 1, 1),
-(2, 90, 3, 1),
-(3, 90, 5, 1),
-(1, 60, 3, 2),
-(2, 120, 5, 2);
+(1, 1, 60, 1, 1),
+(2, 2, 90, 3, 1),
+(3, 3, 90, 5, 1),
+(4, 1, 60, 3, 2),
+(5, 2, 120, 5, 2);
+
+SELECT setval(pg_get_serial_sequence('etape', 'id'), (SELECT MAX(id) FROM etape));

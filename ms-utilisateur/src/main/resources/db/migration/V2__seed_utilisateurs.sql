@@ -1,10 +1,11 @@
 -- =============================================================================
--- Migration V2 : Données de référence pour ms-utilisateur
+-- Migration V2 : Données de référence pour ms-utilisateur (Comptes Démo UASZ)
 -- =============================================================================
 
-INSERT INTO utilisateur (nom, prenom, email, mot_de_passe, telephone, role, actif, date_inscription)
+INSERT INTO utilisateur (id, nom, prenom, email, mot_de_passe, telephone, role, actif, date_inscription)
 VALUES
 (
+    1,
     'Faty',
     'Lamine',
     'lamine.faty@univ-zig.sn',
@@ -15,6 +16,7 @@ VALUES
     CURRENT_TIMESTAMP - INTERVAL '30 days'
 ),
 (
+    2,
     'Diop',
     'Moussa',
     'moussa.diop@zig.univ.sn',
@@ -25,6 +27,7 @@ VALUES
     CURRENT_TIMESTAMP - INTERVAL '15 days'
 ),
 (
+    3,
     'Sagna',
     'Awa',
     'awa.sagna@zig.univ.sn',
@@ -34,3 +37,5 @@ VALUES
     TRUE,
     CURRENT_TIMESTAMP - INTERVAL '20 days'
 );
+
+SELECT setval(pg_get_serial_sequence('utilisateur', 'id'), (SELECT MAX(id) FROM utilisateur));

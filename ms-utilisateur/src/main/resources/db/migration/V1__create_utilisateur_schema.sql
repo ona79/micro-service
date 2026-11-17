@@ -1,8 +1,8 @@
 -- =============================================================================
--- Migration V1 : Création du schéma de ms-utilisateur (PostgreSQL)
+-- Migration V1 : Création du schéma DDL de ms-utilisateur (PostgreSQL)
 -- =============================================================================
 
-CREATE TABLE IF NOT EXISTS utilisateur (
+CREATE TABLE utilisateur (
     id BIGSERIAL PRIMARY KEY,
     nom VARCHAR(255) NOT NULL,
     prenom VARCHAR(255) NOT NULL,
@@ -14,4 +14,4 @@ CREATE TABLE IF NOT EXISTS utilisateur (
     date_inscription TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_utilisateur_email ON utilisateur(email);
+CREATE INDEX idx_utilisateur_email ON utilisateur(email);

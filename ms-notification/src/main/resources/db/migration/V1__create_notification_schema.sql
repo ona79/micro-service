@@ -1,8 +1,8 @@
 -- =============================================================================
--- Migration V1 : Création du schéma de ms-notification (PostgreSQL)
+-- Migration V1 : Création du schéma DDL de ms-notification (PostgreSQL)
 -- =============================================================================
 
-CREATE TABLE IF NOT EXISTS notification (
+CREATE TABLE notification (
     id BIGSERIAL PRIMARY KEY,
     destinataire VARCHAR(255) NOT NULL,
     sujet VARCHAR(255) NOT NULL,
@@ -13,5 +13,5 @@ CREATE TABLE IF NOT EXISTS notification (
     reservation_id BIGINT
 );
 
-CREATE INDEX IF NOT EXISTS idx_notification_reservation_id ON notification(reservation_id);
-CREATE INDEX IF NOT EXISTS idx_notification_destinataire ON notification(destinataire);
+CREATE INDEX idx_notification_reservation_id ON notification(reservation_id);
+CREATE INDEX idx_notification_destinataire ON notification(destinataire);

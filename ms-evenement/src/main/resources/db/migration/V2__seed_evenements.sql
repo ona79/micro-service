@@ -1,5 +1,5 @@
 -- =============================================================================
--- Migration V2 : Données de référence pour ms-evenement
+-- Migration V2 : Données de référence pour ms-evenement (Événements Casamance)
 -- =============================================================================
 
 INSERT INTO evenement (id, nom_evenement, description_evenement, type_evenement, date_debut, date_fin, lieu, capacite_max, prix, patrimoine_id)
@@ -41,4 +41,4 @@ VALUES
     5
 );
 
-SELECT setval('evenement_id_seq', (SELECT MAX(id) FROM evenement));
+SELECT setval(pg_get_serial_sequence('evenement', 'id'), (SELECT MAX(id) FROM evenement));

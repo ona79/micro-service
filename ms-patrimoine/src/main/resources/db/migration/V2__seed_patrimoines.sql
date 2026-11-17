@@ -2,9 +2,10 @@
 -- Migration V2 : Données de référence pour ms-patrimoine (Casamance & Sénégal)
 -- =============================================================================
 
-INSERT INTO patrimoine (nom_patrimoine, code_patrimoine, description_patrimoine, historique_patrimoine, adresse_patrimoine, capacite_patrimoine, latitude_patrimoine, longitude_patrimoine)
+INSERT INTO patrimoine (id, nom_patrimoine, code_patrimoine, description_patrimoine, historique_patrimoine, adresse_patrimoine, capacite_patrimoine, latitude_patrimoine, longitude_patrimoine)
 VALUES
 (
+    1,
     'Maison des Esclaves de Gorée',
     'PAT-DKR-001',
     'Monument historique emblématique situé sur l''île de Gorée, dédié à la mémoire de la traite atlantique et célèbre pour sa Porte du voyage sans retour.',
@@ -15,6 +16,7 @@ VALUES
     -17.3990
 ),
 (
+    2,
     'Monument de la Renaissance Africaine',
     'PAT-DKR-002',
     'Statue monumentale en bronze de 52 mètres dominant la presqu''île du Cap-Vert depuis les collines jumelles des Mamelles à Ouakam.',
@@ -25,6 +27,7 @@ VALUES
     -17.4950
 ),
 (
+    3,
     'Cathédrale Saint-Antoine de Padoue',
     'PAT-ZIG-003',
     'Édifice religieux et patrimonial majeur de la Casamance, reconnaissable à ses arches ocres et son architecture soudano-coloniale.',
@@ -35,6 +38,7 @@ VALUES
     -16.2719
 ),
 (
+    4,
     'Pont Faidherbe et Île de Saint-Louis',
     'PAT-SLN-004',
     'Ouvrage d''art métallique de 507 mètres franchissant le fleuve Sénégal pour relier l''île historique de Ndar au continent.',
@@ -45,6 +49,7 @@ VALUES
     -16.5031
 ),
 (
+    5,
     'Cases à Impluvium et Fromager d''Enampore',
     'PAT-CAS-005',
     'Architecture traditionnelle diola en banco et chaume dotée d''une toiture annulaire recueillant les eaux de pluie au centre de l''habitat.',
@@ -55,6 +60,7 @@ VALUES
     -16.4389
 ),
 (
+    6,
     'Musée Théodore-Monod d''Art Africain (IFAN)',
     'PAT-DKR-006',
     'L''un des plus anciens musées d''art et d''ethnographie d''Afrique de l''Ouest, conservant plus de 9 000 pièces patrimoniales.',
@@ -64,3 +70,5 @@ VALUES
     14.6653,
     -17.4367
 );
+
+SELECT setval(pg_get_serial_sequence('patrimoine', 'id'), (SELECT MAX(id) FROM patrimoine));
