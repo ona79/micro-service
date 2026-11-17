@@ -16,9 +16,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "POSTGRES_INTEGRATION_TEST", matches = "true")
 @TestPropertySource(properties = {
-        "spring.datasource.url=jdbc:postgresql://172.20.0.2:5432/evenement_db",
-        "spring.datasource.username=evenement_user",
-        "spring.datasource.password=evenement_pass_2026!",
+        "spring.datasource.url=jdbc:postgresql://${TEST_DB_HOST:localhost}:${TEST_DB_PORT:5432}/evenement_db",
+        "spring.datasource.username=${EVENEMENT_DB_USER:evenement_user}",
+        "spring.datasource.password=${EVENEMENT_DB_PASSWORD:${DB_PASSWORD:}}",
         "spring.cloud.discovery.enabled=false"
 })
 class EvenementPostgresIntegrationTest {

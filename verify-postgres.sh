@@ -13,6 +13,26 @@ fi
 
 export POSTGRES_INTEGRATION_TEST=true
 
+# Découverte dynamique de l'IP du conteneur PostgreSQL (aucun IP codé en dur)
+PG_CONTAINER=$(docker ps --filter "name=postgres" --filter "status=running" --format "{{.ID}}" | head -n 1)
+if [ -n "$PG_CONTAINER" ]; then
+  DYNAMIC_IP=$(docker inspect "$PG_CONTAINER" --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' | tr -d ' ' | head -n 1)
+  export TEST_DB_HOST="${TEST_DB_HOST:-$DYNAMIC_IP}"
+fi
+export TEST_DB_HOST="${TEST_DB_HOST:-localhost}"
+export TEST_DB_PORT="${TEST_DB_PORT:-5432}"
+
+# Mots de passe d'intégration transmis par variables d'environnement (ségrégation moindre privilège)
+export PATRIMOINE_DB_PASSWORD="${PATRIMOINE_DB_PASSWORD:-patrimoine_pass_2026!}"
+export CIRCUIT_DB_PASSWORD="${CIRCUIT_DB_PASSWORD:-circuit_pass_2026!}"
+export EVENEMENT_DB_PASSWORD="${EVENEMENT_DB_PASSWORD:-evenement_pass_2026!}"
+export RESERVATION_DB_PASSWORD="${RESERVATION_DB_PASSWORD:-reservation_pass_2026!}"
+export UTILISATEUR_DB_PASSWORD="${UTILISATEUR_DB_PASSWORD:-utilisateur_pass_2026!}"
+export PAIEMENT_DB_PASSWORD="${PAIEMENT_DB_PASSWORD:-paiement_pass_2026!}"
+export NOTIFICATION_DB_PASSWORD="${NOTIFICATION_DB_PASSWORD:-notification_pass_2026!}"
+
+echo ">>> Cible PostgreSQL : ${TEST_DB_HOST}:${TEST_DB_PORT}"
+
 SERVICES=(
   "ms-patrimoine:PatrimoinePostgresIntegrationTest"
   "ms-circuit:CircuitPostgresIntegrationTest"
