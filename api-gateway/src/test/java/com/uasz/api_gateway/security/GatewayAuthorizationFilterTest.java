@@ -57,6 +57,10 @@ class GatewayAuthorizationFilterTest {
         assertThatThrownBy(() -> new GatewayAuthorizationFilter("   "))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("32 octets");
+
+        assertThatThrownBy(() -> new GatewayAuthorizationFilter("CHANGE_ME_GENERATE_HMAC_SECRET_VIA_OPENSSL_MIN_32_BYTES"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("CHANGE_ME");
     }
 
     @Test

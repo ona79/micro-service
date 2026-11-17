@@ -35,6 +35,9 @@ public class SessionTokenService {
         if (secret == null || secret.trim().isEmpty() || secret.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_BYTES) {
             throw new IllegalStateException("Le secret HMAC de session doit être configuré et comporter au moins 32 octets (256 bits d'entropie).");
         }
+        if (secret.toUpperCase().contains("CHANGE_ME") || secret.toUpperCase().contains("REPLACE_ME")) {
+            throw new IllegalStateException("Le secret HMAC de session ne peut pas être un marqueur d'exemple (CHANGE_ME). Définissez une clé cryptographique aléatoire.");
+        }
         this.secretKey = secret.getBytes(StandardCharsets.UTF_8);
     }
 
