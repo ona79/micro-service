@@ -34,14 +34,14 @@ class OpenFeignCommunicationIntegrationTest {
         public PatrimoineDto getPatrimoineById(@PathVariable("id") Long id) {
             return new PatrimoineDto(
                     id,
-                    "Maison des Esclaves",
-                    "PAT-GOR-001",
-                    "Haut lieu d'histoire et de mémoire",
-                    "Édifiée en 1776 sur l'île de Gorée",
-                    "Île de Gorée, Dakar",
-                    150,
-                    14.6672f,
-                    -17.3990f
+                    "Mémorial du Joola",
+                    "PAT-ZIG-001",
+                    "Lieu de mémoire et de recueillement national",
+                    "Érigé sur les berges du fleuve Casamance à Ziguinchor",
+                    "Ziguinchor, Casamance",
+                    250,
+                    12.5833f,
+                    -16.2719f
             );
         }
     }
@@ -52,8 +52,8 @@ class OpenFeignCommunicationIntegrationTest {
 
         assertThat(dto).isNotNull();
         assertThat(dto.getId()).isEqualTo(1L);
-        assertThat(dto.getNomPatrimoine()).isEqualTo("Maison des Esclaves");
-        assertThat(dto.getCodePatrimoine()).isEqualTo("PAT-GOR-001");
+        assertThat(dto.getNomPatrimoine()).isEqualTo("Mémorial du Joola");
+        assertThat(dto.getCodePatrimoine()).isEqualTo("PAT-ZIG-001");
         System.out.println(">>> [OPENFEIGN INTERSERVICE TEST] Succès de l'appel HTTP Feign : " + dto.getNomPatrimoine() + " (" + dto.getCodePatrimoine() + ") sur port 9991");
     }
 }

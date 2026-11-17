@@ -7,7 +7,7 @@ VALUES
 (
     1,
     'moussa.diop@zig.univ.sn',
-    'Confirmation de réservation - De Gorée à la Casamance',
+    'Confirmation de réservation - Boucle Mémorielle et Culturelle de Casamance',
     'Votre réservation n° 1 pour 2 personnes a été validée avec succès.',
     'EMAIL',
     'ENVOYE',

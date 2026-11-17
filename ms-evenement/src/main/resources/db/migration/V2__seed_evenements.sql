@@ -18,12 +18,12 @@ VALUES
 ),
 (
     2,
-    'Journées Mémorielles et Colloque de Gorée',
-    'Colloque international et visites nocturnes commémoratives à la Maison des Esclaves.',
+    'Journées Mémorielles et Recueillement du Joola',
+    'Colloque commémoratif, veillées du souvenir et visites mémorielles guidées au Mémorial du Joola.',
     'EXPOSITION',
     '2026-11-25 09:00:00',
     '2026-11-26 18:00:00',
-    'Maison des Esclaves, Île de Gorée',
+    'Mémorial du Joola, Berges du Fleuve, Ziguinchor',
     100,
     3000.0,
     1

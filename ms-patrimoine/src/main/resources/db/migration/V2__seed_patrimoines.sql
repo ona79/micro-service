@@ -1,30 +1,31 @@
 -- =============================================================================
--- Migration V2 : Données de référence pour ms-patrimoine (Casamance & Sénégal)
+-- Migration V2 : Données de référence pour ms-patrimoine (Casamance - UASZ)
+-- Purge et ancrage territorial intégral en Casamance (Ziguinchor, Carabane, Oussouye, Enampore, Sédhiou)
 -- =============================================================================
 
 INSERT INTO patrimoine (id, nom_patrimoine, code_patrimoine, description_patrimoine, historique_patrimoine, adresse_patrimoine, capacite_patrimoine, latitude_patrimoine, longitude_patrimoine)
 VALUES
 (
     1,
-    'Maison des Esclaves de Gorée',
-    'PAT-DKR-001',
-    'Monument historique emblématique situé sur l''île de Gorée, dédié à la mémoire de la traite atlantique et célèbre pour sa Porte du voyage sans retour.',
-    'Édifiée vers 1776 sur l''île de Gorée et sauvegardée sous l''impulsion du conservateur Boubacar Joseph Ndiaye, elle figure au patrimoine mondial de l''UNESCO depuis 1978.',
-    'Île de Gorée, Dakar',
-    150,
-    14.6672,
-    -17.3990
+    'Mémorial de la Tragédie du Joola',
+    'PAT-ZIG-001',
+    'Monument national et sanctuaire de mémoire érigé sur les berges du fleuve Casamance à Ziguinchor, dédié aux disparus du 26 septembre 2002.',
+    'Inauguré en janvier 2024 à Ziguinchor, ce haut lieu de mémoire rassemble les archives, objets mémoriels et récits de la plus grande tragédie maritime sénégalaise reliant la Casamance au reste du pays.',
+    'Esplanade du Fleuve Casamance, Boucotte, Ziguinchor',
+    250,
+    12.5833,
+    -16.2719
 ),
 (
     2,
-    'Monument de la Renaissance Africaine',
-    'PAT-DKR-002',
-    'Statue monumentale en bronze de 52 mètres dominant la presqu''île du Cap-Vert depuis les collines jumelles des Mamelles à Ouakam.',
-    'Inauguré le 3 avril 2010 lors du cinquantenaire de l''indépendance du Sénégal, il abrite un musée panoramique retraçant l''histoire des arts et civilisations d''Afrique.',
-    'Collines des Mamelles, Ouakam, Dakar',
-    500,
-    14.7222,
-    -17.4950
+    'Île et Ancien Comptoir de Carabane',
+    'PAT-CRB-002',
+    'Île historique piétonne à l''embouchure du fleuve Casamance, abritant l''ancienne église de mission de 1885 et le cimetière du Capitaine Protet.',
+    'Premier comptoir commercial français en Casamance fondé en 1836, Carabane fut la première capitale administrative de la région avant d''être supplantée par Ziguinchor en 1904.',
+    'Île de Carabane, Embouchure du Fleuve Casamance, Oussouye',
+    200,
+    12.5358,
+    -16.6978
 ),
 (
     3,
@@ -39,36 +40,36 @@ VALUES
 ),
 (
     4,
-    'Pont Faidherbe et Île de Saint-Louis',
-    'PAT-SLN-004',
-    'Ouvrage d''art métallique de 507 mètres franchissant le fleuve Sénégal pour relier l''île historique de Ndar au continent.',
-    'Inauguré en 1897 et restauré à l''identique en 2011, le pont Faidherbe est la porte d''entrée de l''île de Saint-Louis, classée au patrimoine mondial de l''UNESCO en l''an 2000.',
-    'Île de Ndar, Saint-Louis',
-    400,
-    16.0278,
-    -16.5031
+    'Sanctuaire Royal et Bois Sacré d''Oussouye',
+    'PAT-OSS-004',
+    'Résidence du Roi traditionnel d''Oussouye (Maan Sibilumbaye) et haut lieu des traditions animistes, de la royauté sacrée diola et des fêtes agraires (Humabeul).',
+    'Centre spirituel et régulateur de paix de la royauté du Kasa en Basse-Casamance, garant des rites agraires, du culte des ancêtres et de l''harmonie sociale entre les villages.',
+    'Quartier Royal, Oussouye, Basse-Casamance',
+    350,
+    12.4850,
+    -16.5460
 ),
 (
     5,
-    'Cases à Impluvium et Fromager d''Enampore',
+    'Cases à Impluvium et Fromagers Sacrés d''Enampore',
     'PAT-CAS-005',
-    'Architecture traditionnelle diola en banco et chaume dotée d''une toiture annulaire recueillant les eaux de pluie au centre de l''habitat.',
-    'Perpétuée depuis plusieurs siècles en Basse-Casamance autour des grands fromagers sacrés, cette ingénierie vernaculaire incarne l''harmonie bioclimatique et communautaire du pays diola.',
-    'Enampore, Basse-Casamance, Ziguinchor',
+    'Architecture traditionnelle diola en banco et chaume dotée d''une toiture annulaire recueillant les eaux de pluie au centre de l''habitat communautaire.',
+    'Perpétuée depuis plusieurs siècles en Basse-Casamance autour des grands fromagers sacrés, cette ingénierie vernaculaire incarne l''harmonie bioclimatique et communautaire du pays Bandial.',
+    'Enampore, Royaume Bandial, Basse-Casamance',
     120,
     12.5014,
     -16.4389
 ),
 (
     6,
-    'Musée Théodore-Monod d''Art Africain (IFAN)',
-    'PAT-DKR-006',
-    'L''un des plus anciens musées d''art et d''ethnographie d''Afrique de l''Ouest, conservant plus de 9 000 pièces patrimoniales.',
-    'Fondé en 1936 au sein de l''Institut Fondamental d''Afrique Noire (UCAD) sur la place Soweto à Dakar, il est un lieu phare de la Biennale de l''Art Africain Contemporain (Dak''Art).',
-    'Place Soweto, Plateau, Dakar',
-    250,
-    14.6653,
-    -17.4367
+    'Fort Pinet-Laprade et Tata Historique de Sédhiou',
+    'PAT-SED-006',
+    'Fortification historique de Moyenne-Casamance dominant le fleuve, vestige des résistances mandingues et des batailles de Fodé Kaba Doumbouya.',
+    'Construit sur les berges du fleuve Casamance au XIXe siècle, Sédhiou fut un carrefour commercial et stratégique majeur du royaume mandingue du Pakao et de la Moyenne-Casamance.',
+    'Quartier Escale, Berges du Fleuve, Sédhiou, Moyenne-Casamance',
+    180,
+    12.7081,
+    -15.5569
 );
 
 SELECT setval(pg_get_serial_sequence('patrimoine', 'id'), (SELECT MAX(id) FROM patrimoine));

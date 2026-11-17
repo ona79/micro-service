@@ -6,11 +6,11 @@ INSERT INTO circuit (id, nom_circuit, description_circuit, difficulte, duree_est
 VALUES
 (
     1,
-    'De Gorée à la Casamance',
-    'Grand périple mémoriel et culturel reliant l''île de Gorée à Dakar aux sanctuaires et cases traditionnelles de Basse-Casamance.',
+    'Boucle Mémorielle et Culturelle de Casamance',
+    'Grand périple mémoriel et culturel reliant le Mémorial du Joola à Ziguinchor, la cathédrale Saint-Antoine et les cases traditionnelles d''Enampore.',
     'MOYEN',
     240,
-    450.0,
+    45.0,
     20,
     25000.0
 ),
