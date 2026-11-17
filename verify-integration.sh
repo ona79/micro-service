@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 set -e
 
-export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@21}"
+if [ -z "$JAVA_HOME" ] || [ ! -d "$JAVA_HOME" ]; then
+  if [ -d "/usr/lib/jvm/java-21-temurin-jdk" ]; then
+    export JAVA_HOME="/usr/lib/jvm/java-21-temurin-jdk"
+  elif [ -d "/opt/homebrew/opt/openjdk@21" ]; then
+    export JAVA_HOME="/opt/homebrew/opt/openjdk@21"
+  fi
+fi
 
 SERVICES=(
   config-server

@@ -7,12 +7,13 @@ const executablePath = existsSync(CACHED_CHROME) ? CACHED_CHROME : undefined;
 
 export default defineConfig({
   testDir: './e2e',
-  fullyParallel: true,
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: !!process.env['CI'],
   retries: process.env['CI'] ? 1 : 0,
   reporter: 'list',
   use: {
-    baseURL: 'http://127.0.0.1:4299',
+    baseURL: 'http://localhost:4200',
     trace: 'on-first-retry',
     launchOptions: executablePath ? { executablePath } : undefined,
   },
@@ -27,8 +28,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'npx ng serve --host 127.0.0.1 --port 4299',
-    url: 'http://127.0.0.1:4299',
+    command: 'npx ng serve --host 0.0.0.0 --port 4200 --proxy-config proxy.conf.json',
+    url: 'http://localhost:4200',
     reuseExistingServer: !process.env['CI'],
     timeout: 120000,
   },

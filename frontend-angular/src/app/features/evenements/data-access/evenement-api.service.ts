@@ -14,4 +14,12 @@ export class EvenementApiService {
   getById(id: number | string): Observable<Evenement> {
     return this.http.get<Evenement>(`/evenements/${id}`);
   }
+
+  create(payload: Partial<Evenement>): Observable<Evenement> {
+    return this.http.post<Evenement>('/evenements', payload);
+  }
+
+  delete(id: number | string): Observable<void> {
+    return this.http.delete<void>(`/evenements/${id}`);
+  }
 }

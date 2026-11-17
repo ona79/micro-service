@@ -3,11 +3,16 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import {
   LucideCompass,
+  LucideLogOut,
   LucideMenu,
   LucideSearch,
+  LucideShieldCheck,
   LucideTicket,
+  LucideUser,
   LucideX,
 } from '@lucide/angular';
+import { toast } from 'ngx-sonner';
+import { AuthStore } from '../../auth/auth.store';
 import { APP_SITE_CONFIG } from '../../config/site.config';
 
 interface NavItem {
@@ -29,6 +34,9 @@ interface NavItem {
     LucideMenu,
     LucideSearch,
     LucideTicket,
+    LucideUser,
+    LucideShieldCheck,
+    LucideLogOut,
     LucideX,
   ],
   templateUrl: './main-layout.component.html',
@@ -36,6 +44,7 @@ interface NavItem {
 })
 export class MainLayoutComponent {
   protected readonly config = inject(APP_SITE_CONFIG);
+  protected readonly authStore = inject(AuthStore);
   private readonly router = inject(Router);
 
   protected readonly menuOpen = signal(false);
@@ -72,5 +81,12 @@ export class MainLayoutComponent {
     } else {
       void this.router.navigate(['/patrimoines']);
     }
+  }
+
+  protected async logout(): Promise<void> {
+    this.closeMenu();
+    await this.authStore.logout();
+    toast.success('Déconnexion effectuée.');
+    await this.router.navigate(['/connexion']);
   }
 }

@@ -9,14 +9,19 @@ public interface IUtilisateurService {
 
     UtilisateurDto inscrireUtilisateur(UtilisateurDto utilisateurDto);
 
+    UtilisateurDto creerUtilisateurParAdmin(UtilisateurDto utilisateurDto);
+
     UtilisateurDto connecterUtilisateur(ConnexionRequest request);
 
     List<UtilisateurDto> getAllUtilisateurs();
 
     UtilisateurDto getByIdUtilisateur(Long id);
 
-    UtilisateurDto updateUtilisateur(Long id, UtilisateurDto utilisateurDto);
+    UtilisateurDto updateUtilisateur(Long id, UtilisateurDto utilisateurDto, boolean isAdminCaller);
+
+    default UtilisateurDto updateUtilisateur(Long id, UtilisateurDto utilisateurDto) {
+        return updateUtilisateur(id, utilisateurDto, true);
+    }
 
     void deleteUtilisateur(Long id);
 }
-

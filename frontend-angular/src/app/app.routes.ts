@@ -1,4 +1,5 @@
 import { Routes } from '@angular/router';
+import { authGuard, guestGuard, roleGuard } from './core/guards/auth.guard';
 import { MainLayoutComponent } from './core/layout/main-layout/main-layout.component';
 
 export const routes: Routes = [
@@ -69,6 +70,50 @@ export const routes: Routes = [
           import(
             './features/reservations/pages/reserver-page/reserver-page.component'
           ).then((m) => m.ReserverPageComponent),
+      },
+      {
+        path: 'connexion',
+        title: 'Connexion',
+        canActivate: [guestGuard],
+        loadComponent: () =>
+          import('./features/auth/pages/login-page/login-page.component').then(
+            (m) => m.LoginPageComponent
+          ),
+      },
+      {
+        path: 'inscription',
+        title: 'Inscription',
+        canActivate: [guestGuard],
+        loadComponent: () =>
+          import('./features/auth/pages/register-page/register-page.component').then(
+            (m) => m.RegisterPageComponent
+          ),
+      },
+      {
+        path: 'mon-espace',
+        title: 'Mon Espace Personnel',
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./features/auth/pages/account-page/account-page.component').then(
+            (m) => m.AccountPageComponent
+          ),
+      },
+      {
+        path: 'administration',
+        title: 'Administration & Gestion',
+        canActivate: [authGuard, roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE'])],
+        loadComponent: () =>
+          import(
+            './features/admin/pages/admin-dashboard-page/admin-dashboard-page.component'
+          ).then((m) => m.AdminDashboardPageComponent),
+      },
+      {
+        path: 'acces-refuse',
+        title: 'Accès Refusé (403)',
+        loadComponent: () =>
+          import('./core/layout/forbidden-page/forbidden-page.component').then(
+            (m) => m.ForbiddenPageComponent
+          ),
       },
       {
         path: '**',

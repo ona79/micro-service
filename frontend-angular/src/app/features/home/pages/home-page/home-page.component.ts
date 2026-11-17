@@ -54,7 +54,7 @@ export class HomePageComponent implements OnInit {
 
   protected readonly featuredLead = computed(() => this.patrimoineStore.items()[0] ?? null);
   protected readonly featuredSecondary = computed(() =>
-    this.patrimoineStore.items().slice(1, 3)
+    this.patrimoineStore.items().slice(1, 5)
   );
   protected readonly isLeadMemorial = computed(() => isLieuDeMemoire(this.featuredLead()));
 

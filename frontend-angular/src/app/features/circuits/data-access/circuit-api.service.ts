@@ -14,4 +14,21 @@ export class CircuitApiService {
   getById(id: number | string): Observable<Circuit> {
     return this.http.get<Circuit>(`/circuits/${id}`);
   }
+
+  create(payload: Partial<Circuit>): Observable<Circuit> {
+    return this.http.post<Circuit>('/circuits', payload);
+  }
+
+  delete(id: number | string): Observable<void> {
+    return this.http.delete<void>(`/circuits/${id}`);
+  }
+
+  testerCommunication(
+    mode: 'feign' | 'resttemplate' | 'webclient',
+    patrimoineId: number | string
+  ): Observable<Record<string, unknown>> {
+    return this.http.get<Record<string, unknown>>(
+      `/circuits/communication/${mode}/patrimoines/${patrimoineId}`
+    );
+  }
 }

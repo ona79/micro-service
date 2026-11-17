@@ -1,4 +1,9 @@
-import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
+import {
+  ApplicationConfig,
+  inject,
+  provideAppInitializer,
+  provideBrowserGlobalErrorListeners,
+} from '@angular/core';
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import {
   TitleStrategy,
@@ -7,7 +12,9 @@ import {
   withInMemoryScrolling,
 } from '@angular/router';
 import { routes } from './app.routes';
+import { AuthStore } from './core/auth/auth.store';
 import { apiPrefixInterceptor } from './core/interceptors/api-prefix.interceptor';
+import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { httpErrorInterceptor } from './core/interceptors/http-error.interceptor';
 import { PageTitleStrategy } from './core/services/page-title.strategy';
 
@@ -24,8 +31,12 @@ export const appConfig: ApplicationConfig = {
     ),
     provideHttpClient(
       withFetch(),
-      withInterceptors([apiPrefixInterceptor, httpErrorInterceptor])
+      withInterceptors([apiPrefixInterceptor, authInterceptor, httpErrorInterceptor])
     ),
+    provideAppInitializer(() => {
+      const authStore = inject(AuthStore);
+      return authStore.ensureInitialized();
+    }),
     {
       provide: TitleStrategy,
       useClass: PageTitleStrategy,

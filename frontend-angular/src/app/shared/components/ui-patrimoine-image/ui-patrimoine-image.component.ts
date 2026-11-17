@@ -1,38 +1,32 @@
 import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
-import { LucideLandmark } from '@lucide/angular';
+
+const KNOWN_CODES = new Set([
+  'PAT-DKR-001',
+  'PAT-DKR-002',
+  'PAT-ZIG-003',
+  'PAT-SLN-004',
+  'PAT-CAS-005',
+  'PAT-DKR-006',
+]);
 
 @Component({
   selector: 'app-ui-patrimoine-image',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideLandmark],
   template: `
-    @if (showImage()) {
+    <div class="heritage-media-wrap">
       <img
-        [src]="imageSrc()"
+        [src]="resolvedSrc()"
         [alt]="nomPatrimoine()"
         class="heritage-img"
         loading="lazy"
+        decoding="async"
         (error)="onImageError()"
       />
-    } @else {
-      <div
-        class="heritage-plate"
-        [class.heritage-plate--memorial]="sobriete()"
-        role="img"
-        [attr.aria-label]="nomPatrimoine()"
-      >
-        <div class="heritage-plate__frame">
-          <div class="heritage-plate__icon" aria-hidden="true">
-            <svg lucideLandmark [size]="24"></svg>
-          </div>
-          @if (trimmedCode()) {
-            <span class="heritage-plate__code">{{ trimmedCode() }}</span>
-          }
-          <span class="heritage-plate__name">{{ nomPatrimoine() }}</span>
-        </div>
-      </div>
-    }
+      @if (trimmedCode()) {
+        <span class="heritage-code-pill">{{ trimmedCode() }}</span>
+      }
+    </div>
   `,
   styles: `
     :host {
@@ -41,93 +35,86 @@ import { LucideLandmark } from '@lucide/angular';
       height: 100%;
     }
 
+    .heritage-media-wrap {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 190px;
+      overflow: hidden;
+      background-color: var(--surface-sand);
+    }
+
     .heritage-img {
       width: 100%;
       height: 100%;
+      min-height: 190px;
       object-fit: cover;
       display: block;
+      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
     }
 
-    .heritage-plate {
-      width: 100%;
-      height: 100%;
-      min-height: 180px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: var(--space-5);
-      background:
-        radial-gradient(circle at 85% 20%, rgba(178, 76, 41, 0.08), transparent 55%),
-        linear-gradient(145deg, var(--surface-sand) 0%, var(--brand-soft) 100%);
-      color: var(--brand-primary);
-      text-align: center;
+    :host:hover .heritage-img {
+      transform: scale(1.03);
     }
 
-    .heritage-plate--memorial {
-      background: linear-gradient(
-        145deg,
-        var(--memorial-surface) 0%,
-        var(--memorial-surface-alt) 100%
-      );
-      color: var(--memorial-ink);
-    }
-
-    .heritage-plate__frame {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: var(--space-2);
-      padding: var(--space-4) var(--space-5);
-      border: 1px solid rgba(31, 81, 56, 0.16);
-      border-radius: var(--radius-md);
-      background-color: rgba(255, 255, 255, 0.62);
-      max-width: 90%;
-    }
-
-    .heritage-plate--memorial .heritage-plate__frame {
-      border-color: var(--memorial-border);
-      background-color: rgba(255, 255, 255, 0.55);
-    }
-
-    .heritage-plate__icon {
-      opacity: 0.85;
-    }
-
-    .heritage-plate__code {
+    .heritage-code-pill {
+      position: absolute;
+      bottom: var(--space-3);
+      left: var(--space-3);
+      padding: 0.2rem 0.65rem;
+      border-radius: var(--radius-pill);
+      background-color: rgba(24, 21, 18, 0.76);
+      backdrop-filter: blur(6px);
+      color: #faf6f0;
       font-size: var(--text-xs);
       font-weight: 700;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      padding: 0.15rem 0.6rem;
-      border-radius: var(--radius-pill);
-      background-color: var(--surface-elevated);
-      border: 1px solid var(--border-subtle);
-    }
-
-    .heritage-plate__name {
-      font-family: var(--font-display);
-      font-size: var(--text-md);
-      font-weight: 600;
-      line-height: 1.3;
+      border: 1px solid rgba(255, 255, 255, 0.18);
     }
   `,
 })
 export class UiPatrimoineImageComponent {
   readonly codePatrimoine = input<string | null | undefined>(null);
-  readonly nomPatrimoine = input<string>('Patrimoine culturel');
+  readonly nomPatrimoine = input<string>('Patrimoine culturel du Sénégal');
   readonly sobriete = input<boolean>(false);
 
-  private readonly erroredCode = signal<string | null>(null);
+  private readonly useFallback = signal<boolean>(false);
 
-  protected readonly trimmedCode = computed(() => (this.codePatrimoine() ?? '').trim());
-  protected readonly imageSrc = computed(() =>
-    this.trimmedCode() ? `/images/patrimoines/${this.trimmedCode()}.jpg` : ''
-  );
-  protected readonly showImage = computed(
-    () => Boolean(this.trimmedCode()) && this.erroredCode() !== this.trimmedCode()
-  );
+  protected readonly trimmedCode = computed(() => (this.codePatrimoine() ?? '').trim().toUpperCase());
+
+  protected readonly contextualFallbackSrc = computed(() => {
+    const code = this.trimmedCode();
+    const name = (this.nomPatrimoine() ?? '').toLowerCase();
+    if (this.sobriete() || name.includes('gorée') || name.includes('esclave')) {
+      return '/images/patrimoines/PAT-DKR-001.jpg';
+    }
+    if (code.includes('ZIG') || name.includes('ziguinchor') || name.includes('cathédrale')) {
+      return '/images/patrimoines/PAT-ZIG-003.jpg';
+    }
+    if (code.includes('CAS') || name.includes('casamance') || name.includes('impluvium') || name.includes('enampore')) {
+      return '/images/patrimoines/PAT-CAS-005.jpg';
+    }
+    if (code.includes('SLN') || name.includes('saint-louis') || name.includes('faidherbe')) {
+      return '/images/patrimoines/PAT-SLN-004.jpg';
+    }
+    if (name.includes('musée') || name.includes('ifan') || name.includes('monod')) {
+      return '/images/patrimoines/PAT-DKR-006.jpg';
+    }
+    return '/images/patrimoines/PAT-DKR-002.jpg';
+  });
+
+  protected readonly resolvedSrc = computed(() => {
+    const code = this.trimmedCode();
+    if (!this.useFallback() && code && KNOWN_CODES.has(code)) {
+      return `/images/patrimoines/${code}.jpg`;
+    }
+    return this.contextualFallbackSrc();
+  });
 
   protected onImageError(): void {
-    this.erroredCode.set(this.trimmedCode());
+    if (!this.useFallback()) {
+      this.useFallback.set(true);
+    }
   }
 }

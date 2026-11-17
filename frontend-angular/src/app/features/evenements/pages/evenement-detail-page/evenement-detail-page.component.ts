@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+  untracked,
+} from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import {
@@ -126,7 +135,9 @@ export class EvenementDetailPageComponent {
   constructor() {
     effect(() => {
       const currentId = this.id();
-      void this.loadDetail(currentId);
+      untracked(() => {
+        void this.loadDetail(currentId);
+      });
     });
   }
 

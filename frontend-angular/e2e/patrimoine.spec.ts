@@ -182,6 +182,12 @@ async function setupApiMocks(page: Page) {
 }
 
 test.describe('Patrimoine du Sénégal — Parcours E2E, Responsive & Accessibilité', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route(/^https:\/\/(fonts\.googleapis\.com|fonts\.gstatic\.com|images\.unsplash\.com|tile\.openstreetmap\.org)/, (route) =>
+      route.abort()
+    );
+  });
+
   test('parcourt l’accueil, les patrimoines (et mode mémoire), les circuits et les événements', async ({
     page,
   }) => {
@@ -277,4 +283,124 @@ test.describe('Patrimoine du Sénégal — Parcours E2E, Responsive & Accessibil
     await page.keyboard.press('Escape');
     await expect(page.locator('#mobile-navigation')).toBeHidden();
   });
+
+  test('valide le flux Full-Stack réel (Angular -> API Gateway :8090 -> Microservices :3001..3004 -> H2) sans mock', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'Flux Full-Stack validé sur le profil desktop');
+
+    await page.goto('/');
+    await expect(page.getByText(/\d+ site\(s\) référencé\(s\)/)).toBeVisible();
+
+    // Vérification du circuit réel et de la distance Haversine calculée par ms-circuit -> ms-patrimoine
+    await page.goto('/circuits');
+    await expect(
+      page.getByRole('heading', { name: 'De Gorée à la Casamance : Mémoire et Teranga' })
+    ).toBeVisible();
+
+    await page.getByRole('link', { name: /Voir l’itinéraire/i }).first().click();
+    await expect(page.locator('.timeline-item')).toHaveCount(3);
+    await expect(page.getByText(/284\.08 km/).first()).toBeVisible();
+
+    // Création réelle d'une réservation persistée dans H2 via ms-reservation + ms-circuit
+    await page.goto('/reserver?type=CIRCUIT&circuitId=1');
+    await page.locator('#nomClient').fill('Fatou Ndiaye E2E');
+    await page.locator('#emailClient').fill('fatou.e2e@zig.univ.sn');
+    await page.locator('#telephoneClient').fill('+221770001122');
+    await page.locator('#nombrePlaces').fill('1');
+    await page.getByRole('button', { name: 'Confirmer la réservation' }).click();
+
+    await expect(page.locator('.booking-success')).toContainText('Fatou Ndiaye E2E');
+  });
+
+  test('valide le cycle d’authentification, session HttpOnly, espace personnel et RBAC', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'Parcours validé sur le profil desktop');
+
+    // 1. Accès protégé : /mon-espace redirige un visiteur anonyme vers /connexion
+    await page.goto('/mon-espace');
+    await expect(page).toHaveURL(/\/connexion\?returnUrl=%2Fmon-espace/);
+
+    // 2. Connexion avec compte Touriste réel
+    await page.locator('#login-email').fill('moussa.diop@zig.univ.sn');
+    await page.locator('#login-password').fill('Passer123!');
+    await page.getByRole('button', { name: 'Se connecter' }).click();
+
+    // 3. Redirection automatique vers /mon-espace
+    await expect(page).toHaveURL(/\/mon-espace/, { timeout: 10000 });
+    // La page account affiche le nom dans .account-hero__name (h1)
+    await expect(page.locator('.account-hero__name')).toContainText('Moussa');
+    // Le badge de rôle est dans .account-hero__badges
+    await expect(page.locator('.account-hero__badges .ui-badge--terracotta')).toContainText('Touriste');
+
+    // 4. Présence des sections de réservations et notifications
+    await expect(page.getByText(/Mes réservations/)).toBeVisible();
+    await expect(page.getByText(/Notifications reçues/)).toBeVisible();
+
+    // 5. Tentative d'accès interdit : Touriste accédant à /administration -> 403 Forbidden page
+    await page.goto('/administration');
+    await expect(page).toHaveURL(/\/acces-refuse/);
+    await expect(page.getByRole('heading', { name: 'Autorisation insuffisante pour cette section' })).toBeVisible();
+
+    // 6. Déconnexion via le bouton .btn-logout de la page account
+    await page.goto('/mon-espace');
+    await page.locator('.btn-logout').first().click();
+    await expect(page).toHaveURL(/\/connexion/, { timeout: 8000 });
+
+    // 7. Connexion en tant qu’Administrateur via le formulaire (redirection automatique vers /administration)
+    await page.locator('#login-email').fill('lamine.faty@univ-zig.sn');
+    await page.locator('#login-password').fill('Admin2026!');
+    await page.getByRole('button', { name: 'Se connecter' }).click();
+    await expect(page).toHaveURL(/\/administration/, { timeout: 10000 });
+    await expect(page.getByRole('heading', { name: /Administration du Patrimoine/ })).toBeVisible();
+
+    // 8. Vérification des onglets d’administration
+    await expect(page.locator('.admin-tabs').getByRole('button', { name: /Patrimoines/i })).toBeVisible();
+    await expect(page.locator('.admin-tabs').getByRole('button', { name: /Circuits/i })).toBeVisible();
+    await expect(page.locator('.admin-tabs').getByRole('button', { name: /utilisateurs/i })).toBeVisible();
+
+    // Test de l’onglet Utilisateurs et affichage de la liste RBAC
+    await page.locator('.admin-tabs').getByRole('button', { name: /utilisateurs/i }).click();
+    await expect(page.getByText('lamine.faty@univ-zig.sn')).toBeVisible();
+    await expect(page.getByText('awa.sagna@zig.univ.sn')).toBeVisible();
+
+    // 9. L’administrateur consulte son espace personnel
+    await page.goto('/mon-espace');
+    await expect(page).toHaveURL(/\/mon-espace/);
+    await expect(page.locator('.account-hero__name')).toContainText('Lamine');
+    await expect(page.locator('.account-hero__badges .ui-badge--terracotta')).toContainText('Administrateur');
+  });
+
+  test('valide les actifs photographiques réels et l’illustration architecturale SVG', async ({
+    page,
+    isMobile,
+  }) => {
+    test.skip(isMobile, 'Vérification assets sur profil desktop');
+
+    await setupApiMocks(page);
+    await page.goto('/');
+
+    // Hero banner photographic asset — classe réelle dans le template : .hero-photo-frame
+    const heroImg = page.locator('.hero-photo-frame img');
+    await expect(heroImg).toBeVisible({ timeout: 8000 });
+    await expect(heroImg).toHaveAttribute('src', '/images/hero.jpg');
+
+    // Bannières éditoriales — classe réelle dans le template : .banner-card__media
+    const bannerImages = page.locator('.banner-card__media img');
+    await expect(bannerImages.first()).toBeVisible();
+    await expect(bannerImages).toHaveCount(2);
+
+    // Cartes patrimoines — classe réelle dans le template : .heritage-card
+    const cards = page.locator('.heritage-card');
+    await expect(cards.first()).toBeVisible();
+
+    // État vide avec illustration architecturale SVG
+    await page.goto('/patrimoines?q=TermeInexistantQuiRetourneVide999');
+    await expect(page.locator('.empty-state__illustration svg')).toBeVisible();
+    await expect(page.getByText('Aucun site patrimonial trouvé')).toBeVisible();
+  });
 });
+

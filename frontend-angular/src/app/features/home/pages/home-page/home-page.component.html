@@ -255,3 +255,54 @@
     }
   </div>
 </section>
+
+<section class="editorial-banners">
+  <div class="container editorial-banners__grid">
+    <article class="banner-card">
+      <div class="banner-card__media">
+        <img
+          src="/images/circuits-banner.jpg"
+          alt="Pirogues traditionnelles et itinéraires fluviaux du Sénégal"
+          loading="lazy"
+          decoding="async"
+        />
+      </div>
+      <div class="banner-card__body">
+        <span class="ui-badge ui-badge--ochre">Parcours &amp; Géodésie Haversine</span>
+        <h2 class="banner-card__title">Itinéraires Culturels Accompagnés</h2>
+        <p class="banner-card__desc">
+          Reliez les monuments de Dakar, de Saint-Louis et de la Casamance à travers des
+          circuits structurés par étapes avec calcul automatique des distances et durées.
+        </p>
+        <a routerLink="/circuits" class="banner-card__cta">
+          <span>Parcourir les circuits ({{ circuitStore.items().length }})</span>
+          <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
+        </a>
+      </div>
+    </article>
+
+    <article class="banner-card">
+      <div class="banner-card__media">
+        <img
+          src="/images/evenements-banner.jpg"
+          alt="Kora et rencontres culturelles au Sénégal"
+          loading="lazy"
+          decoding="async"
+        />
+      </div>
+      <div class="banner-card__body">
+        <span class="ui-badge ui-badge--terracotta">Patrimoine Vivant</span>
+        <h2 class="banner-card__title">Agenda Culturel &amp; Visites Guidées</h2>
+        <p class="banner-card__desc">
+          Participez aux expositions, conférences et visites guidées organisées au sein
+          des sites historiques et réservez vos places en ligne.
+        </p>
+        <a routerLink="/evenements" class="banner-card__cta">
+          <span>Consulter l’agenda ({{ evenementStore.items().length }})</span>
+          <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
+        </a>
+      </div>
+    </article>
+  </div>
+</section>
+
