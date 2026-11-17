@@ -29,9 +29,9 @@ management:
       show-details: when_authorized
 
 circuit:
-  url: ${CIRCUIT_URL:}
+  url: ${CIRCUIT_URL:http://localhost:3002}
 evenement:
-  url: ${EVENEMENT_URL:}
+  url: ${EVENEMENT_URL:http://localhost:3003}
 
 eureka:
   client:

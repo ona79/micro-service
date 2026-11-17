@@ -29,9 +29,9 @@ management:
       show-details: when_authorized
 
 reservation:
-  url: ${RESERVATION_URL:}
+  url: ${RESERVATION_URL:http://localhost:3004}
 notification:
-  url: ${NOTIFICATION_URL:}
+  url: ${NOTIFICATION_URL:http://localhost:3006}
 
 eureka:
   client:

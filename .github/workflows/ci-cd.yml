@@ -126,7 +126,7 @@ jobs:
           done
 
           echo "1. Vérification des patrimoines initiaux (:3001)"
-          curl -sf http://localhost:3001/api/patrimoines | grep -q "PAT-DKR-001"
+          curl -sf http://localhost:3001/api/patrimoines | grep -q "PAT-ZIG-001"
 
           echo "2. Vérification des 3 modes de communication TP2 (:3002 -> :3001)"
           curl -sf http://localhost:3002/api/circuits/communication/feign/patrimoines/1 | grep -q "FEIGN"
