@@ -89,6 +89,11 @@
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
         </dependency>
+        <!-- Spring Cloud LoadBalancer : résolution dynamique Eureka pour OpenFeign -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-loadbalancer</artifactId>
+        </dependency>
         <!-- WebFlux : fournit WebClient (objectif TP2 : RestTemplate, WebClient, OpenFeign) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
