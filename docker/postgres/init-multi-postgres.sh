@@ -12,15 +12,35 @@ echo "=================================================================="
 echo " [PostgreSQL Init] Initialisation sécurisée des 7 bases & utilisateurs"
 echo "=================================================================="
 
-# Définition des 7 couples (Base de données, Utilisateur, Mot de passe)
+# 1. Validation stricte et fail-fast des variables obligatoires (AUCUNE valeur de secours autorisée)
+: "${POSTGRES_USER:=postgres}"
+: "${POSTGRES_DB:=postgres}"
+: "${POSTGRES_PASSWORD:=${POSTGRES_ROOT_PASSWORD:?Variable POSTGRES_ROOT_PASSWORD ou POSTGRES_PASSWORD obligatoire}}"
+: "${PATRIMOINE_DB_PASSWORD:?Variable PATRIMOINE_DB_PASSWORD obligatoire}"
+: "${CIRCUIT_DB_PASSWORD:?Variable CIRCUIT_DB_PASSWORD obligatoire}"
+: "${EVENEMENT_DB_PASSWORD:?Variable EVENEMENT_DB_PASSWORD obligatoire}"
+: "${RESERVATION_DB_PASSWORD:?Variable RESERVATION_DB_PASSWORD obligatoire}"
+: "${UTILISATEUR_DB_PASSWORD:?Variable UTILISATEUR_DB_PASSWORD obligatoire}"
+: "${PAIEMENT_DB_PASSWORD:?Variable PAIEMENT_DB_PASSWORD obligatoire}"
+: "${NOTIFICATION_DB_PASSWORD:?Variable NOTIFICATION_DB_PASSWORD obligatoire}"
+
+# 2. Rejet impératif des marqueurs d'exemples (CHANGE_ME)
+for var in PATRIMOINE_DB_PASSWORD CIRCUIT_DB_PASSWORD EVENEMENT_DB_PASSWORD RESERVATION_DB_PASSWORD UTILISATEUR_DB_PASSWORD PAIEMENT_DB_PASSWORD NOTIFICATION_DB_PASSWORD POSTGRES_PASSWORD; do
+    if [[ "${!var}" == *"CHANGE_ME"* ]]; then
+        echo "[ERREUR CRITIQUE DE SÉCURITÉ] La variable $var contient un marqueur d'exemple 'CHANGE_ME'. Définissez un secret cryptographique réel." >&2
+        exit 1
+    fi
+done
+
+# 3. Définition des 7 couples (Base de données, Utilisateur, Mot de passe) sans AUCUNE valeur par défaut
 SERVICES=(
-    "patrimoine_db:patrimoine_user:${PATRIMOINE_DB_PASSWORD:-patrimoine_pass_2026!}"
-    "circuit_db:circuit_user:${CIRCUIT_DB_PASSWORD:-circuit_pass_2026!}"
-    "evenement_db:evenement_user:${EVENEMENT_DB_PASSWORD:-evenement_pass_2026!}"
-    "reservation_db:reservation_user:${RESERVATION_DB_PASSWORD:-reservation_pass_2026!}"
-    "utilisateur_db:utilisateur_user:${UTILISATEUR_DB_PASSWORD:-utilisateur_pass_2026!}"
-    "paiement_db:paiement_user:${PAIEMENT_DB_PASSWORD:-paiement_pass_2026!}"
-    "notification_db:notification_user:${NOTIFICATION_DB_PASSWORD:-notification_pass_2026!}"
+    "patrimoine_db:patrimoine_user:${PATRIMOINE_DB_PASSWORD}"
+    "circuit_db:circuit_user:${CIRCUIT_DB_PASSWORD}"
+    "evenement_db:evenement_user:${EVENEMENT_DB_PASSWORD}"
+    "reservation_db:reservation_user:${RESERVATION_DB_PASSWORD}"
+    "utilisateur_db:utilisateur_user:${UTILISATEUR_DB_PASSWORD}"
+    "paiement_db:paiement_user:${PAIEMENT_DB_PASSWORD}"
+    "notification_db:notification_user:${NOTIFICATION_DB_PASSWORD}"
 )
 
 for entry in "${SERVICES[@]}"; do
