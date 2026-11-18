@@ -1,0 +1,58 @@
+package com.uasz.ms_patrimoine.security;
+
+import java.util.Collections;
+import java.util.List;
+
+public record SecurityUserContext(
+        Long userId,
+        String role,
+        List<String> permissions,
+        String email,
+        boolean isServiceCall,
+        String serviceName
+) {
+    public SecurityUserContext(Long userId, String role, String email, boolean isServiceCall, String serviceName) {
+        this(userId, role, defaultPermissionsForRole(role), email, isServiceCall, serviceName);
+    }
+
+    public boolean hasPermission(String permission) {
+        return (permissions != null && permissions.contains(permission))
+                || "ADMINISTRATEUR".equals(role);
+    }
+
+    public static List<String> defaultPermissionsForRole(String role) {
+        if (role == null) return Collections.emptyList();
+        return switch (role) {
+            case "TOURISTE" -> List.of(
+                    "PATRIMOINE:LIRE", "CIRCUIT:LIRE", "EVENEMENT:LIRE",
+                    "RESERVATION:CREER", "RESERVATION:LIRE_PROPRE", "RESERVATION:ANNULER_PROPRE",
+                    "PAIEMENT:INITIER", "PAIEMENT:LIRE_PROPRE", "UTILISATEUR:LIRE_PROFIL"
+            );
+            case "GUIDE" -> List.of(
+                    "PATRIMOINE:LIRE", "CIRCUIT:LIRE", "CIRCUIT:MODIFIER",
+                    "EVENEMENT:LIRE", "RESERVATION:LIRE_PROPRE", "UTILISATEUR:LIRE_PROFIL"
+            );
+            case "CONSERVATEUR" -> List.of(
+                    "PATRIMOINE:LIRE", "PATRIMOINE:CREER", "PATRIMOINE:MODIFIER", "PATRIMOINE:SUPPRIMER",
+                    "CIRCUIT:LIRE", "EVENEMENT:LIRE", "UTILISATEUR:LIRE_PROFIL"
+            );
+            case "GESTIONNAIRE_SITE" -> List.of(
+                    "PATRIMOINE:LIRE",
+                    "CIRCUIT:LIRE", "CIRCUIT:CREER", "CIRCUIT:MODIFIER", "CIRCUIT:SUPPRIMER",
+                    "EVENEMENT:LIRE", "EVENEMENT:CREER", "EVENEMENT:MODIFIER", "EVENEMENT:SUPPRIMER",
+                    "RESERVATION:LIRE_TOUT", "RESERVATION:GERER", "UTILISATEUR:LIRE_PROFIL"
+            );
+            case "ADMINISTRATEUR" -> List.of(
+                    "PATRIMOINE:LIRE", "PATRIMOINE:CREER", "PATRIMOINE:MODIFIER", "PATRIMOINE:SUPPRIMER",
+                    "CIRCUIT:LIRE", "CIRCUIT:CREER", "CIRCUIT:MODIFIER", "CIRCUIT:SUPPRIMER",
+                    "EVENEMENT:LIRE", "EVENEMENT:CREER", "EVENEMENT:MODIFIER", "EVENEMENT:SUPPRIMER",
+                    "RESERVATION:CREER", "RESERVATION:LIRE_PROPRE", "RESERVATION:LIRE_TOUT",
+                    "RESERVATION:ANNULER_PROPRE", "RESERVATION:GERER",
+                    "PAIEMENT:INITIER", "PAIEMENT:LIRE_PROPRE", "PAIEMENT:LIRE_TOUT",
+                    "UTILISATEUR:LIRE_PROFIL", "UTILISATEUR:LIRE_TOUT", "UTILISATEUR:CREER_STAFF",
+                    "UTILISATEUR:GERER_ROLES", "UTILISATEUR:SUPPRIMER", "AUDIT:LIRE"
+            );
+            default -> Collections.emptyList();
+        };
+    }
+}

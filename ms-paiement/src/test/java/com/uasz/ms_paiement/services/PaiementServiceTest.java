@@ -10,6 +10,9 @@ import com.uasz.ms_paiement.entities.StatutPaiement;
 import com.uasz.ms_paiement.exceptions.BadRequestException;
 import com.uasz.ms_paiement.mappers.PaiementMapper;
 import com.uasz.ms_paiement.repositories.PaiementRepository;
+import com.uasz.ms_paiement.security.SecurityUserContext;
+import com.uasz.ms_paiement.security.SecurityUserContextHolder;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,12 +49,19 @@ class PaiementServiceTest {
         paiementService = new PaiementService(
                 paiementRepository, paiementMapper, reservationClient, notificationClient
         );
+        SecurityUserContextHolder.setContext(new SecurityUserContext(2L, "TOURISTE", "moussa@uasz.sn", false, null));
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityUserContextHolder.clear();
     }
 
     @Test
     void effectuerPaiement_valideEtDeclencheNotification() {
         ReservationDto res = new ReservationDto(2L, "Moussa Diop", "moussa@uasz.sn",
                 "+221771234567", 2, LocalDateTime.now(), "CIRCUIT", "CONFIRMEE", 30000.0, 1L, null);
+        res.setUtilisateurId(2L);
         when(paiementRepository.existsByReservationIdAndStatut(2L, StatutPaiement.REUSSI)).thenReturn(false);
         when(reservationClient.getReservationById(2L)).thenReturn(res);
         when(paiementRepository.save(any(Paiement.class))).thenAnswer(inv -> {
@@ -64,6 +74,7 @@ class PaiementServiceTest {
         PaiementDto result = paiementService.effectuerPaiement(input);
 
         assertThat(result.getId()).isEqualTo(1L);
+        assertThat(result.getUtilisateurId()).isEqualTo(2L);
         assertThat(result.getReferenceTransaction()).startsWith("PAY-");
         assertThat(result.getMontant()).isEqualTo(30000.0);
         assertThat(result.getStatut()).isEqualTo(StatutPaiement.REUSSI);
@@ -74,6 +85,7 @@ class PaiementServiceTest {
     void effectuerPaiement_reservationAnnulee_leveBadRequest() {
         ReservationDto res = new ReservationDto(2L, "Moussa Diop", "moussa@uasz.sn",
                 null, 2, LocalDateTime.now(), "CIRCUIT", "ANNULEE", 30000.0, 1L, null);
+        res.setUtilisateurId(2L);
         when(paiementRepository.existsByReservationIdAndStatut(2L, StatutPaiement.REUSSI)).thenReturn(false);
         when(reservationClient.getReservationById(2L)).thenReturn(res);
 

@@ -8,10 +8,14 @@ import com.uasz.ms_circuit.dto.PatrimoineDto;
 import com.uasz.ms_circuit.entities.Circuit;
 import com.uasz.ms_circuit.entities.Etape;
 import com.uasz.ms_circuit.exceptions.BadRequestException;
+import com.uasz.ms_circuit.exceptions.ForbiddenException;
 import com.uasz.ms_circuit.exceptions.ResourceNotFoundException;
 import com.uasz.ms_circuit.exceptions.ServiceIndisponibleException;
+import com.uasz.ms_circuit.exceptions.UnauthorizedException;
 import com.uasz.ms_circuit.mappers.CircuitMapper;
 import com.uasz.ms_circuit.repositories.CircuitRepository;
+import com.uasz.ms_circuit.security.SecurityUserContext;
+import com.uasz.ms_circuit.security.SecurityUserContextHolder;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,6 +56,7 @@ public class CircuitService implements ICircuitService {
 
     @Override
     public CircuitDto saveCircuit(CircuitDto circuitDto) {
+        requirePermission("CIRCUIT:CREER");
         Circuit circuit = circuitMapper.toEntity(circuitDto);
         circuit.setId(null);
         circuit.getEtapes().forEach(etape -> etape.setId(null));
@@ -62,7 +67,6 @@ public class CircuitService implements ICircuitService {
     @Override
     @Transactional(readOnly = true)
     public List<CircuitDto> getAllCircuits() {
-        // Liste légère : pas d'appel à ms-patrimoine (seuls les patrimoineId sont renvoyés)
         return circuitRepository.findAll().stream()
                 .map(circuitMapper::toDto)
                 .toList();
@@ -72,7 +76,6 @@ public class CircuitService implements ICircuitService {
     @Transactional(readOnly = true)
     public CircuitDto getByIdCircuit(Long id) {
         Circuit circuit = findCircuit(id);
-        // Enrichissement "tolérant" : si ms-patrimoine est indisponible, on renvoie quand même le circuit
         Map<Long, PatrimoineDto> patrimoines = new HashMap<>();
         for (Etape etape : circuit.getEtapes()) {
             try {
@@ -86,10 +89,10 @@ public class CircuitService implements ICircuitService {
 
     @Override
     public CircuitDto updateCircuit(Long id, CircuitDto circuitDto) {
+        requirePermission("CIRCUIT:MODIFIER");
         Circuit circuit = findCircuit(id);
         circuitMapper.updateEntity(circuitDto, circuit);
 
-        // Remplacement complet des étapes (orphanRemoval supprime les anciennes)
         circuit.getEtapes().clear();
         circuitDto.getEtapes().forEach(etapeDto -> {
             Etape etape = circuitMapper.toEntity(etapeDto);
@@ -104,6 +107,7 @@ public class CircuitService implements ICircuitService {
 
     @Override
     public void deleteCircuit(Long id) {
+        requirePermission("CIRCUIT:SUPPRIMER");
         if (!circuitRepository.existsById(id)) {
             throw new ResourceNotFoundException("Circuit introuvable avec l'id : " + id);
         }
@@ -121,17 +125,24 @@ public class CircuitService implements ICircuitService {
         };
     }
 
-    // ------------------------------------------------------------------ utilitaires
+    private void requirePermission(String permission) {
+        SecurityUserContext caller = SecurityUserContextHolder.getContext();
+        if (caller == null || caller.userId() == null) {
+            throw new UnauthorizedException("Authentification requise pour modifier les circuits.");
+        }
+        if (caller.isServiceCall()) {
+            throw new ForbiddenException("Accès interdit : un appel de service ne peut pas modifier les circuits.");
+        }
+        if (!caller.hasPermission(permission)) {
+            throw new ForbiddenException("Accès interdit : votre rôle (" + caller.role() + ") ne possède pas la permission " + permission + ".");
+        }
+    }
 
     private Circuit findCircuit(Long id) {
         return circuitRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Circuit introuvable avec l'id : " + id));
     }
 
-    /**
-     * Vérifie les étapes (ordre unique, patrimoines existants via OpenFeign),
-     * les trie par ordre puis calcule la durée et la distance totales.
-     */
     private Map<Long, PatrimoineDto> preparerCircuit(Circuit circuit) {
         List<Etape> etapes = circuit.getEtapes();
 
@@ -158,11 +169,10 @@ public class CircuitService implements ICircuitService {
         }
 
         circuit.setDureeEstimee(duree);
-        circuit.setDistanceTotale(Math.round(distance * 100.0) / 100.0); // arrondi à 2 décimales
+        circuit.setDistanceTotale(Math.round(distance * 100.0) / 100.0);
         return patrimoines;
     }
 
-    /** Appel OpenFeign vers ms-patrimoine avec traduction des erreurs */
     private PatrimoineDto recupererPatrimoine(Long patrimoineId) {
         try {
             return patrimoineClient.getPatrimoineById(patrimoineId);
@@ -182,7 +192,6 @@ public class CircuitService implements ICircuitService {
         return dto;
     }
 
-    /** Distance orthodromique (formule de haversine) en kilomètres */
     static double distanceKm(double lat1, double lon1, double lat2, double lon2) {
         double dLat = Math.toRadians(lat2 - lat1);
         double dLon = Math.toRadians(lon2 - lon1);
@@ -192,4 +201,3 @@ public class CircuitService implements ICircuitService {
         return 2 * RAYON_TERRE_KM * Math.asin(Math.sqrt(h));
     }
 }
-

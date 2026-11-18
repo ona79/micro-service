@@ -2,9 +2,14 @@ package com.uasz.ms_patrimoine.services;
 
 import com.uasz.ms_patrimoine.dto.PatrimoineDto;
 import com.uasz.ms_patrimoine.entities.Patrimoine;
+import com.uasz.ms_patrimoine.exceptions.ForbiddenException;
 import com.uasz.ms_patrimoine.exceptions.ResourceNotFoundException;
+import com.uasz.ms_patrimoine.exceptions.UnauthorizedException;
 import com.uasz.ms_patrimoine.mappers.PatrimoineMapper;
 import com.uasz.ms_patrimoine.repositories.PatrimoineRepository;
+import com.uasz.ms_patrimoine.security.SecurityUserContext;
+import com.uasz.ms_patrimoine.security.SecurityUserContextHolder;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,7 +33,6 @@ class PatrimoineServiceTest {
     @Mock
     private PatrimoineRepository patrimoineRepository;
 
-    // Vrai mapper généré par MapStruct (PatrimoineMapperImpl)
     private final PatrimoineMapper patrimoineMapper = Mappers.getMapper(PatrimoineMapper.class);
 
     private PatrimoineService patrimoineService;
@@ -38,6 +42,7 @@ class PatrimoineServiceTest {
     @BeforeEach
     void setUp() {
         patrimoineService = new PatrimoineService(patrimoineRepository, patrimoineMapper);
+        SecurityUserContextHolder.setContext(new SecurityUserContext(4L, "CONSERVATEUR", "fatou@uasz.sn", false, null));
         patrimoine = Patrimoine.builder()
                 .id(1L)
                 .nomPatrimoine("Mémorial du Joola")
@@ -49,6 +54,11 @@ class PatrimoineServiceTest {
                 .latitudePatrimoine(12.5833f)
                 .longitudePatrimoine(-16.2719f)
                 .build();
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityUserContextHolder.clear();
     }
 
     @Test
@@ -67,6 +77,27 @@ class PatrimoineServiceTest {
         assertThat(result.getId()).isEqualTo(1L);
         assertThat(result.getNomPatrimoine()).isEqualTo("Mémorial du Joola");
         assertThat(result.getCapacitePatrimoine()).isEqualTo(250);
+    }
+
+    @Test
+    void rbac_seulsConservateurEtAdministrateurPeuventModifierPatrimoine() {
+        PatrimoineDto dto = patrimoineMapper.toDto(patrimoine);
+
+        // Sans contexte -> 401
+        SecurityUserContextHolder.clear();
+        assertThatThrownBy(() -> patrimoineService.savePatrimoine(dto)).isInstanceOf(UnauthorizedException.class);
+
+        // TOURISTE -> 403
+        SecurityUserContextHolder.setContext(new SecurityUserContext(2L, "TOURISTE", "t@uasz.sn", false, null));
+        assertThatThrownBy(() -> patrimoineService.savePatrimoine(dto)).isInstanceOf(ForbiddenException.class);
+
+        // GUIDE -> 403
+        SecurityUserContextHolder.setContext(new SecurityUserContext(5L, "GUIDE", "g@uasz.sn", false, null));
+        assertThatThrownBy(() -> patrimoineService.updatePatrimoine(1L, dto)).isInstanceOf(ForbiddenException.class);
+
+        // GESTIONNAIRE_SITE -> 403 (ne possède que PATRIMOINE:LIRE)
+        SecurityUserContextHolder.setContext(new SecurityUserContext(3L, "GESTIONNAIRE_SITE", "gs@uasz.sn", false, null));
+        assertThatThrownBy(() -> patrimoineService.deletePatrimoine(1L)).isInstanceOf(ForbiddenException.class);
     }
 
     @Test
@@ -136,4 +167,3 @@ class PatrimoineServiceTest {
         verify(patrimoineRepository, never()).deleteById(any());
     }
 }
-

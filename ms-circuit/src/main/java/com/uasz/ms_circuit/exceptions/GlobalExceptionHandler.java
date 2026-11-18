@@ -29,6 +29,16 @@ public class GlobalExceptionHandler {
         return erreur(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<Map<String, String>> handleUnauthorized(UnauthorizedException ex) {
+        return erreur(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<Map<String, String>> handleForbidden(ForbiddenException ex) {
+        return erreur(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
     @ExceptionHandler(ServiceIndisponibleException.class)
     public ResponseEntity<Map<String, String>> handleServiceIndisponible(ServiceIndisponibleException ex) {
         return erreur(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
@@ -54,7 +64,6 @@ public class GlobalExceptionHandler {
                 "Valeur invalide pour le paramètre '" + ex.getName() + "' : " + ex.getValue());
     }
 
-    /** Toute autre erreur : on garde le statut des erreurs Spring (404 route, 405...), sinon 500 */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleOther(Exception ex) {
         if (ex instanceof ErrorResponse errorResponse) {
@@ -71,4 +80,3 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(Map.of("erreur", message));
     }
 }
-

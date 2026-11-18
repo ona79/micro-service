@@ -6,12 +6,16 @@ import com.uasz.ms_evenement.dto.PatrimoineDto;
 import com.uasz.ms_evenement.entities.Evenement;
 import com.uasz.ms_evenement.entities.TypeEvenement;
 import com.uasz.ms_evenement.exceptions.BadRequestException;
+import com.uasz.ms_evenement.exceptions.ForbiddenException;
 import com.uasz.ms_evenement.exceptions.ResourceNotFoundException;
 import com.uasz.ms_evenement.mappers.EvenementMapper;
 import com.uasz.ms_evenement.repositories.EvenementRepository;
+import com.uasz.ms_evenement.security.SecurityUserContext;
+import com.uasz.ms_evenement.security.SecurityUserContextHolder;
 import feign.FeignException;
 import feign.Request;
 import feign.RequestTemplate;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,8 +49,14 @@ class EvenementServiceTest {
     @BeforeEach
     void setUp() {
         evenementService = new EvenementService(evenementRepository, evenementMapper, patrimoineClient);
+        SecurityUserContextHolder.setContext(new SecurityUserContext(3L, "GESTIONNAIRE_SITE", "awa@uasz.sn", false, null));
         patrimoine = new PatrimoineDto(1L, "Mémorial du Joola", "PAT-ZIG-001", "Desc", "Hist",
                 "Boucotte, Ziguinchor", 150, 12.5833f, -16.2719f);
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityUserContextHolder.clear();
     }
 
     @Test
@@ -67,6 +77,21 @@ class EvenementServiceTest {
         assertThat(saved.getId()).isEqualTo(1L);
         assertThat(saved.getLieu()).isEqualTo("Boucotte, Ziguinchor");
         assertThat(saved.getPatrimoine().getNomPatrimoine()).isEqualTo("Mémorial du Joola");
+    }
+
+    @Test
+    void rbac_interditCreationEvenementPourConservateurGuideEtTouriste() {
+        EvenementDto dto = new EvenementDto(null, "Expo", "Desc", TypeEvenement.EXPOSITION,
+                LocalDateTime.of(2026, 12, 1, 9, 0), LocalDateTime.of(2026, 12, 1, 17, 0), null, 50, 1000.0, 1L, null);
+
+        SecurityUserContextHolder.setContext(new SecurityUserContext(4L, "CONSERVATEUR", "c@uasz.sn", false, null));
+        assertThatThrownBy(() -> evenementService.saveEvenement(dto)).isInstanceOf(ForbiddenException.class);
+
+        SecurityUserContextHolder.setContext(new SecurityUserContext(5L, "GUIDE", "g@uasz.sn", false, null));
+        assertThatThrownBy(() -> evenementService.saveEvenement(dto)).isInstanceOf(ForbiddenException.class);
+
+        SecurityUserContextHolder.setContext(new SecurityUserContext(2L, "TOURISTE", "t@uasz.sn", false, null));
+        assertThatThrownBy(() -> evenementService.deleteEvenement(1L)).isInstanceOf(ForbiddenException.class);
     }
 
     @Test
@@ -116,4 +141,3 @@ class EvenementServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 }
-

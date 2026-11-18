@@ -38,6 +38,12 @@ eureka:
     service-url:
       defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}
 
+security:
+  session:
+    secret: ${SECURITY_SESSION_SECRET:?Variable obligatoire SECURITY_SESSION_SECRET non definie (min 32 octets)}
+  interservice:
+    secret: ${SECURITY_INTERSERVICE_SECRET:?Variable obligatoire SECURITY_INTERSERVICE_SECRET non definie (min 32 octets)}
+
 ---
 # Profil DEV : H2 en mémoire pour le développement local
 spring:

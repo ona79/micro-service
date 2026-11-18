@@ -8,10 +8,14 @@ import com.uasz.ms_paiement.dto.ReservationDto;
 import com.uasz.ms_paiement.entities.Paiement;
 import com.uasz.ms_paiement.entities.StatutPaiement;
 import com.uasz.ms_paiement.exceptions.BadRequestException;
+import com.uasz.ms_paiement.exceptions.ForbiddenException;
 import com.uasz.ms_paiement.exceptions.ResourceNotFoundException;
 import com.uasz.ms_paiement.exceptions.ServiceIndisponibleException;
+import com.uasz.ms_paiement.exceptions.UnauthorizedException;
 import com.uasz.ms_paiement.mappers.PaiementMapper;
 import com.uasz.ms_paiement.repositories.PaiementRepository;
+import com.uasz.ms_paiement.security.SecurityUserContext;
+import com.uasz.ms_paiement.security.SecurityUserContextHolder;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +39,12 @@ public class PaiementService implements IPaiementService {
 
     @Override
     public PaiementDto effectuerPaiement(PaiementDto dto) {
+        SecurityUserContext caller = requireAuthenticatedContext();
+
+        if (!caller.hasPermission("PAIEMENT:INITIER")) {
+            throw new ForbiddenException("Accès interdit : votre rôle (" + caller.role() + ") ne possède pas la permission PAIEMENT:INITIER.");
+        }
+
         if (paiementRepository.existsByReservationIdAndStatut(dto.getReservationId(), StatutPaiement.REUSSI)) {
             throw new BadRequestException("La réservation " + dto.getReservationId() + " a déjà été payée");
         }
@@ -43,26 +53,22 @@ public class PaiementService implements IPaiementService {
             throw new BadRequestException("Impossible de payer une réservation annulée");
         }
 
-        // Contrôle BOLA / IDOR : vérifie que la réservation appartient bien à l'utilisateur courant
-        com.uasz.ms_paiement.security.SecurityUserContext caller = com.uasz.ms_paiement.security.SecurityUserContextHolder.getContext();
-        if (caller != null && !caller.isStaffOrAdmin() && !caller.isServiceCall()) {
-            boolean isOwnerById = caller.userId() != null && caller.userId().equals(reservation.getUtilisateurId());
-            boolean isOwnerByEmail = caller.email() != null && !caller.email().isBlank()
-                    && caller.email().equalsIgnoreCase(reservation.getEmailClient());
-
-            if (!isOwnerById && !isOwnerByEmail && reservation.getUtilisateurId() != null) {
-                throw new com.uasz.ms_paiement.exceptions.ForbiddenException(
+        // Contrôle BOLA / IDOR FAIL-CLOSED :
+        // Une réservation sans utilisateurId ne peut JAMAIS être considérée comme appartenant à un utilisateur standard.
+        if (!caller.hasPermission("PAIEMENT:LIRE_TOUT")) {
+            if (reservation.getUtilisateurId() == null) {
+                throw new ForbiddenException(
+                        "Accès interdit (Fail-Closed) : cette réservation n'a pas de propriétaire vérifié et ne peut pas être payée par un compte non administrateur.");
+            }
+            if (!caller.userId().equals(reservation.getUtilisateurId())) {
+                throw new ForbiddenException(
                         "Accès interdit : vous ne pouvez pas payer la réservation d'un autre utilisateur.");
             }
         }
 
         Paiement paiement = paiementMapper.toEntity(dto);
         paiement.setId(null);
-        if (caller != null && caller.userId() != null) {
-            paiement.setUtilisateurId(caller.userId());
-        } else if (reservation.getUtilisateurId() != null) {
-            paiement.setUtilisateurId(reservation.getUtilisateurId());
-        }
+        paiement.setUtilisateurId(reservation.getUtilisateurId() != null ? reservation.getUtilisateurId() : caller.userId());
         paiement.setReferenceTransaction("PAY-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         paiement.setMontant(reservation.getMontantTotal());
         paiement.setStatut(StatutPaiement.REUSSI);
@@ -92,28 +98,43 @@ public class PaiementService implements IPaiementService {
     @Override
     @Transactional(readOnly = true)
     public List<PaiementDto> getAllPaiements() {
-        com.uasz.ms_paiement.security.SecurityUserContext caller = com.uasz.ms_paiement.security.SecurityUserContextHolder.getContext();
-        if (caller != null && !caller.isStaffOrAdmin() && !caller.isServiceCall() && caller.userId() != null) {
+        SecurityUserContext caller = requireAuthenticatedContext();
+
+        if (caller.hasPermission("PAIEMENT:LIRE_TOUT")) {
+            return paiementRepository.findAll().stream()
+                    .map(paiementMapper::toDto)
+                    .toList();
+        }
+
+        if (caller.hasPermission("PAIEMENT:LIRE_PROPRE")) {
             return paiementRepository.findByUtilisateurId(caller.userId()).stream()
                     .map(paiementMapper::toDto)
                     .toList();
         }
-        return paiementRepository.findAll().stream()
-                .map(paiementMapper::toDto)
-                .toList();
+
+        throw new ForbiddenException("Accès interdit : permission de consultation des paiements absente.");
     }
 
     @Override
     @Transactional(readOnly = true)
     public PaiementDto getByIdPaiement(Long id) {
+        SecurityUserContext caller = requireAuthenticatedContext();
+
+        if (!caller.hasPermission("PAIEMENT:LIRE_TOUT") && !caller.hasPermission("PAIEMENT:LIRE_PROPRE")) {
+            throw new ForbiddenException("Accès interdit : permission de consultation des reçus de paiement requise.");
+        }
+
         Paiement paiement = paiementRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Paiement introuvable avec l'id : " + id));
 
-        // Contrôle horizontal BOLA / IDOR
-        com.uasz.ms_paiement.security.SecurityUserContext caller = com.uasz.ms_paiement.security.SecurityUserContextHolder.getContext();
-        if (caller != null && !caller.isStaffOrAdmin() && !caller.isServiceCall() && caller.userId() != null) {
-            if (paiement.getUtilisateurId() != null && !caller.userId().equals(paiement.getUtilisateurId())) {
-                throw new com.uasz.ms_paiement.exceptions.ForbiddenException(
+        // Contrôle horizontal BOLA / IDOR FAIL-CLOSED
+        if (!caller.hasPermission("PAIEMENT:LIRE_TOUT")) {
+            if (paiement.getUtilisateurId() == null) {
+                throw new ForbiddenException(
+                        "Accès interdit (Fail-Closed) : ce reçu de paiement n'a pas de propriétaire vérifié.");
+            }
+            if (!caller.userId().equals(paiement.getUtilisateurId())) {
+                throw new ForbiddenException(
                         "Accès interdit : vous ne pouvez pas consulter le reçu de paiement d'un autre utilisateur.");
             }
         }
@@ -127,9 +148,30 @@ public class PaiementService implements IPaiementService {
         return dto;
     }
 
+    /**
+     * Politique FAIL-CLOSED stricte :
+     * Aucun accès privé par défaut si SecurityUserContext est absent ou incomplet,
+     * et rejet des appels de service non autorisés.
+     */
+    private SecurityUserContext requireAuthenticatedContext() {
+        SecurityUserContext caller = SecurityUserContextHolder.getContext();
+        if (caller == null) {
+            throw new UnauthorizedException("Accès refusé (Fail-Closed) : contexte de sécurité utilisateur absent.");
+        }
+        if (caller.isServiceCall()) {
+            throw new ForbiddenException("Accès interdit : aucun service interne n'est autorisé à appeler directement ms-paiement.");
+        }
+        if (caller.userId() == null) {
+            throw new UnauthorizedException("Accès refusé (Fail-Closed) : identifiant utilisateur manquant dans le contexte de sécurité.");
+        }
+        return caller;
+    }
+
     private ReservationDto recupererReservation(Long reservationId) {
         try {
             return reservationClient.getReservationById(reservationId);
+        } catch (FeignException.Forbidden ex) {
+            throw new ForbiddenException("Accès interdit : vous ne pouvez pas payer la réservation d'un autre utilisateur.");
         } catch (FeignException.NotFound ex) {
             throw new BadRequestException("La réservation " + reservationId + " n'existe pas dans ms-reservation");
         } catch (FeignException ex) {
@@ -138,4 +180,3 @@ public class PaiementService implements IPaiementService {
         }
     }
 }
-

@@ -1,5 +1,6 @@
 package com.uasz.ms_notification.security;
 
+import com.uasz.ms_notification.TestEphemeralSecretsPostProcessor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockFilterChain;
@@ -17,14 +18,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class NotificationSecurityTest {
 
-    private static final String GATEWAY_SECRET = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    private static final String INTERSERVICE_SECRET = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
+    private String gatewaySecret;
+    private String interserviceSecret;
 
     private MicroserviceSecurityFilter securityFilter;
 
     @BeforeEach
     void setUp() {
-        securityFilter = new MicroserviceSecurityFilter(GATEWAY_SECRET, INTERSERVICE_SECRET);
+        gatewaySecret = TestEphemeralSecretsPostProcessor.generateRandomSecret();
+        interserviceSecret = TestEphemeralSecretsPostProcessor.generateRandomSecret();
+        securityFilter = new MicroserviceSecurityFilter(gatewaySecret, interserviceSecret);
     }
 
     @Test
@@ -41,12 +44,19 @@ class NotificationSecurityTest {
     @Test
     void filter_avecJetonGatewayValide_estAccepte() throws Exception {
         long ts = Instant.now().getEpochSecond();
-        String sig = signHmac("1:ADMINISTRATEUR:" + ts, GATEWAY_SECRET);
+        String nonce = UUID.randomUUID().toString();
+        String emptyBodySha = MicroserviceSecurityFilter.sha256Hex(new byte[0]);
+        String canonical = "GET|/api/notifications|1|ADMINISTRATEUR|AUDIT:LIRE|admin@uasz.sn|sess-1|" + ts + "|" + nonce + "|" + emptyBodySha;
+        String sig = signHmac(canonical, gatewaySecret);
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/notifications");
-        request.addHeader("X-Internal-Gateway-Token", ts + "." + sig);
         request.addHeader("X-User-Id", "1");
         request.addHeader("X-User-Roles", "ADMINISTRATEUR");
+        request.addHeader("X-User-Permissions", "AUDIT:LIRE");
+        request.addHeader("X-User-Email", "admin@uasz.sn");
+        request.addHeader("X-User-Session-Id", "sess-1");
+        request.addHeader("X-Content-SHA256", emptyBodySha);
+        request.addHeader("X-Internal-Gateway-Token", ts + "." + nonce + "." + sig);
 
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
@@ -60,9 +70,10 @@ class NotificationSecurityTest {
     @Test
     void filter_jetonGatewayFalsifie_estRefuse403() throws Exception {
         long ts = Instant.now().getEpochSecond();
+        String nonce = UUID.randomUUID().toString();
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/notifications");
-        request.addHeader("X-Internal-Gateway-Token", ts + ".fausseSignature");
+        request.addHeader("X-Internal-Gateway-Token", ts + "." + nonce + ".fausseSignature");
         request.addHeader("X-User-Id", "1");
         request.addHeader("X-User-Roles", "ADMINISTRATEUR");
 
@@ -75,20 +86,29 @@ class NotificationSecurityTest {
     }
 
     @Test
-    void filter_avecAppelFeignValide_estAccepte() throws Exception {
+    void filter_avecAppelFeignValideEtIntegriteCorps_estAccepte() throws Exception {
         long ts = Instant.now().getEpochSecond();
         String nonce = UUID.randomUUID().toString();
         String method = "POST";
         String uri = "/api/notifications";
         String serviceName = "ms-paiement";
+        byte[] body = "{\"destinataire\":\"a@uasz.sn\",\"sujet\":\"Reçu\"}".getBytes(StandardCharsets.UTF_8);
+        String bodySha = MicroserviceSecurityFilter.sha256Hex(body);
 
-        String canonical = method + "|" + uri + "|" + serviceName + "|" + ts + "|" + nonce;
-        String signature = signHmac(canonical, INTERSERVICE_SECRET);
+        String canonical = method + "|" + uri + "|ms-notification|" + serviceName + "|" + ts + "|" + nonce + "|2|TOURISTE|PAIEMENT:INITIER|a@uasz.sn|" + bodySha;
+        String signature = signHmac(canonical, interserviceSecret);
 
         MockHttpServletRequest request = new MockHttpServletRequest(method, uri);
+        request.setContent(body);
         request.addHeader("X-Service-Name", serviceName);
+        request.addHeader("X-Service-Audience", "ms-notification");
         request.addHeader("X-Service-Timestamp", String.valueOf(ts));
         request.addHeader("X-Service-Nonce", nonce);
+        request.addHeader("X-Content-SHA256", bodySha);
+        request.addHeader("X-User-Id", "2");
+        request.addHeader("X-User-Roles", "TOURISTE");
+        request.addHeader("X-User-Permissions", "PAIEMENT:INITIER");
+        request.addHeader("X-User-Email", "a@uasz.sn");
         request.addHeader("X-Service-Signature", signature);
 
         MockHttpServletResponse response = new MockHttpServletResponse();
@@ -101,36 +121,60 @@ class NotificationSecurityTest {
     }
 
     @Test
-    void filter_attaqueParRejeuSurAppelFeign_estRefusee403() throws Exception {
+    void filter_modificationDuCorpsApresSignatureOuRejeu_estRefusee403() throws Exception {
         long ts = Instant.now().getEpochSecond();
         String nonce = UUID.randomUUID().toString();
         String method = "POST";
         String uri = "/api/notifications";
         String serviceName = "ms-reservation";
+        byte[] body = "{\"destinataire\":\"a@uasz.sn\"}".getBytes(StandardCharsets.UTF_8);
+        String bodySha = MicroserviceSecurityFilter.sha256Hex(body);
 
-        String canonical = method + "|" + uri + "|" + serviceName + "|" + ts + "|" + nonce;
-        String signature = signHmac(canonical, INTERSERVICE_SECRET);
+        String canonical = method + "|" + uri + "|ms-notification|" + serviceName + "|" + ts + "|" + nonce + "|SYSTEM|SYSTEM|||" + bodySha;
+        String signature = signHmac(canonical, interserviceSecret);
 
-        // Premier appel : accepté
+        // 1. Premier appel valide : accepté
         MockHttpServletRequest req1 = new MockHttpServletRequest(method, uri);
+        req1.setContent(body);
         req1.addHeader("X-Service-Name", serviceName);
+        req1.addHeader("X-Service-Audience", "ms-notification");
         req1.addHeader("X-Service-Timestamp", String.valueOf(ts));
         req1.addHeader("X-Service-Nonce", nonce);
+        req1.addHeader("X-Content-SHA256", bodySha);
         req1.addHeader("X-Service-Signature", signature);
         MockHttpServletResponse resp1 = new MockHttpServletResponse();
         securityFilter.doFilter(req1, resp1, new MockFilterChain());
         assertThat(resp1.getStatus()).isEqualTo(200);
 
-        // Deuxième appel avec même nonce (rejeu) : refusé 403
+        // 2. Deuxième appel avec même nonce (rejeu) : refusé 403
         MockHttpServletRequest req2 = new MockHttpServletRequest(method, uri);
+        req2.setContent(body);
         req2.addHeader("X-Service-Name", serviceName);
+        req2.addHeader("X-Service-Audience", "ms-notification");
         req2.addHeader("X-Service-Timestamp", String.valueOf(ts));
         req2.addHeader("X-Service-Nonce", nonce);
+        req2.addHeader("X-Content-SHA256", bodySha);
         req2.addHeader("X-Service-Signature", signature);
         MockHttpServletResponse resp2 = new MockHttpServletResponse();
         securityFilter.doFilter(req2, resp2, new MockFilterChain());
         assertThat(resp2.getStatus()).isEqualTo(403);
         assertThat(resp2.getContentAsString()).contains("Attaque par rejeu détectée");
+
+        // 3. Modification du corps après signature : refusé 403
+        String nonce3 = UUID.randomUUID().toString();
+        String sig3 = signHmac(method + "|" + uri + "|ms-notification|" + serviceName + "|" + ts + "|" + nonce3 + "|SYSTEM|SYSTEM|||" + bodySha, interserviceSecret);
+        MockHttpServletRequest reqTampered = new MockHttpServletRequest(method, uri);
+        reqTampered.setContent("{\"destinataire\":\"pirate@uasz.sn\"}".getBytes(StandardCharsets.UTF_8));
+        reqTampered.addHeader("X-Service-Name", serviceName);
+        reqTampered.addHeader("X-Service-Audience", "ms-notification");
+        reqTampered.addHeader("X-Service-Timestamp", String.valueOf(ts));
+        reqTampered.addHeader("X-Service-Nonce", nonce3);
+        reqTampered.addHeader("X-Content-SHA256", bodySha);
+        reqTampered.addHeader("X-Service-Signature", sig3);
+        MockHttpServletResponse respTampered = new MockHttpServletResponse();
+        securityFilter.doFilter(reqTampered, respTampered, new MockFilterChain());
+        assertThat(respTampered.getStatus()).isEqualTo(403);
+        assertThat(respTampered.getContentAsString()).contains("Intégrité du corps");
     }
 
     private String signHmac(String data, String secret) {
