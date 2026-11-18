@@ -1,144 +1,88 @@
-# SÉCURISATION DES COMMUNICATIONS INTERSERVICES — PHASE P02
+# SÉCURISATION DES COMMUNICATIONS GATEWAY ET INTERSERVICES — PHASE P02 (RÉVISÉE P02-CORRECTION)
 ## Plateforme de Gestion et de Valorisation du Patrimoine Touristique de la Casamance — UASZ
 
 ---
 
-## 1. CONTEXTE ET PROBLÉMATIQUE DE SÉCURITÉ
+## 1. ARCHITECTURE DE SIGNATURE DE BOUT EN BOUT
 
-Dans l'architecture microservices déployée sur le réseau Docker `app-net`, deux vulnérabilités critiques ont été mises en évidence lors de l'audit initial :
-1. **`SEC-VULN-02` (Absence de filtre de sécurité sur les microservices) :** Tout conteneur ou processus connecté à `app-net` peut envoyer des requêtes HTTP directes aux ports d'écoute des microservices métier sans passer par le Gateway.
-2. **`SEC-VULN-03` / `SEC-VULN-06` (Usurpation d'identité et rejeu) :** Les microservices se fiaient aveuglément aux en-têtes HTTP `X-User-Id` et `X-User-Roles` sans vérifier leur authenticité cryptographique, et les appels OpenFeign (ex: `ms-reservation` -> `ms-circuit`, `ms-paiement` -> `ms-reservation`) étaient dépourvus d'authentification et de protection anti-rejeu.
-
-Pour instaurer un modèle Zero Trust étanche, la phase P02 déploie deux mécanismes cryptographiques complémentaires :
-- **Le jeton d'enveloppe Gateway (`X-Internal-Gateway-Token`)** pour le trafic Nord-Sud.
-- **Le protocole signé avec Nonce et Horodatage (`X-Service-*`)** pour le trafic Est-Ouest (OpenFeign).
+Pour empêcher tout contournement du Gateway, toute falsification d'identité ou toute modification de requête en transit sur le réseau interne, deux protocoles cryptographiques basés sur `HMAC-SHA256` et la clé obligatoire `${SECURITY_INTERSERVICE_SECRET}` protègent l'intégralité des échanges :
+1. **Enveloppe Gateway liée à la requête (`X-Internal-Gateway-Token`)** pour le trafic Nord-Sud (`api-gateway` $\rightarrow$ microservices).
+2. **Signature Canonique Interservices (`X-Service-Signature`)** + **Matrice ACL** pour le trafic Est-Ouest (`OpenFeign`, `RestTemplate`, `WebClient`).
 
 ---
 
-## 2. TRAFIC NORD-SUD : ENVELOPPE SIGNÉE DU GATEWAY
+## 2. TRAFIC NORD-SUD : ENVELOPPE GATEWAY LIÉE À LA REQUÊTE
 
-Lorsqu'une requête externe traverse le Spring Cloud Gateway, le filtre `GatewayAuthorizationFilter` applique la séquence de durcissement suivante :
+### 2.1 En-têtes injectés par `GatewayAuthorizationFilter`
+Après assainissement des en-têtes entrants (`SanitizedGatewayRequestWrapper`), validation du JWT et contrôle RBAC/CSRF, le Gateway injecte :
+- `X-User-Id` : Identifiant utilisateur vérifié (ou `"ANONYMOUS"` pour les lectures publiques).
+- `X-User-Roles` : Rôle vérifié (ou `"PUBLIC"`).
+- `X-User-Permissions` : Liste des permissions vérifiées séparées par virgule.
+- `X-User-Email` : Email vérifié.
+- `X-Session-Id` : Identifiant de session actif.
+- `X-Content-SHA256` : Condensat SHA-256 hexadécimal du corps HTTP de la requête.
+- `X-Internal-Gateway-Token` : `<timestamp_epoch_seconds>.<nonce_uuid>.<signature_base64url>`
 
+### 2.2 Chaîne Canonique de l'Enveloppe Gateway (10 champs)
+La signature de l'enveloppe Gateway couvre l'intégralité du contexte de la requête :
 ```
-Client Externe (Internet)
-       │
-       │  Envoie potentiellement de faux en-têtes (ex: X-User-Roles: ADMINISTRATEUR)
-       ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│ API GATEWAY (:8090)                                                    │
-│ 1. ASSAINISSEMENT : Suppression de X-User-Id, X-User-Roles, etc.        │
-│ 2. VALIDATION : Vérification cryptographique du JWT (PATRIMOINE_SESSION)│
-│ 3. ENRICHISSEMENT : Injection des claims vérifiés                      │
-│ 4. SIGNATURE : Génération de X-Internal-Gateway-Token                   │
-└────────────────────────────────────────────────────────────────────────┘
-       │
-       │  X-User-Id: 2
-       │  X-User-Roles: TOURISTE
-       │  X-Internal-Gateway-Token: HMAC-SHA256(userId + ":" + role + ":" + ts, secret)
-       ▼
-Microservice Métier (:3001..:3007)
-  Vérifie X-Internal-Gateway-Token avant de faire confiance à X-User-*
+CanonicalGatewayPayload = METHOD + "|" + NORMALIZED_PATH + "|" + USER_ID + "|" + ROLES + "|" + PERMISSIONS + "|" + EMAIL + "|" + SESSION_ID + "|" + TIMESTAMP + "|" + NONCE + "|" + BODY_SHA256
 ```
+$$\text{Signature} = \text{Base64Url}\left(\text{HMAC-SHA256}_{K_{\text{interservice}}}(\text{CanonicalGatewayPayload})\right)$$
 
-### Format du Jeton d'Enveloppe Interne :
-L'en-tête `X-Internal-Gateway-Token` est structuré sous la forme :
-```
-<timestamp_epoch_seconds>.<signature_base64url>
-```
-La signature est calculée comme suit :
-$$\text{Signature} = \text{HMAC-SHA256}_{K_{gateway}}(\text{userId} \parallel \text{":"} \parallel \text{role} \parallel \text{":"} \parallel \text{timestamp})$$
-
-- Si la requête est anonyme (lecture publique du catalogue), le Gateway signe avec `userId = "ANONYMOUS"` et `role = "PUBLIC"`.
-- Tout microservice rejettera avec HTTP 403 Forbidden une requête dont la signature interne est absente, invalide ou expirée ($> 30$ secondes).
+### 2.3 Vérification côté Microservice (`MicroserviceSecurityFilter`)
+Chaque microservice vérifie à la réception :
+1. La validité de la fenêtre temporelle ($|\text{now} - \text{timestamp}| \le 30\text{ s}$).
+2. L'unicité du `nonce` dans le cache anti-rejeu (`gateway:<nonce>`).
+3. L'égalité entre `X-Content-SHA256` et le condensat SHA-256 réel du corps reçu (`CachedBodyHttpServletRequest`).
+4. La signature HMAC-SHA256 en temps constant (`MessageDigest.isEqual`) sur le chemin normalisé (`URI.normalize()`).
+Un jeton capturé sur `GET /api/patrimoines` est donc inutilisable sur `POST /api/reservations` ou avec un corps modifié.
 
 ---
 
-## 3. TRAFIC EST-OUEST : PROTOCOLE FEIGN SIGNÉ ANTI-REJEU
+## 3. TRAFIC EST-OUEST : SIGNATURE CANONIQUE INTERSERVICES & ACL
 
-Lorsque des microservices communiquent entre eux (par exemple `ms-reservation` vérifiant l'existence d'un circuit dans `ms-circuit`), ils utilisent OpenFeign. 
+### 3.1 En-têtes injectés (`InterserviceFeignSecurityInterceptor` & `HttpClientsConfig`)
+Tous les appels interservices (`OpenFeign`, `RestTemplate`, `WebClient`) injectent :
 
-Pour authentifier le service appelant et prévenir toute attaque par rejeu (replay attack), chaque requête Feign est signée dynamiquement via un intercepteur dédié : `InterserviceFeignSecurityInterceptor`.
+| En-tête | Description |
+| :--- | :--- |
+| `X-Service-Name` | Identifiant du microservice appelant (ex: `ms-reservation`, `ms-paiement`, `ms-circuit`) |
+| `X-Service-Audience` | Identifiant du microservice destinataire (ex: `ms-circuit`, `ms-reservation`, `ms-notification`) |
+| `X-Service-Timestamp` | Horodatage Unix en secondes |
+| `X-Service-Nonce` | UUID v4 unique par requête |
+| `X-Content-SHA256` | Condensat SHA-256 hexadécimal du corps de la requête |
+| `X-Service-Signature` | Signature HMAC-SHA256 encodée en Base64URL |
+| `X-User-Id`, `X-User-Roles`, `X-User-Permissions`, `X-User-Email` | Contexte utilisateur propagé et protégé par la signature |
 
-### 3.1 En-têtes injectés :
-
-| En-tête | Type | Description |
-| :--- | :--- | :--- |
-| `X-Service-Name` | String | Nom du service émetteur (ex: `ms-reservation`) |
-| `X-Service-Timestamp` | Long | Horodatage Unix en secondes au moment de l'émission |
-| `X-Service-Nonce` | UUID | Identifiant unique aléatoire émis pour cette requête |
-| `X-Service-Signature` | String | Condensat HMAC-SHA256 encodé en Base64URL |
-| `X-User-Id` | Long (optionnel) | Propagation de l'identité de l'utilisateur à l'origine de l'action |
-| `X-User-Roles` | String (optionnel) | Propagation des rôles de l'utilisateur d'origine |
-
-### 3.2 Canonicalisation et calcul de la signature :
-
-Pour garantir l'intégrité de la requête, la chaîne canonique inclut la méthode, le chemin, le nom du service, l'horodatage et le nonce :
-
-$$\text{CanonicalString} = \text{METHOD} \parallel \text{"\|"} \parallel \text{PATH} \parallel \text{"\|"} \parallel \text{SERVICE\_NAME} \parallel \text{"\|"} \parallel \text{TIMESTAMP} \parallel \text{"\|"} \parallel \text{NONCE}$$
-
-Exemple :
-`GET|/api/circuits/10|ms-reservation|1731888120|550e8400-e29b-41d4-a716-446655440000`
-
-La signature est générée avec la clé partagée `${security.interservice.secret}` :
-$$\text{X-Service-Signature} = \text{Base64Url}(\text{HMAC-SHA256}_{K_{interservice}}(\text{CanonicalString}))$$
-
----
-
-## 4. VALIDATION ET PROTECTION ANTI-REJEU CÔTÉ DESTINATAIRE
-
-À la réception d'une requête interservice, le filtre de sécurité `InterserviceAuthFilter` du microservice cible exécute cinq contrôles séquentiels :
-
-```plantuml
-@startuml P02_Interservice_Validation
-!theme plain
-start
-:Réception de la requête interservice;
-if (En-têtes X-Service-* présents ?) then (Non)
-  :Refus : 401 Unauthorized\n(Authentification interservice manquante);
-  stop
-endif
-
-if (|T_serveur - X-Service-Timestamp| <= 30 secondes ?) then (Non)
-  :Refus : 401 Unauthorized\n(Horodatage expiré ou asynchrone);
-  stop
-endif
-
-if (Nonce déjà vu dans le cache glissant ?) then (Oui)
-  :Refus : 403 Forbidden\n(Attaque par rejeu détectée);
-  stop
-endif
-
-:Calcul de la signature attendue sur la chaîne canonique;
-if (MessageDigest.isEqual(sigReçue, sigAttendue)) then (Non)
-  :Refus : 403 Forbidden\n(Signature interservice falsifiée);
-  stop
-endif
-
-:Enregistrement du Nonce (TTL 60s);
-:Injection de l'authentification dans le SecurityContext\n(ROLE_SERVICE_<NOM_SERVICE>);
-:Poursuite de la chaîne de filtres vers le contrôleur;
-stop
-@enduml
+### 3.2 Chaîne Canonique Interservices (11 champs)
 ```
+CanonicalInterserviceString = METHOD + "|" + NORMALIZED_PATH + "|" + AUDIENCE + "|" + CALLER_SERVICE + "|" + TIMESTAMP + "|" + NONCE + "|" + USER_ID + "|" + ROLES + "|" + PERMISSIONS + "|" + EMAIL + "|" + BODY_SHA256
+```
+$$\text{X-Service-Signature} = \text{Base64Url}\left(\text{HMAC-SHA256}_{K_{\text{interservice}}}(\text{CanonicalInterserviceString})\right)$$
 
-### Caractéristiques de l'implémentation :
-1. **Comparaison en temps constant :** Utilisation systématique de `MessageDigest.isEqual()` pour neutraliser les attaques par canal auxiliaire (timing attacks).
-2. **Mémoire glissante du cache Nonce :** Utilisation d'un cache LRU expirable (Caffeine ou ConcurrentHashMap avec purge temporelle) limitant l'empreinte mémoire à moins de 5 Mo pour 10 000 requêtes/minute.
-3. **Tolérance aux dérives d'horloge :** La fenêtre de validité de $\pm 30$ secondes est adaptée aux environnements conteneurisés Docker synchronisés par NTP.
+### 3.3 Vérification Stricte et Matrice ACL par Service Destinataire
+Le microservice destinataire ne fait **jamais** confiance au seul en-tête `X-Service-Name` :
+1. Il vérifie que `X-Service-Audience` correspond exactement à son propre `spring.application.name`.
+2. Il vérifie l'horodatage ($\pm 30\text{ s}$), le `nonce` unique, le hash `X-Content-SHA256` du corps et la signature HMAC-SHA256 complète (incluant l'identité et les rôles propagés).
+3. Il applique sa **Matrice ACL des services autorisés** avant d'autoriser l'exécution :
 
----
-
-## 5. MATRICE DES FLUX INTERSERVICES AUTORISÉS
-
-Pour appliquer le principe du moindre privilège entre microservices, seuls les flux métiers documentés sont autorisés :
-
-| Émetteur | Destinataire | Endpoint Cible | Justification Métier |
+| Service Destinataire (`Audience`) | Services Appelants Autorisés (`Caller`) | Méthodes & Chemins Autorisés | Justification Métier |
 | :--- | :--- | :--- | :--- |
-| `ms-reservation` | `ms-circuit` | `GET /api/circuits/{id}` | Vérification de validité et tarif du circuit |
-| `ms-reservation` | `ms-evenement`| `GET /api/evenements/{id}` | Vérification des places disponibles |
-| `ms-reservation` | `ms-patrimoine`| `GET /api/patrimoines/{id}` | Contrôle d'existence du site patrimonial |
-| `ms-paiement` | `ms-reservation`| `GET /api/reservations/{id}` | Validation du montant à régler |
-| `ms-reservation` | `ms-notification`| `POST /api/notifications` | Envoi de confirmation de réservation |
-| `ms-paiement` | `ms-notification`| `POST /api/notifications` | Envoi de reçu de paiement |
+| `ms-patrimoine` | `ms-circuit`, `ms-reservation` | `GET /api/patrimoines/**` | Lecture des sites patrimoniaux d'un circuit |
+| `ms-circuit` | `ms-reservation` | `GET /api/circuits/**` | Vérification de disponibilité et tarif d'un circuit |
+| `ms-evenement` | `ms-reservation` | `GET /api/evenements/**` | Vérification de disponibilité d'un événement |
+| `ms-reservation` | `ms-paiement` | `GET /api/reservations/*` | Vérification du montant et du propriétaire avant paiement |
+| `ms-notification` | `ms-reservation`, `ms-paiement` | `POST /api/notifications/envoyer`, `POST /api/notifications` | Envoi de confirmation de réservation ou de reçu de paiement |
+| `ms-utilisateur` | *(Aucun appel interservice métier autorisé)* | — | Isolation stricte du fournisseur d'identité |
+| `ms-paiement` | *(Aucun appel interservice entrant autorisé)* | — | Isolation stricte des transactions de paiement |
 
-Tout autre appel interservice non répertorié est rejeté par défaut.
+Tout appel interservice provenant d'un service non listé ou ciblant une méthode/route non autorisée est rejeté avec `403 Forbidden`.
+
+---
+
+## 4. PROTECTION ANTI-REJEU ET HYPOTHÈSE D'ARCHITECTURE
+
+Chaque microservice maintient un registre atomique des nonces consommés (`usedNonces` avec purge des entrées expirées au-delà de la fenêtre de tolérance de $\pm 30\text{ s}$) en utilisant `putIfAbsent(nonceKey, timestamp) != null`.
+- **Architecture déployée (Docker Compose mono-instance par microservice)** : Chaque microservice s'exécutant en instance unique derrière Eureka et le Gateway, le registre en mémoire locale garantit une détection anti-rejeu déterministe et sans latence réseau.
+- **Évolution multi-instances (Scale-out horizontal)** : Si plusieurs répliques d'un même microservice sont déployées en production, la vérification du nonce doit être déléguée à un magasin atomique partagé (`Redis SET key value NX EX 60`) afin d'empêcher le rejeu croisé entre deux instances distinctes dans la fenêtre de 30 secondes.

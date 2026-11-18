@@ -1,27 +1,28 @@
-# ARCHITECTURE D'AUTHENTIFICATION ET DE GESTION DES SESSIONS — PHASE P02
+# ARCHITECTURE D'AUTHENTIFICATION ET DE GESTION DES SESSIONS — PHASE P02 (RÉVISÉE P02-CORRECTION)
 ## Plateforme de Gestion et de Valorisation du Patrimoine Touristique de la Casamance — UASZ
 
 ---
 
-## 1. STRATÉGIE GLOBALE : LE PATTERN DUAL-TOKEN
+## 1. STRATÉGIE GLOBALE : LE PATTERN DUAL-TOKEN DURCI
 
-Pour concilier performance stateless des microservices et contrôle strict du cycle de vie des sessions, la plateforme adopte le pattern **Dual-Token** :
+Pour concilier performance des microservices et contrôle immédiat du cycle de vie des sessions (révocation, changement de rôle, détection de rejeu), la plateforme implémente le pattern **Dual-Token avec vérification d'état de session** :
 
 ```
 Client (Angular 22)
        │
-       ├─── Requêtes métier standard ───►  Access Token (JWT, 15 min, en Cookie HttpOnly ou Bearer)
-       │                                  Validé cryptographiquement sans requête DB
+       ├─── Requêtes métier ─────────►  Access Token (JWT HS256, 15 min, Cookie HttpOnly PATRIMOINE_SESSION)
+       │                                + Protection CSRF (Cookie XSRF-TOKEN + En-tête X-XSRF-TOKEN)
+       │                                + Contrôle de non-révocation de session et de cohérence de rôle
        │
-       └─── Expiration du JWT (401)  ───►  Refresh Token (Opaque 256-bit, 7 jours, en Cookie HttpOnly)
-                                          Validé et tourné de manière atomique en base PostgreSQL
+       └─── Expiration du JWT (401) ─►  Refresh Token (Opaque 256-bit, 7 jours, Cookie HttpOnly PATRIMOINE_REFRESH)
+                                        Verrouillage pessimiste SELECT ... FOR UPDATE & rotation atomique sur PostgreSQL 16
 ```
 
 ---
 
 ## 2. SPÉCIFICATIONS DU JETON D'ACCÈS (ACCESS TOKEN JWT)
 
-L'Access Token est un JSON Web Token (JWT RFC 7519) signé avec l'algorithme HMAC-SHA256 (`HS256`).
+L'Access Token est un JSON Web Token (RFC 7519) signé avec l'algorithme HMAC-SHA256 (`HS256`) via la clé obligatoire `${SECURITY_SESSION_SECRET}` ($\ge 256$ bits, entropie vérifiée au démarrage).
 
 ### Structure du Header :
 ```json
@@ -47,7 +48,8 @@ L'Access Token est un JSON Web Token (JWT RFC 7519) signé avec l'algorithme HMA
     "RESERVATION:ANNULER_PROPRE",
     "PAIEMENT:INITIER",
     "PAIEMENT:LIRE_PROPRE",
-    "UTILISATEUR:LIRE_PROFIL"
+    "UTILISATEUR:LIRE_PROFIL",
+    "UTILISATEUR:MODIFIER_PROPRE"
   ],
   "sessionId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
   "jti": "987fcdeb-51a2-4321-fedc-ba0987654321",
@@ -56,108 +58,52 @@ L'Access Token est un JSON Web Token (JWT RFC 7519) signé avec l'algorithme HMA
 }
 ```
 
-### Règles de validation :
-- **Durée de vie :** 15 minutes (900 secondes).
-- **Contrôle d'émetteur (`iss`) :** Doit correspondre strictement à `casamance-auth-service`.
-- **Tolérance d'horloge :** Aucune tolérance supérieure à 5 secondes.
-- **Secret :** Clé cryptographique symétrique d'au moins 256 bits (32 octets) gérée via `${SECURITY_SESSION_SECRET}`.
+---
+
+## 3. SPÉCIFICATIONS DU REFRESH TOKEN ET CONCURRENCE ATOMIQUE
+
+Le Refresh Token est une chaîne opaque cryptographiquement aléatoire (32 octets / 64 caractères hexadécimaux générés par `SecureRandom`).
+
+### 3.1 Transport exclusivement par Cookie HttpOnly
+- Le Refresh Token est transmis **exclusivement** via le cookie `PATRIMOINE_REFRESH` (`HttpOnly; SameSite=Strict; Path=/api/utilisateurs`).
+- L'en-tête `X-Refresh-Token` a été intégralement supprimé en écriture (`UtilisateurController`) comme en lecture (`SessionTokenService`).
+
+### 3.2 Rotation Atomique et Protection contre les Courses Concurrentes
+Dans `AuthSessionManager.refreshSession` :
+1. **Verrouillage pessimiste (`SELECT ... FOR UPDATE`)** : `refreshTokenRepository.findByTokenHashForUpdate(tokenHash)` acquiert un verrou exclusif `PESSIMISTIC_WRITE` sur la ligne du jeton dans PostgreSQL 16.
+2. **Consommation atomique conditionnelle** : `refreshTokenRepository.consumeTokenAtomically(id, newHash, now)` exécute `UPDATE refresh_token SET revoked = true, revoked_at = :now, replaced_by_hash = :newHash WHERE id = :id AND revoked = false` et vérifie que le nombre de lignes affectées vaut exactement `1`.
+3. **Contrainte d'unicité en base (Flyway V4)** : La colonne `parent_token_hash VARCHAR(64)` porte la contrainte unique `uk_refresh_token_parent_hash`. Il est mathématiquement et transactionnellement impossible que deux requêtes concurrentes utilisant le même refresh token produisent deux jetons successeurs valides. Sur $N$ requêtes concurrentes simultanées, exactement **1** réussit (`200 OK`) et **$N-1$** sont rejetées (`401 Unauthorized`).
+
+### 3.3 Persistance Garantie de la Détection de Rejeu
+- La méthode `refreshSession` est annotée `@Transactional(noRollbackFor = {UnauthorizedException.class, ForbiddenException.class})`.
+- Lorsqu'un jeton déjà révoqué (`revoked == true`) est présenté :
+  1. `refreshTokenRepository.revokeEntireFamily(familyId, now)` révoque immédiatement tous les jetons de la famille (y compris le jeton successeur légitime).
+  2. La session `session_utilisateur` est désactivée (`active = false`, `revoked_at = now`, `revocation_reason = 'TOKEN_REPLAY_DETECTED'`).
+  3. `auditSecuriteService.logEvent("ALERT_TOKEN_REPLAY", ...)` persiste l'alerte dans une transaction indépendante (`Propagation.REQUIRES_NEW`).
+  4. L'exception `UnauthorizedException` (HTTP 401) est levée **sans annuler (noRollbackFor)** la transaction de révocation.
 
 ---
 
-## 3. SPÉCIFICATIONS DU JETON DE RENOUVELLEMENT (REFRESH TOKEN)
+## 4. PROTECTION CSRF DOUBLE-SUBMIT SIGNÉE PAR HMAC
 
-Le Refresh Token est une chaîne opaque cryptographiquement aléatoire (32 octets encodés en hexadécimal, 64 caractères).
-
-### Principes de sécurité appliqués :
-1. **Stockage sous forme de hash :** Le token en clair n'est jamais stocké dans PostgreSQL. Seul son condensat `SHA-256` est persisté dans la colonne `refresh_token.token_hash`.
-2. **Rotation systématique (RTR - Refresh Token Rotation) :** À chaque appel à `/api/utilisateurs/refresh`, le refresh token soumis est immédiatement invalidé (`revoked = TRUE`, `replaced_by_hash = <nouveau_hash>`), et un nouveau couple (Access Token + Refresh Token) est émis.
-3. **Familles de jetons (`family_id`) :** Tous les refresh tokens issus d'une même session de connexion partagent le même `family_id` (UUID).
-4. **Détection de réutilisation (Replay Attack Detection) :** Si un refresh token déjà révoqué est présenté, le système détecte une compromission potentielle (vol de jeton par un attaquant) :
-   - Toute la famille (`family_id`) est révoquée immédiatement en base de données.
-   - La session utilisateur associée est marquée inactive.
-   - Une alerte critique est enregistrée dans `audit_securite` (`ALERT_TOKEN_REPLAY`).
-   - La requête est rejetée avec HTTP 401 Unauthorized.
-5. **Atomicité des opérations :** La rotation et la détection s'exécutent au sein d'une transaction `@Transactional` avec verrouillage pessimiste ou contrôle de concurrence strict pour éviter les conditions de course lors de requêtes concurrentes.
+Pour protéger toutes les opérations mutatives (`POST`, `PUT`, `PATCH`, `DELETE`) lorsque l'authentification repose sur le cookie `PATRIMOINE_SESSION` :
+1. À la connexion et au rafraîchissement, `SessionTokenService.generateCsrfToken(sessionId)` calcule :
+   $$\text{XSRF-TOKEN} = \text{Base64Url}\left(\text{HMAC-SHA256}_{K_{\text{session}}}(\text{"CSRF:"} \parallel \text{sessionId})\right)$$
+2. Le navigateur stocke ce jeton dans le cookie `XSRF-TOKEN` (`HttpOnly=false`, `SameSite=Strict`, `Path=/`) et l'intercepteur Angular `authInterceptor` l'injecte dans l'en-tête `X-XSRF-TOKEN`.
+3. `GatewayAuthorizationFilter` et `UtilisateurController` vérifient en temps constant (`MessageDigest.isEqual`) que :
+   - Le cookie `XSRF-TOKEN` et l'en-tête `X-XSRF-TOKEN` sont présents et identiques (ou que l'en-tête est valide),
+   - La valeur correspond exactement au HMAC calculé à partir du `sessionId` contenu dans le JWT.
 
 ---
 
-## 4. SCHÉMA DE SÉQUENCE : CONNEXION ET RENOUVELLEMENT DE SESSION
+## 5. INVALIDATION IMMÉDIATE DES SESSIONS LORS DES ACTIONS ADMINISTRATIVES
 
-```plantuml
-@startuml P02_Auth_Flow
-!theme plain
-autonumber
-actor "Utilisateur" as User
-boundary "API Gateway" as GW
-control "ms-utilisateur\n(AuthService)" as Auth
-database "PostgreSQL\n(db_utilisateur)" as DB
+Lorsqu'un administrateur :
+- modifie le rôle d'un utilisateur (`PUT /api/utilisateurs/{id}/role`),
+- désactive un compte (`PUT /api/utilisateurs/{id}` avec `actif = false`),
+- supprime un utilisateur (`DELETE /api/utilisateurs/{id}`), ou
+- révoque ses sessions (`POST /api/utilisateurs/{id}/revoquer-sessions`),
 
-== Phase 1 : Authentification Initiale ==
-User -> GW : POST /api/utilisateurs/connexion\n{email, motDePasse}
-GW -> Auth : Relais requête
-Auth -> DB : SELECT * FROM utilisateur WHERE email = ?
-DB --> Auth : Données utilisateur (hash mot de passe)
-Auth -> Auth : Vérification BCrypt
-alt Mot de passe invalide
-    Auth -> DB : INSERT INTO audit_securite (LOGIN_FAILURE)
-    Auth --> GW : 401 Unauthorized (Message générique)
-    GW --> User : 401 Unauthorized
-else Mot de passe valide
-    Auth -> Auth : Génère sessionId & familyId\nGénère Access Token (15m JWT)\nGénère Refresh Token (opaque 64-char)
-    Auth -> DB : INSERT INTO session_utilisateur\nINSERT INTO refresh_token (hash, familyId, active)
-    Auth -> DB : INSERT INTO audit_securite (LOGIN_SUCCESS)
-    Auth --> GW : 200 OK + Set-Cookie PATRIMOINE_SESSION (JWT)\n+ Set-Cookie PATRIMOINE_REFRESH (Opaque)
-    GW --> User : 200 OK + Cookies HttpOnly
-end
-
-== Phase 2 : Renouvellement Silencieux (Refresh) ==
-User -> GW : POST /api/utilisateurs/refresh\n(Cookie PATRIMOINE_REFRESH)
-GW -> Auth : Relais requête
-Auth -> Auth : Calcul hash(Refresh Token)
-Auth -> DB : SELECT * FROM refresh_token WHERE token_hash = ?
-alt Token inexistant ou expiré
-    Auth --> GW : 401 Unauthorized
-    GW --> User : 401 Unauthorized
-else Token déjà révoqué (DÉTECTION DE REJEU)
-    Auth -> DB : UPDATE refresh_token SET revoked=true WHERE family_id = ?\nUPDATE session_utilisateur SET active=false
-    Auth -> DB : INSERT INTO audit_securite (ALERT_TOKEN_REPLAY)
-    Auth --> GW : 401 Unauthorized (Compromission détectée)
-    GW --> User : 401 Unauthorized
-else Token valide et actif
-    Auth -> DB : UPDATE refresh_token SET revoked=true, replaced_by_hash = <new_hash>\nWHERE id = ?
-    Auth -> Auth : Génère nouvel Access Token (JWT)\nGénère nouveau Refresh Token (opaque)
-    Auth -> DB : INSERT INTO refresh_token (new_hash, familyId, active)
-    Auth --> GW : 200 OK + Nouveaux Set-Cookie (Session & Refresh)
-    GW --> User : 200 OK (Session renouvelée)
-end
-@enduml
-```
-
----
-
-## 5. DÉCONNEXION ET RÉVOCATION PERSISTANTE
-
-Contrairement à l'ancienne implémentation qui stockait les `jti` révoqués dans une `ConcurrentHashMap` en mémoire (perdue à chaque redémarrage de conteneur), la révocation est désormais **persistante** :
-
-1. **Déconnexion volontaire (`POST /api/utilisateurs/deconnexion`) :**
-   - La session associée au jeton est marquée `active = FALSE` dans la table `session_utilisateur`.
-   - Tous les refresh tokens de la session sont marqués `revoked = TRUE`.
-   - Les cookies `PATRIMOINE_SESSION` et `PATRIMOINE_REFRESH` sont supprimés côté client en renvoyant des en-têtes `Set-Cookie` avec `Max-Age=0`.
-   - L'événement est consigné dans `audit_securite` (`LOGOUT`).
-
-2. **Révocation administrative (`POST /api/utilisateurs/{id}/revoquer-sessions`) :**
-   - Un administrateur peut révoquer instantanément toutes les sessions d'un utilisateur suspecté de compromission.
-
----
-
-## 6. GESTION DES ERREURS ET PROTECTION ANTI-ÉNUMÉRATION
-
-Pour neutraliser la vulnérabilité `SEC-VULN-11` (énumération des comptes existants) :
-- En cas d'échec d'authentification (email inexistant ou mot de passe erroné), le service retourne systématiquement le même message d'erreur générique :
-  ```json
-  {
-    "statut": 401,
-    "erreur": "Identifiants invalides. Vérifiez votre adresse email et votre mot de passe."
-  }
-  ```
-- Les temps de réponse sont homogénéisés pour prévenir les attaques temporelles (timing attacks).
+le système :
+1. Révoque immédiatement toutes les entrées `session_utilisateur` et `refresh_token` de l'utilisateur en base de données (`AuthSessionManager.revokeAllUserSessions`).
+2. Publie l'invalidation au niveau du Gateway (`X-Revoke-User-Id` / `X-Revoke-User-Active-Role`) et vérifie la cohérence entre le rôle porté par le JWT et le rôle actif en base (`AuthSessionManager.validateActiveSessionAndRole`). Tout Access Token déjà émis avec l'ancien rôle ou appartenant à une session révoquée est immédiatement rejeté (`401 Unauthorized`).
