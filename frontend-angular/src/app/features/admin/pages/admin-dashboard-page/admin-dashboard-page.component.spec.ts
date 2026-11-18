@@ -207,4 +207,118 @@ describe('AdminDashboardPageComponent (P04)', () => {
     expect(fixture.nativeElement.textContent).toContain('PAY-SIM-OM-56');
     expect(fixture.nativeElement.textContent).not.toContain('Rembourser (simulé)');
   });
+
+  it('loads P05 guides, moderation & notifications tabs and executes guide validation + notification retry', async () => {
+    const fixture = TestBed.createComponent(AdminDashboardPageComponent);
+    fixture.detectChanges();
+    flushInitialCatalogs();
+
+    const comp = fixture.componentInstance as unknown as {
+      switchTab: (tab: 'guides' | 'moderation' | 'notifications') => void;
+      openGuideDecision: (g: { id: number; prenom: string; nom: string }, action: 'VALIDER') => void;
+      submitGuideDecision: () => Promise<void>;
+      retrySingleNotification: (id: number) => Promise<void>;
+    };
+
+    comp.switchTab('guides');
+    httpMock.expectOne('/api/guides/admin/tous').flush([
+      {
+        id: 2,
+        utilisateurId: 9,
+        nom: 'Sagna',
+        prenom: 'Binta',
+        email: 'binta.sagna@casamance.sn',
+        compteActif: true,
+        presentationCourte: 'Guide nature et mangroves',
+        biographie: '10 ans expérience',
+        languesParlees: 'Français, Wolof, Diola',
+        specialites: 'Écotourisme',
+        zonesIntervention: 'Basse-Casamance',
+        anneesExperience: 10,
+        numeroCarteProfessionnelle: 'CG-2026-099',
+        disponible: true,
+        visibilitePublique: true,
+        statutValidation: 'EN_ATTENTE_VALIDATION',
+      },
+    ]);
+    await flushMicrotasks();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Binta Sagna');
+
+    comp.openGuideDecision({ id: 2, prenom: 'Binta', nom: 'Sagna' }, 'VALIDER');
+    const decisionPromise = comp.submitGuideDecision();
+    const valReq = httpMock.expectOne('/api/guides/2/valider');
+    expect(valReq.request.method).toBe('POST');
+    valReq.flush({ id: 2, statutValidation: 'VALIDE' });
+    await flushMicrotasks();
+    httpMock.expectOne('/api/guides/admin/tous').flush([]);
+    await decisionPromise;
+
+    comp.switchTab('moderation');
+    httpMock.expectOne('/api/moderation/signalements?statut=OUVERT').flush([]);
+    httpMock.expectOne('/api/moderation/avis').flush([
+      {
+        id: 7,
+        auteurId: 4,
+        auteurNom: 'Moussa Diop',
+        cibleType: 'EVENEMENT',
+        cibleId: 1,
+        reservationId: 4,
+        note: 5,
+        commentaire: 'Soirée culturelle remarquable.',
+        experienceVerifiee: true,
+        statutModeration: 'APPROUVE',
+        datePublication: '2026-11-18T10:00:00',
+      },
+    ]);
+    await flushMicrotasks();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Soirée culturelle remarquable.');
+
+    comp.switchTab('notifications');
+    httpMock.expectOne('/api/notifications/toutes?page=0&size=15').flush({
+      content: [
+        {
+          id: 99,
+          destinataire: 'touriste@uasz.sn',
+          utilisateurId: 4,
+          sujet: 'Avis modéré',
+          contenu: 'Notification test',
+          canal: 'EMAIL',
+          statut: 'ECHEC_TEMPORAIRE',
+          typeEvenement: 'AVIS_MODERE',
+          tentatives: 1,
+          maxTentatives: 4,
+          dernierErreur: 'Timeout simulé',
+          dateEnvoi: '2026-11-18T10:00:00',
+          reservationId: null,
+        },
+      ],
+      page: 0,
+      size: 15,
+      totalElements: 1,
+      totalPages: 1,
+      last: true,
+      unreadCount: 0,
+    });
+    await flushMicrotasks();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.textContent).toContain('Timeout simulé');
+
+    const retryPromise = comp.retrySingleNotification(99);
+    const retryReq = httpMock.expectOne('/api/notifications/99/relancer');
+    expect(retryReq.request.method).toBe('POST');
+    retryReq.flush({ id: 99, statut: 'ENVOYEE' });
+    await flushMicrotasks();
+    httpMock.expectOne('/api/notifications/toutes?page=0&size=15').flush({
+      content: [],
+      page: 0,
+      size: 15,
+      totalElements: 0,
+      totalPages: 1,
+      last: true,
+      unreadCount: 0,
+    });
+    await retryPromise;
+  });
 });

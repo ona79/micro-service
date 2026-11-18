@@ -9,9 +9,12 @@ import {
 } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
+  LucideAward,
+  LucideBell,
   LucideCalendar,
   LucideCreditCard,
   LucideLandmark,
+  LucideMessageSquare,
   LucidePlus,
   LucideRefreshCw,
   LucideRoute,
@@ -25,6 +28,16 @@ import { toast } from 'ngx-sonner';
 import { AuthStore, formatRoleLabel } from '../../../../core/auth/auth.store';
 import { normalizeHttpError } from '../../../../core/interceptors/http-error.interceptor';
 import {
+  Avis,
+  AvisModerationHistorique,
+  CibleAvis,
+  SignalementAvis,
+  StatutModerationAvis,
+  StatutSignalement,
+  formatModerationStatusLabel,
+  moderationBadgeClass,
+} from '../../../../core/models/avis.model';
+import {
   Circuit,
   Difficulte,
   Etape,
@@ -36,6 +49,18 @@ import {
   StatutEvenement,
   TypeEvenement,
 } from '../../../../core/models/evenement.model';
+import {
+  GuideHistorique,
+  GuideProfil,
+  StatutValidationGuide,
+  formatGuideStatusLabel,
+  guideStatusBadgeClass,
+} from '../../../../core/models/guide.model';
+import {
+  NotificationItem,
+  StatutNotification,
+  formatNotificationEventLabel,
+} from '../../../../core/models/notification.model';
 import {
   ModePaiement,
   Paiement,
@@ -63,10 +88,13 @@ import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confi
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
+import { AvisApiService } from '../../../avis/data-access/avis-api.service';
 import { CircuitApiService } from '../../../circuits/data-access/circuit-api.service';
 import { CircuitStore } from '../../../circuits/data-access/circuit.store';
 import { EvenementApiService } from '../../../evenements/data-access/evenement-api.service';
 import { EvenementStore } from '../../../evenements/data-access/evenement.store';
+import { GuideApiService } from '../../../guides/data-access/guide-api.service';
+import { NotificationApiService } from '../../../notifications/data-access/notification-api.service';
 import { PaiementApiService } from '../../../paiements/data-access/paiement-api.service';
 import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoine-api.service';
 import { PatrimoineStore } from '../../../patrimoines/data-access/patrimoine.store';
@@ -78,6 +106,9 @@ type AdminTab =
   | 'evenements'
   | 'reservations'
   | 'paiements'
+  | 'guides'
+  | 'moderation'
+  | 'notifications'
   | 'utilisateurs';
 
 interface EtapeFormItem {
@@ -108,6 +139,9 @@ interface EtapeFormItem {
     LucidePlus,
     LucideTrash2,
     LucideShieldCheck,
+    LucideAward,
+    LucideMessageSquare,
+    LucideBell,
   ],
   template: `
     <div class="page-section">
@@ -179,6 +213,42 @@ interface EtapeFormItem {
             <svg lucideCreditCard [size]="16" aria-hidden="true"></svg>
             <span>Paiements Simulés</span>
           </button>
+
+          @if (canValidateGuides()) {
+            <button
+              type="button"
+              class="admin-tab"
+              [class.admin-tab--active]="activeTab() === 'guides'"
+              (click)="switchTab('guides')"
+            >
+              <svg lucideAward [size]="16" aria-hidden="true"></svg>
+              <span>Validation Guides</span>
+            </button>
+          }
+
+          @if (canModerateAvis()) {
+            <button
+              type="button"
+              class="admin-tab"
+              [class.admin-tab--active]="activeTab() === 'moderation'"
+              (click)="switchTab('moderation')"
+            >
+              <svg lucideMessageSquare [size]="16" aria-hidden="true"></svg>
+              <span>Modération Avis</span>
+            </button>
+          }
+
+          @if (authStore.isAdmin()) {
+            <button
+              type="button"
+              class="admin-tab"
+              [class.admin-tab--active]="activeTab() === 'notifications'"
+              (click)="switchTab('notifications')"
+            >
+              <svg lucideBell [size]="16" aria-hidden="true"></svg>
+              <span>Notifications Système</span>
+            </button>
+          }
 
           <button
             type="button"
@@ -448,14 +518,27 @@ interface EtapeFormItem {
                   <textarea id="cir-pres" rows="2" formControlName="presentationTouristique" class="form-input"></textarea>
                 </div>
 
-                <div class="form-field">
-                  <label for="cir-statut">Statut du circuit</label>
-                  <select id="cir-statut" formControlName="statutCircuit" class="form-input">
-                    <option value="BROUILLON">Brouillon</option>
-                    <option value="SOUMIS">Soumis</option>
-                    <option value="PUBLIE">Publié</option>
-                    <option value="ARCHIVE">Archivé</option>
-                  </select>
+                <div class="form-row">
+                  <div class="form-field">
+                    <label for="cir-statut">Statut du circuit</label>
+                    <select id="cir-statut" formControlName="statutCircuit" class="form-input">
+                      <option value="BROUILLON">Brouillon</option>
+                      <option value="SOUMIS">Soumis</option>
+                      <option value="PUBLIE">Publié</option>
+                      <option value="ARCHIVE">Archivé</option>
+                    </select>
+                  </div>
+                  <div class="form-field">
+                    <label for="cir-guide">Guide responsable validé (optionnel)</label>
+                    <select id="cir-guide" formControlName="guideResponsableId" class="form-input">
+                      <option [ngValue]="null">Aucun guide affecté</option>
+                      @for (g of guidesCatalog(); track g.utilisateurId) {
+                        <option [ngValue]="g.utilisateurId">
+                          Guide #{{ g.utilisateurId }} — {{ g.prenom }} {{ g.nom }} ({{ g.zonesIntervention }})
+                        </option>
+                      }
+                    </select>
+                  </div>
                 </div>
 
                 <div class="form-field">
@@ -564,6 +647,24 @@ interface EtapeFormItem {
                         <td>
                           <strong>{{ c.nomCircuit }}</strong><br />
                           <small>{{ c.statutCircuit || 'PUBLIE' }} · {{ c.etapes.length }} étape(s)</small>
+                          @if (c.guideResponsableId) {
+                            <br /><small>Guide : {{ guideLabel(c.guideResponsableId) }}</small>
+                          }
+                          @if (canValidateGuides()) {
+                            <div style="margin-top:0.35rem;">
+                              <select
+                                class="form-input"
+                                [ngModel]="c.guideResponsableId ?? ''"
+                                [ngModelOptions]="{ standalone: true }"
+                                (ngModelChange)="assignGuideToCircuit(c.id, $event)"
+                              >
+                                <option value="">— Sans guide —</option>
+                                @for (g of guidesCatalog(); track g.utilisateurId) {
+                                  <option [ngValue]="g.utilisateurId">#{{ g.utilisateurId }} {{ g.prenom }} {{ g.nom }}</option>
+                                }
+                              </select>
+                            </div>
+                          }
                         </td>
                         <td class="tabular-nums">~{{ c.distanceTotale || 0 }} km · {{ c.dureeEstimee }} min</td>
                         <td class="tabular-nums">{{ c.prix | fcfaPrice }}</td>
@@ -1135,6 +1236,495 @@ interface EtapeFormItem {
             </div>
           }
         }
+
+          <!-- ONGLET P05 : VALIDATION DES GUIDES -->
+          @if (activeTab() === 'guides' && canValidateGuides()) {
+            <section class="admin-card">
+              <div class="section-head">
+                <h2 class="admin-card__title" style="margin:0;">Validation &amp; gestion des guides touristiques</h2>
+                <button type="button" class="btn-secondary" (click)="loadAdminGuides()">Actualiser</button>
+              </div>
+
+              <div class="filter-bar">
+                <select
+                  class="form-input"
+                  [ngModel]="guideStatutFilter()"
+                  (ngModelChange)="guideStatutFilter.set($event); loadAdminGuides()"
+                >
+                  <option value="">Tous les statuts</option>
+                  <option value="EN_ATTENTE_VALIDATION">En attente de validation</option>
+                  <option value="VALIDE">Validés</option>
+                  <option value="REJETE">Rejetés</option>
+                  <option value="SUSPENDU">Suspendus</option>
+                  <option value="BROUILLON">Brouillons</option>
+                  <option value="DESACTIVE">Désactivés</option>
+                </select>
+                <span>Total : <strong>{{ adminGuides().length }}</strong> dossier(s)</span>
+              </div>
+
+              @if (selectedGuideAction(); as pending) {
+                <div class="admin-card" style="background:var(--surface-canvas);margin-bottom:var(--space-4);">
+                  <h3 class="admin-card__title" style="font-size:var(--text-base);">
+                    Confirmer l’action « {{ pending.action }} » sur {{ pending.guide.prenom }} {{ pending.guide.nom }} (#{{ pending.guide.id }})
+                  </h3>
+                  <div class="form-field">
+                    <label for="guide-decision-motif">
+                      Motif de la décision
+                      {{ pending.action === 'REJETER' || pending.action === 'SUSPENDRE' ? '(obligatoire)' : '(optionnel)' }}
+                    </label>
+                    <input
+                      id="guide-decision-motif"
+                      type="text"
+                      class="form-input"
+                      [(ngModel)]="guideActionMotif"
+                      placeholder="Ex: Carte professionnelle et références vérifiées"
+                    />
+                  </div>
+                  <div class="form-actions">
+                    <button type="button" class="btn-primary" (click)="submitGuideDecision()">Confirmer</button>
+                    <button type="button" class="btn-secondary" (click)="cancelGuideDecision()">Annuler</button>
+                  </div>
+                </div>
+              }
+
+              <div class="table-wrap">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Guide</th>
+                      <th>Carte &amp; Zones</th>
+                      <th>Langues &amp; Exp.</th>
+                      <th>Statut</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (g of adminGuides(); track g.id) {
+                      <tr>
+                        <td>
+                          <strong>#{{ g.id }} · {{ g.prenom }} {{ g.nom }}</strong><br />
+                          <small>{{ g.email || 'utilisateur #' + g.utilisateurId }}</small>
+                          @if (g.motifDecision) {
+                            <br /><small>Motif : {{ g.motifDecision }}</small>
+                          }
+                        </td>
+                        <td>
+                          <span>{{ g.numeroCarteProfessionnelle || 'Sans numéro' }}</span><br />
+                          <small>{{ g.zonesIntervention || '—' }}</small>
+                        </td>
+                        <td>
+                          <span>{{ g.languesParlees || '—' }}</span><br />
+                          <small class="tabular-nums">{{ g.anneesExperience }} an(s)</small>
+                        </td>
+                        <td>
+                          <span [class]="guideStatusBadgeClass(g.statutValidation)">
+                            {{ formatGuideStatusLabel(g.statutValidation) }}
+                          </span>
+                        </td>
+                        <td class="table-actions">
+                          @if (g.statutValidation === 'EN_ATTENTE_VALIDATION') {
+                            <button type="button" class="btn-xs" (click)="openGuideDecision(g, 'VALIDER')">Valider</button>
+                            <button type="button" class="btn-xs btn-xs--danger" (click)="openGuideDecision(g, 'REJETER')">Rejeter</button>
+                          }
+                          @if (g.statutValidation === 'VALIDE') {
+                            <button type="button" class="btn-xs btn-xs--danger" (click)="openGuideDecision(g, 'SUSPENDRE')">Suspendre</button>
+                            <button type="button" class="btn-xs" (click)="openGuideDecision(g, 'DESACTIVER')">Désactiver</button>
+                          }
+                          @if (g.statutValidation === 'SUSPENDU' || g.statutValidation === 'DESACTIVE') {
+                            <button type="button" class="btn-xs" (click)="openGuideDecision(g, 'REACTIVER')">Réactiver</button>
+                          }
+                          <button type="button" class="btn-xs" (click)="loadGuideHistorique(g)">Historique</button>
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="5">Aucun dossier guide ne correspond au filtre sélectionné.</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              @if (guideHistoriqueTarget(); as histTarget) {
+                <div style="margin-top:var(--space-5);">
+                  <div class="section-head">
+                    <h3 class="admin-card__title" style="margin:0;font-size:var(--text-base);">
+                      Historique d’audit — {{ histTarget.prenom }} {{ histTarget.nom }} (#{{ histTarget.id }})
+                    </h3>
+                    <button type="button" class="btn-xs" (click)="guideHistoriqueTarget.set(null)">Fermer</button>
+                  </div>
+                  <div class="table-wrap">
+                    <table class="admin-table">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th>Transition</th>
+                          <th>Acteur</th>
+                          <th>Motif</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (h of guideHistorique(); track h.id) {
+                          <tr>
+                            <td class="tabular-nums">{{ h.dateTransition | dateFr }}</td>
+                            <td>{{ h.ancienStatut || 'NOUVEAU' }} → <strong>{{ h.nouveauStatut }}</strong></td>
+                            <td>#{{ h.acteurId }} ({{ h.acteurRole }})</td>
+                            <td>{{ h.motif || '—' }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              }
+            </section>
+          }
+
+          <!-- ONGLET P05 : MODÉRATION DES AVIS & SIGNALEMENTS -->
+          @if (activeTab() === 'moderation' && canModerateAvis()) {
+            <div class="p04-stack">
+              <section class="admin-card">
+                <div class="section-head">
+                  <h2 class="admin-card__title" style="margin:0;">File de traitement des signalements ({{ moderationSignalements().length }})</h2>
+                  <button type="button" class="btn-secondary" (click)="loadModerationData()">Actualiser</button>
+                </div>
+
+                <div class="filter-bar">
+                  <select
+                    class="form-input"
+                    [ngModel]="signalementStatutFilter()"
+                    (ngModelChange)="signalementStatutFilter.set($event); loadModerationData()"
+                  >
+                    <option value="OUVERT">Signalements ouverts</option>
+                    <option value="VALIDE_CONTENU_RETIRE">Validés (contenu retiré)</option>
+                    <option value="REJETE_ABUSIF">Rejetés (abusifs)</option>
+                    <option value="">Tous les signalements</option>
+                  </select>
+                </div>
+
+                @if (selectedSignalementAction(); as sigPending) {
+                  <div class="admin-card" style="background:var(--surface-canvas);margin-bottom:var(--space-4);">
+                    <h3 class="admin-card__title" style="font-size:var(--text-base);">
+                      Traiter signalement #{{ sigPending.signalement.id }} ({{ sigPending.decision }})
+                    </h3>
+                    <div class="form-field">
+                      <label for="sig-decision-comment">Justification de modération *</label>
+                      <input
+                        id="sig-decision-comment"
+                        type="text"
+                        class="form-input"
+                        [(ngModel)]="signalementDecisionMotif"
+                        placeholder="Ex: Propos non conformes à la charte ou signalement non fondé"
+                      />
+                    </div>
+                    <div class="form-actions">
+                      <button type="button" class="btn-primary" (click)="submitSignalementDecision()">Enregistrer la décision</button>
+                      <button type="button" class="btn-secondary" (click)="selectedSignalementAction.set(null)">Annuler</button>
+                    </div>
+                  </div>
+                }
+
+                <div class="table-wrap">
+                  <table class="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Signalement</th>
+                        <th>Avis concerné</th>
+                        <th>Motif du visiteur</th>
+                        <th>Statut</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (s of moderationSignalements(); track s.id) {
+                        <tr>
+                          <td>
+                            <strong>#{{ s.id }} · {{ s.categorie }}</strong><br />
+                            <small>Par {{ s.signaleParNom }} le {{ s.dateSignalement | dateFr }}</small>
+                          </td>
+                          <td>
+                            <strong>Avis #{{ s.avisId }}</strong>
+                            @if (s.avis) {
+                              <span class="tabular-nums"> ({{ s.avis.note }}/5)</span><br />
+                              <small>{{ s.avis.commentaire }}</small>
+                            }
+                          </td>
+                          <td>{{ s.motif }}</td>
+                          <td>{{ s.statut }}</td>
+                          <td class="table-actions">
+                            @if (s.statut === 'OUVERT') {
+                              <button type="button" class="btn-xs btn-xs--danger" (click)="openSignalementDecision(s, 'VALIDE_CONTENU_RETIRE')">
+                                Retirer l’avis
+                              </button>
+                              <button type="button" class="btn-xs" (click)="openSignalementDecision(s, 'REJETE_ABUSIF')">
+                                Rejeter signalement
+                              </button>
+                            } @else {
+                              <small>{{ s.decisionCommentaire || 'Traité' }}</small>
+                            }
+                          </td>
+                        </tr>
+                      } @empty {
+                        <tr>
+                          <td colspan="5">Aucun signalement dans cette file.</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section class="admin-card">
+                <div class="section-head">
+                  <h2 class="admin-card__title" style="margin:0;">Catalogue des avis vérifiés ({{ moderationAvis().length }})</h2>
+                </div>
+
+                <div class="filter-bar">
+                  <select
+                    class="form-input"
+                    [ngModel]="avisCibleFilter()"
+                    (ngModelChange)="avisCibleFilter.set($event); loadModerationData()"
+                  >
+                    <option value="">Toutes les cibles</option>
+                    <option value="PATRIMOINE">Patrimoines</option>
+                    <option value="CIRCUIT">Circuits</option>
+                    <option value="EVENEMENT">Événements</option>
+                    <option value="GUIDE">Guides</option>
+                  </select>
+                  <select
+                    class="form-input"
+                    [ngModel]="avisStatutFilter()"
+                    (ngModelChange)="avisStatutFilter.set($event); loadModerationData()"
+                  >
+                    <option value="">Tous les statuts</option>
+                    <option value="APPROUVE">Approuvé</option>
+                    <option value="EN_ATTENTE">En attente</option>
+                    <option value="MASQUE">Masqué</option>
+                    <option value="REJETE">Rejeté</option>
+                  </select>
+                </div>
+
+                @if (selectedAvisAction(); as avisPending) {
+                  <div class="admin-card" style="background:var(--surface-canvas);margin-bottom:var(--space-4);">
+                    <h3 class="admin-card__title" style="font-size:var(--text-base);">
+                      Appliquer « {{ formatModerationStatusLabel(avisPending.decision) }} » à l’avis #{{ avisPending.avis.id }}
+                    </h3>
+                    <div class="form-field">
+                      <label for="avis-decision-motif">Motif obligatoire pour l’audit *</label>
+                      <input
+                        id="avis-decision-motif"
+                        type="text"
+                        class="form-input"
+                        [(ngModel)]="avisModerationMotif"
+                        placeholder="Précisez la justification de modération"
+                      />
+                    </div>
+                    <div class="form-actions">
+                      <button type="button" class="btn-primary" (click)="submitAvisModeration()">Appliquer</button>
+                      <button type="button" class="btn-secondary" (click)="selectedAvisAction.set(null)">Annuler</button>
+                    </div>
+                  </div>
+                }
+
+                <div class="table-wrap">
+                  <table class="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Auteur &amp; Cible</th>
+                        <th>Note &amp; Commentaire</th>
+                        <th>Statut</th>
+                        <th>Modération</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (a of moderationAvis(); track a.id) {
+                        <tr>
+                          <td>
+                            <strong>{{ a.auteurNom }}</strong><br />
+                            <small>{{ a.cibleType }} #{{ a.cibleId }} · Rés. #{{ a.reservationId }}</small>
+                          </td>
+                          <td>
+                            <strong class="tabular-nums">{{ a.note }}/5</strong>
+                            @if (a.experienceVerifiee) {
+                              <span class="ui-badge ui-badge--success">Expérience vérifiée</span>
+                            }
+                            <br />
+                            <small>{{ a.commentaire }}</small>
+                          </td>
+                          <td>
+                            <span [class]="moderationStatusBadgeClass(a.statutModeration)">
+                              {{ formatModerationStatusLabel(a.statutModeration) }}
+                            </span>
+                          </td>
+                          <td class="table-actions">
+                            @if (a.statutModeration !== 'APPROUVE') {
+                              <button type="button" class="btn-xs" (click)="openAvisModeration(a, 'APPROUVE')">Approuver</button>
+                            }
+                            @if (a.statutModeration !== 'MASQUE') {
+                              <button type="button" class="btn-xs btn-xs--danger" (click)="openAvisModeration(a, 'MASQUE')">Masquer</button>
+                            }
+                            @if (a.statutModeration !== 'REJETE') {
+                              <button type="button" class="btn-xs btn-xs--danger" (click)="openAvisModeration(a, 'REJETE')">Rejeter</button>
+                            }
+                            <button type="button" class="btn-xs" (click)="loadAvisModerationHistorique(a)">Historique</button>
+                          </td>
+                        </tr>
+                      } @empty {
+                        <tr>
+                          <td colspan="4">Aucun avis trouvé pour ces critères.</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+
+                @if (avisHistoriqueTarget(); as avisHistTarget) {
+                  <div style="margin-top:var(--space-5);">
+                    <div class="section-head">
+                      <h3 class="admin-card__title" style="margin:0;font-size:var(--text-base);">
+                        Historique de modération — Avis #{{ avisHistTarget.id }}
+                      </h3>
+                      <button type="button" class="btn-xs" (click)="avisHistoriqueTarget.set(null)">Fermer</button>
+                    </div>
+                    <div class="table-wrap">
+                      <table class="admin-table">
+                        <thead>
+                          <tr>
+                            <th>Date</th>
+                            <th>Transition</th>
+                            <th>Acteur</th>
+                            <th>Justification</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (h of avisModerationHistorique(); track h.id) {
+                            <tr>
+                              <td class="tabular-nums">{{ h.dateDecision | dateFr }}</td>
+                              <td>{{ h.ancienStatut || 'NOUVEAU' }} → <strong>{{ h.nouveauStatut }}</strong></td>
+                              <td>#{{ h.acteurId }} ({{ h.acteurRole }})</td>
+                              <td>{{ h.justification }}</td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                }
+              </section>
+            </div>
+          }
+
+          <!-- ONGLET P05 : NOTIFICATIONS SYSTÈME & RELANCE (ADMIN) -->
+          @if (activeTab() === 'notifications' && authStore.isAdmin()) {
+            <section class="admin-card">
+              <div class="section-head">
+                <h2 class="admin-card__title" style="margin:0;">
+                  Supervision des notifications ({{ notifAdminTotalElements() }})
+                </h2>
+                <div style="display:flex;gap:var(--space-2);flex-wrap:wrap;">
+                  <button type="button" class="btn-secondary" (click)="loadAdminNotifications(notifAdminPage())">
+                    Actualiser
+                  </button>
+                  <button type="button" class="btn-primary" (click)="triggerNotificationsRetrySweep()">
+                    Forcer reprise des échecs
+                  </button>
+                </div>
+              </div>
+
+              <div class="filter-bar">
+                <select
+                  class="form-input"
+                  [ngModel]="notifAdminStatutFilter()"
+                  (ngModelChange)="notifAdminStatutFilter.set($event); loadAdminNotifications(0)"
+                >
+                  <option value="">Tous les statuts</option>
+                  <option value="ENVOYEE">Envoyées</option>
+                  <option value="ECHEC_TEMPORAIRE">Échecs temporaires</option>
+                  <option value="ECHEC">Échecs définitifs</option>
+                  <option value="EN_ATTENTE">En attente</option>
+                </select>
+                <input
+                  type="text"
+                  class="form-input"
+                  placeholder="Type événement (ex: AVIS_MODERE)"
+                  [ngModel]="notifAdminTypeFilter()"
+                  (ngModelChange)="notifAdminTypeFilter.set($event)"
+                />
+                <button type="button" class="btn-secondary" (click)="loadAdminNotifications(0)">Filtrer</button>
+              </div>
+
+              <div class="table-wrap">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Destinataire</th>
+                      <th>Événement &amp; Sujet</th>
+                      <th>Canal &amp; Statut</th>
+                      <th>Tentatives</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (n of adminNotifications(); track n.id) {
+                      <tr>
+                        <td>
+                          <strong>{{ n.destinataire }}</strong><br />
+                          <small>Utilisateur #{{ n.utilisateurId ?? '—' }}</small>
+                        </td>
+                        <td>
+                          <strong>{{ formatNotificationEventLabel(n.typeEvenement) }}</strong><br />
+                          <small>{{ n.sujet }}</small>
+                          @if (n.dernierErreur) {
+                            <br /><small style="color:var(--danger);">{{ n.dernierErreur }}</small>
+                          }
+                        </td>
+                        <td>
+                          <span>{{ n.canal }}</span> ·
+                          <span [class]="notificationStatusBadgeClass(n.statut)">{{ n.statut }}</span>
+                        </td>
+                        <td class="tabular-nums">{{ n.tentatives ?? 1 }} / {{ n.maxTentatives ?? 4 }}</td>
+                        <td class="table-actions">
+                          @if (n.statut !== 'ENVOYEE') {
+                            <button type="button" class="btn-xs" (click)="retrySingleNotification(n.id)">
+                              Relancer
+                            </button>
+                          } @else {
+                            <small class="tabular-nums">{{ n.dateEnvoi | dateFr }}</small>
+                          }
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="5">Aucune notification enregistrée pour ces critères.</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              @if (notifAdminTotalPages() > 1) {
+                <div class="pager">
+                  <button
+                    type="button"
+                    class="btn-xs"
+                    [disabled]="notifAdminPage() === 0"
+                    (click)="loadAdminNotifications(notifAdminPage() - 1)"
+                  >
+                    Précédent
+                  </button>
+                  <span>Page {{ notifAdminPage() + 1 }} / {{ notifAdminTotalPages() }}</span>
+                  <button
+                    type="button"
+                    class="btn-xs"
+                    [disabled]="notifAdminPage() + 1 >= notifAdminTotalPages()"
+                    (click)="loadAdminNotifications(notifAdminPage() + 1)"
+                  >
+                    Suivant
+                  </button>
+                </div>
+              }
+            </section>
+          }
       </div>
     </div>
   `,
@@ -1421,6 +2011,9 @@ export class AdminDashboardPageComponent implements OnInit {
   private readonly evenementApi = inject(EvenementApiService);
   private readonly reservationApi = inject(ReservationApiService);
   private readonly paiementApi = inject(PaiementApiService);
+  private readonly guideApi = inject(GuideApiService);
+  private readonly avisApi = inject(AvisApiService);
+  private readonly notificationApi = inject(NotificationApiService);
 
   protected readonly authStore = inject(AuthStore);
   protected readonly patrimoineStore = inject(PatrimoineStore);
@@ -1431,6 +2024,20 @@ export class AdminDashboardPageComponent implements OnInit {
   protected readonly reservationStatusBadgeClass = reservationStatusBadgeClass;
   protected readonly formatPaiementStatusLabel = formatPaiementStatusLabel;
   protected readonly paiementStatusBadgeClass = paiementStatusBadgeClass;
+  protected readonly formatGuideStatusLabel = formatGuideStatusLabel;
+  protected readonly guideStatusBadgeClass = guideStatusBadgeClass;
+  protected readonly formatModerationStatusLabel = formatModerationStatusLabel;
+  protected readonly moderationStatusBadgeClass = moderationBadgeClass;
+  protected readonly formatNotificationEventLabel = formatNotificationEventLabel;
+
+  protected readonly canValidateGuides = computed(() => {
+    const role = this.authStore.user()?.role;
+    return this.authStore.isAdmin() || role === 'GESTIONNAIRE_SITE';
+  });
+  protected readonly canModerateAvis = computed(() => {
+    const role = this.authStore.user()?.role;
+    return this.authStore.isAdmin() || role === 'GESTIONNAIRE_SITE';
+  });
 
   protected readonly activeTab = signal<AdminTab>('patrimoines');
   protected readonly editingPatrimoineId = signal<number | null>(null);
@@ -1439,6 +2046,43 @@ export class AdminDashboardPageComponent implements OnInit {
   protected readonly actionError = signal<string | null>(null);
   protected readonly users = signal<Utilisateur[]>([]);
   protected readonly commResult = signal<string | null>(null);
+
+  protected readonly guidesCatalog = signal<GuideProfil[]>([]);
+  protected readonly adminGuides = signal<GuideProfil[]>([]);
+  protected readonly guideStatutFilter = signal<StatutValidationGuide | ''>('');
+  protected readonly guideHistorique = signal<GuideHistorique[]>([]);
+  protected readonly guideHistoriqueTarget = signal<GuideProfil | null>(null);
+  protected readonly selectedGuideAction = signal<{
+    guide: GuideProfil;
+    action: 'VALIDER' | 'REJETER' | 'SUSPENDRE' | 'REACTIVER' | 'DESACTIVER';
+  } | null>(null);
+  protected guideActionMotif = '';
+
+  protected readonly moderationSignalements = signal<SignalementAvis[]>([]);
+  protected readonly signalementStatutFilter = signal<StatutSignalement | ''>('OUVERT');
+  protected readonly selectedSignalementAction = signal<{
+    signalement: SignalementAvis;
+    decision: 'VALIDE_CONTENU_RETIRE' | 'REJETE_ABUSIF';
+  } | null>(null);
+  protected signalementDecisionMotif = '';
+
+  protected readonly moderationAvis = signal<Avis[]>([]);
+  protected readonly avisCibleFilter = signal<CibleAvis | ''>('');
+  protected readonly avisStatutFilter = signal<StatutModerationAvis | ''>('');
+  protected readonly selectedAvisAction = signal<{
+    avis: Avis;
+    decision: StatutModerationAvis;
+  } | null>(null);
+  protected avisModerationMotif = '';
+  protected readonly avisModerationHistorique = signal<AvisModerationHistorique[]>([]);
+  protected readonly avisHistoriqueTarget = signal<Avis | null>(null);
+
+  protected readonly adminNotifications = signal<NotificationItem[]>([]);
+  protected readonly notifAdminStatutFilter = signal<StatutNotification | ''>('');
+  protected readonly notifAdminTypeFilter = signal('');
+  protected readonly notifAdminPage = signal(0);
+  protected readonly notifAdminTotalPages = signal(1);
+  protected readonly notifAdminTotalElements = signal(0);
 
   protected readonly adminReservations = signal<Reservation[]>([]);
   protected readonly resStats = signal<ReservationStats | null>(null);
@@ -1505,6 +2149,7 @@ export class AdminDashboardPageComponent implements OnInit {
     placesMax: [20, [Validators.required, Validators.min(1)]],
     prix: [15000, [Validators.required, Validators.min(0)]],
     statutCircuit: ['PUBLIE' as StatutCircuit, [Validators.required]],
+    guideResponsableId: [null as number | null],
   });
 
   protected readonly evenementForm = this.fb.nonNullable.group({
@@ -1547,12 +2192,20 @@ export class AdminDashboardPageComponent implements OnInit {
   protected switchTab(tab: AdminTab): void {
     this.activeTab.set(tab);
     this.actionError.set(null);
-    if (tab === 'utilisateurs' && this.authStore.isAdmin()) {
+    if (tab === 'circuits') {
+      void this.loadGuidesCatalog();
+    } else if (tab === 'utilisateurs' && this.authStore.isAdmin()) {
       void this.loadUsers();
     } else if (tab === 'reservations') {
       void this.loadReservationsPage(0);
     } else if (tab === 'paiements') {
       void this.loadPaiementsPage(0);
+    } else if (tab === 'guides' && this.canValidateGuides()) {
+      void this.loadAdminGuides();
+    } else if (tab === 'moderation' && this.canModerateAvis()) {
+      void this.loadModerationData();
+    } else if (tab === 'notifications' && this.authStore.isAdmin()) {
+      void this.loadAdminNotifications(0);
     }
   }
 
@@ -1701,6 +2354,7 @@ export class AdminDashboardPageComponent implements OnInit {
   }
 
   protected startEditCircuit(c: Circuit): void {
+    void this.loadGuidesCatalog();
     this.editingCircuitId.set(c.id);
     this.circuitForm.setValue({
       nomCircuit: c.nomCircuit,
@@ -1714,6 +2368,7 @@ export class AdminDashboardPageComponent implements OnInit {
       placesMax: c.placesMax,
       prix: c.prix,
       statutCircuit: c.statutCircuit ?? 'PUBLIE',
+      guideResponsableId: c.guideResponsableId ?? null,
     });
     if (c.etapes?.length) {
       this.circuitEtapes.set(
@@ -1742,6 +2397,7 @@ export class AdminDashboardPageComponent implements OnInit {
       placesMax: 20,
       prix: 15000,
       statutCircuit: 'PUBLIE',
+      guideResponsableId: null,
     });
     this.circuitEtapes.set([
       {
@@ -1763,6 +2419,7 @@ export class AdminDashboardPageComponent implements OnInit {
     const raw = this.circuitForm.getRawValue();
     const payload: Partial<Circuit> = {
       ...raw,
+      guideResponsableId: raw.guideResponsableId ? Number(raw.guideResponsableId) : null,
       etapes: this.circuitEtapes().map((e, i) => ({
         ordre: i + 1,
         patrimoineId: e.patrimoineId,
@@ -2083,6 +2740,240 @@ export class AdminDashboardPageComponent implements OnInit {
     } catch (err) {
       this.actionError.set(normalizeHttpError(err).message);
     }
+  }
+
+  protected async loadGuidesCatalog(): Promise<void> {
+    try {
+      const guides = await firstValueFrom(this.guideApi.getPublicGuides());
+      this.guidesCatalog.set(guides);
+    } catch {
+      this.guidesCatalog.set([]);
+    }
+  }
+
+  protected guideLabel(guideUtilisateurId: number): string {
+    const found = this.guidesCatalog().find((g) => g.utilisateurId === guideUtilisateurId);
+    return found ? `${found.prenom} ${found.nom} (#${guideUtilisateurId})` : `#${guideUtilisateurId}`;
+  }
+
+  protected async assignGuideToCircuit(circuitId: number, rawGuideId: unknown): Promise<void> {
+    this.actionError.set(null);
+    const guideId = rawGuideId === '' || rawGuideId == null ? null : Number(rawGuideId);
+    try {
+      await firstValueFrom(this.circuitApi.affecterGuideResponsable(circuitId, guideId));
+      toast.success(guideId ? `Guide #${guideId} affecté au circuit #${circuitId}` : `Affectation guide retirée du circuit #${circuitId}`);
+      await this.circuitStore.reload();
+    } catch (err) {
+      this.actionError.set(normalizeHttpError(err).message);
+    }
+  }
+
+  protected async loadAdminGuides(): Promise<void> {
+    this.actionError.set(null);
+    try {
+      const list = await firstValueFrom(this.guideApi.getAllAdmin(this.guideStatutFilter()));
+      this.adminGuides.set(list);
+    } catch (err) {
+      this.actionError.set(normalizeHttpError(err).message);
+    }
+  }
+
+  protected openGuideDecision(
+    guide: GuideProfil,
+    action: 'VALIDER' | 'REJETER' | 'SUSPENDRE' | 'REACTIVER' | 'DESACTIVER'
+  ): void {
+    this.selectedGuideAction.set({ guide, action });
+    this.guideActionMotif =
+      action === 'VALIDER' || action === 'REACTIVER'
+        ? 'Dossier vérifié et conforme'
+        : '';
+  }
+
+  protected cancelGuideDecision(): void {
+    this.selectedGuideAction.set(null);
+    this.guideActionMotif = '';
+  }
+
+  protected async submitGuideDecision(): Promise<void> {
+    const pending = this.selectedGuideAction();
+    if (!pending) return;
+    const motif = this.guideActionMotif.trim();
+    if ((pending.action === 'REJETER' || pending.action === 'SUSPENDRE') && motif.length < 3) {
+      this.actionError.set('Un motif explicite (minimum 3 caractères) est obligatoire pour un rejet ou une suspension.');
+      return;
+    }
+    this.actionError.set(null);
+    try {
+      const id = pending.guide.id;
+      if (pending.action === 'VALIDER') {
+        await firstValueFrom(this.guideApi.validerProfil(id, motif || undefined));
+        toast.success(`Guide #${id} validé et publié dans l'annuaire`);
+      } else if (pending.action === 'REJETER') {
+        await firstValueFrom(this.guideApi.rejeterProfil(id, motif));
+        toast.success(`Dossier guide #${id} rejeté`);
+      } else if (pending.action === 'SUSPENDRE') {
+        await firstValueFrom(this.guideApi.suspendreProfil(id, motif));
+        toast.success(`Guide #${id} suspendu`);
+      } else if (pending.action === 'REACTIVER') {
+        await firstValueFrom(this.guideApi.reactiverProfil(id, motif || undefined));
+        toast.success(`Guide #${id} réactivé`);
+      } else {
+        await firstValueFrom(this.guideApi.desactiverProfilParAdmin(id, motif || undefined));
+        toast.success(`Guide #${id} désactivé`);
+      }
+      this.cancelGuideDecision();
+      await this.loadAdminGuides();
+    } catch (err) {
+      this.actionError.set(normalizeHttpError(err).message);
+    }
+  }
+
+  protected async loadGuideHistorique(guide: GuideProfil): Promise<void> {
+    this.actionError.set(null);
+    try {
+      const list = await firstValueFrom(this.guideApi.getHistorique(guide.id));
+      this.guideHistoriqueTarget.set(guide);
+      this.guideHistorique.set(list);
+    } catch (err) {
+      this.actionError.set(normalizeHttpError(err).message);
+    }
+  }
+
+  protected async loadModerationData(): Promise<void> {
+    this.actionError.set(null);
+    try {
+      const [sigs, avis] = await Promise.all([
+        firstValueFrom(this.avisApi.getSignalementsModeration(this.signalementStatutFilter())),
+        firstValueFrom(this.avisApi.getAvisModeration(this.avisCibleFilter(), this.avisStatutFilter())),
+      ]);
+      this.moderationSignalements.set(sigs);
+      this.moderationAvis.set(avis);
+    } catch (err) {
+      this.actionError.set(normalizeHttpError(err).message);
+    }
+  }
+
+  protected openSignalementDecision(
+    signalement: SignalementAvis,
+    decision: 'VALIDE_CONTENU_RETIRE' | 'REJETE_ABUSIF'
+  ): void {
+    this.selectedSignalementAction.set({ signalement, decision });
+    this.signalementDecisionMotif =
+      decision === 'VALIDE_CONTENU_RETIRE'
+        ? 'Contenu retiré suite au signalement vérifié'
+        : 'Signalement examiné et jugé non fondé';
+  }
+
+  protected async submitSignalementDecision(): Promise<void> {
+    const pending = this.selectedSignalementAction();
+    if (!pending) return;
+    const motif = this.signalementDecisionMotif.trim();
+    if (motif.length < 3) {
+      this.actionError.set('La justification de modération est obligatoire (minimum 3 caractères).');
+      return;
+    }
+    this.actionError.set(null);
+    try {
+      await firstValueFrom(
+        this.avisApi.traiterSignalement(
+          pending.signalement.id,
+          pending.decision,
+          motif,
+          pending.decision === 'VALIDE_CONTENU_RETIRE' ? 'MASQUE' : undefined
+        )
+      );
+      toast.success(`Signalement #${pending.signalement.id} traité`);
+      this.selectedSignalementAction.set(null);
+      await this.loadModerationData();
+    } catch (err) {
+      this.actionError.set(normalizeHttpError(err).message);
+    }
+  }
+
+  protected openAvisModeration(avis: Avis, decision: StatutModerationAvis): void {
+    this.selectedAvisAction.set({ avis, decision });
+    this.avisModerationMotif = decision === 'APPROUVE' ? 'Avis vérifié et approuvé' : '';
+  }
+
+  protected async submitAvisModeration(): Promise<void> {
+    const pending = this.selectedAvisAction();
+    if (!pending) return;
+    const motif = this.avisModerationMotif.trim();
+    if (motif.length < 3) {
+      this.actionError.set('Une justification écrite est obligatoire pour toute décision de modération.');
+      return;
+    }
+    this.actionError.set(null);
+    try {
+      await firstValueFrom(
+        this.avisApi.deciderModerationAvis(pending.avis.id, pending.decision, motif)
+      );
+      toast.success(`Avis #${pending.avis.id} passé au statut ${pending.decision}`);
+      this.selectedAvisAction.set(null);
+      await this.loadModerationData();
+    } catch (err) {
+      this.actionError.set(normalizeHttpError(err).message);
+    }
+  }
+
+  protected async loadAvisModerationHistorique(avis: Avis): Promise<void> {
+    this.actionError.set(null);
+    try {
+      const list = await firstValueFrom(this.avisApi.getHistoriqueModeration(avis.id));
+      this.avisHistoriqueTarget.set(avis);
+      this.avisModerationHistorique.set(list);
+    } catch (err) {
+      this.actionError.set(normalizeHttpError(err).message);
+    }
+  }
+
+  protected async loadAdminNotifications(page: number): Promise<void> {
+    this.actionError.set(null);
+    try {
+      const paged = await firstValueFrom(
+        this.notificationApi.getAllAdminPaged(
+          page,
+          15,
+          this.notifAdminStatutFilter(),
+          this.notifAdminTypeFilter().trim() || undefined
+        )
+      );
+      this.adminNotifications.set(paged.content ?? []);
+      this.notifAdminPage.set(paged.page);
+      this.notifAdminTotalPages.set(Math.max(1, paged.totalPages));
+      this.notifAdminTotalElements.set(paged.totalElements);
+    } catch (err) {
+      this.actionError.set(normalizeHttpError(err).message);
+    }
+  }
+
+  protected async retrySingleNotification(id: number): Promise<void> {
+    this.actionError.set(null);
+    try {
+      await firstValueFrom(this.notificationApi.relancerNotification(id));
+      toast.success(`Relance exécutée pour la notification #${id}`);
+      await this.loadAdminNotifications(this.notifAdminPage());
+    } catch (err) {
+      this.actionError.set(normalizeHttpError(err).message);
+    }
+  }
+
+  protected async triggerNotificationsRetrySweep(): Promise<void> {
+    this.actionError.set(null);
+    try {
+      const res = await firstValueFrom(this.notificationApi.forcerRepriseEchecs());
+      toast.success(`${res.notificationsLivrees} notification(s) livrée(s) lors du rattrapage`);
+      await this.loadAdminNotifications(this.notifAdminPage());
+    } catch (err) {
+      this.actionError.set(normalizeHttpError(err).message);
+    }
+  }
+
+  protected notificationStatusBadgeClass(statut: StatutNotification): string {
+    if (statut === 'ENVOYEE') return 'ui-badge ui-badge--success';
+    if (statut === 'ECHEC') return 'ui-badge ui-badge--danger';
+    if (statut === 'ECHEC_TEMPORAIRE' || statut === 'EN_ATTENTE') return 'ui-badge ui-badge--warning';
+    return 'ui-badge ui-badge--neutral';
   }
 
   private async confirmDialog(title: string, message: string, confirmLabel: string): Promise<boolean> {

@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -64,6 +65,20 @@ public class CircuitController {
     @GetMapping("/{id}")
     public ResponseEntity<CircuitDto> getByIdCircuit(@PathVariable Long id) {
         return ResponseEntity.ok(circuitService.getByIdCircuit(id));
+    }
+
+    @GetMapping("/guide/mes-circuits")
+    public ResponseEntity<List<CircuitDto>> getMesCircuitsGuide() {
+        return ResponseEntity.ok(circuitService.getMesCircuitsGuide());
+    }
+
+    @PatchMapping("/{id}/guide")
+    public ResponseEntity<CircuitDto> affecterGuideResponsable(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, Long> body
+    ) {
+        Long guideId = body != null ? body.get("guideResponsableId") : null;
+        return ResponseEntity.ok(circuitService.affecterGuideResponsable(id, guideId));
     }
 
     @PutMapping("/{id}")

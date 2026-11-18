@@ -20,7 +20,10 @@ import {
 import { APP_SITE_CONFIG } from '../../../../core/config/site.config';
 import { extractErrorMessage } from '../../../../core/models/api-error.model';
 import { Circuit } from '../../../../core/models/circuit.model';
+import { GuideProfil } from '../../../../core/models/guide.model';
 import { Patrimoine } from '../../../../core/models/patrimoine.model';
+import { UiAvisSectionComponent } from '../../../../shared/components/ui-avis-section/ui-avis-section.component';
+import { GuideApiService } from '../../../guides/data-access/guide-api.service';
 import {
   BreadcrumbItem,
   UiBreadcrumbComponent,
@@ -62,6 +65,7 @@ import { CircuitStore } from '../../data-access/circuit.store';
     UiHeritageMapComponent,
     UiSkeletonGridComponent,
     UiErrorBannerComponent,
+    UiAvisSectionComponent,
     DifficulteLabelPipe,
     DurationMinutesPipe,
     FcfaPricePipe,
@@ -74,11 +78,13 @@ export class CircuitDetailPageComponent {
 
   protected readonly store = inject(CircuitStore);
   protected readonly patrimoineStore = inject(PatrimoineStore);
+  private readonly guideApi = inject(GuideApiService);
   private readonly reservationApi = inject(ReservationApiService);
   private readonly titleService = inject(Title);
   private readonly config = inject(APP_SITE_CONFIG);
 
   protected readonly circuit = signal<Circuit | null>(null);
+  protected readonly guide = signal<GuideProfil | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly disponibilite = signal<DisponibilitePrestation | null>(null);
@@ -180,6 +186,7 @@ export class CircuitDetailPageComponent {
     this.loading.set(true);
     this.error.set(null);
     this.disponibilite.set(null);
+    this.guide.set(null);
 
     void this.store.ensureLoaded();
     void this.patrimoineStore.ensureLoaded();
@@ -189,6 +196,10 @@ export class CircuitDetailPageComponent {
       if (seq !== this.loadSeq) return;
       this.circuit.set(detail);
       this.titleService.setTitle(`${detail.nomCircuit} — ${this.config.siteName}`);
+      if (detail.guideResponsableId) {
+        const g = await firstValueFrom(this.guideApi.getByUtilisateurId(detail.guideResponsableId)).catch(() => null);
+        if (seq === this.loadSeq) this.guide.set(g);
+      }
     } catch (err) {
       if (seq !== this.loadSeq) return;
       this.circuit.set(null);

@@ -1,0 +1,69 @@
+@startuml p05-architecture-globale
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam componentStyle rectangle
+skinparam shadowing false
+
+title Architecture Distribuée P05 — Guides, Avis Vérifiés, Modération & Notifications (Casamance UASZ)
+
+actor "Visiteur / Touriste" as Touriste
+actor "Guide Touristique" as Guide
+actor "Gestionnaire / Admin" as Admin
+
+rectangle "Front-End SPA" {
+  [Angular 22\n/guides, /espace-guide,\n/notifications, /administration\nUiAvisSection] as Angular
+}
+
+rectangle "Infrastructure & Sécurité" {
+  [API Gateway (:8090)\nJWT HttpOnly + CSRF +\nRBAC P05 + HMAC-SHA256] as Gateway
+  [Discovery Server\nEureka (:8761)] as Eureka
+}
+
+package "Domaine Utilisateurs & Guides" {
+  [ms-utilisateur (:3005)\n/api/guides/**\nGuideService + OutboxRelay] as MsUser
+  database "utilisateur_db (PG 16)\nutilisateurs, permissions,\nguide_profil,\nguide_validation_historique,\nutilisateur_notification_outbox" as DbUser
+}
+
+package "Domaine Circuits Touristiques" {
+  [ms-circuit (:3002)\n/api/circuits/guide/mes-circuits\nPATCH /api/circuits/{id}/guide\nCircuitService + OutboxRelay] as MsCircuit
+  database "circuit_db (PG 16)\ncircuits, etapes,\ncircuit_notification_outbox" as DbCircuit
+}
+
+package "Domaine Réservations, Avis & Modération" {
+  [ms-reservation (:3004)\n/api/avis/** & /api/moderation/**\nAvisModerationService + OutboxRelay] as MsResa
+  database "reservation_db (PG 16)\nreservations, avis,\navis_signalement,\navis_moderation_historique,\nreservation_notification_outbox" as DbResa
+}
+
+package "Domaine Paiements & Notifications" {
+  [ms-paiement (:3006)\nPost-outbox Notification Guard] as MsPay
+  [ms-notification (:3007)\n/api/notifications/**\nIdempotence, BOLA, Retry Scheduler] as MsNotif
+  database "notification_db (PG 16)\nnotifications (idempotency_key UNIQUE)" as DbNotif
+}
+
+Touriste --> Angular
+Guide --> Angular
+Admin --> Angular
+
+Angular --> Gateway : HTTPS / Cookie Session + X-XSRF-TOKEN
+Gateway .> Eureka : Résolution routes lb://
+Gateway --> MsUser : HMAC Envelope (/api/guides/**)
+Gateway --> MsCircuit : HMAC Envelope (/api/circuits/**)
+Gateway --> MsResa : HMAC Envelope (/api/avis/**, /api/moderation/**)
+Gateway --> MsNotif : HMAC Envelope (/api/notifications/**)
+
+MsCircuit --> MsUser : OpenFeign ACL\nGET /api/guides/internal/utilisateur/{utilisateurId}
+MsResa --> MsUser : OpenFeign ACL\nGET /api/guides/internal/utilisateur/{utilisateurId}
+MsResa --> MsCircuit : OpenFeign ACL\nGET /api/circuits/{id}
+MsResa --> MsPay : OpenFeign ACL
+MsResa --> MsNotif : Outbox POST /api/notifications
+
+MsUser --> MsNotif : Outbox POST /api/notifications
+MsCircuit --> MsNotif : Outbox POST /api/notifications
+MsPay --> MsNotif : Outbox POST /api/notifications
+
+MsUser -- DbUser
+MsCircuit -- DbCircuit
+MsResa -- DbResa
+MsNotif -- DbNotif
+
+@enduml

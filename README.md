@@ -60,12 +60,12 @@ Services démarrés :
 | **`api-gateway`** | `8090` | `8090` | — | Point d'entrée unique HTTP routant `/api/**` vers les microservices |
 | **`discovery-server`** | `8761` | `8761` | — | Annuaire de services Netflix Eureka |
 | **`ms-patrimoine`** | `3001` | *Réseau privé* | `patrimoine_db` | Inventaire des sites patrimoniaux, coordonnées GPS, capacité |
-| **`ms-circuit`** | `3002` | *Réseau privé* | `circuit_db` | Circuits touristiques, étapes, calcul durée/distance (OpenFeign -> `ms-patrimoine`) |
+| **`ms-circuit`** | `3002` | *Réseau privé* | `circuit_db` | Circuits touristiques, étapes, affectation guide validé (`ms-patrimoine`, `ms-utilisateur`) |
 | **`ms-evenement`** | `3003` | *Réseau privé* | `evenement_db` | Manifestations culturelles, festivals, ateliers (OpenFeign -> `ms-patrimoine`) |
-| **`ms-reservation`** | `3004` | *Réseau privé* | `reservation_db` | Gestion des réservations (OpenFeign -> `ms-circuit`, `ms-evenement`) |
-| **`ms-utilisateur`** | `3005` | *Réseau privé* | `utilisateur_db` | Comptes utilisateurs, profils et gestion des rôles |
-| **`ms-paiement`** | `3006` | *Réseau privé* | `paiement_db` | Simulation des transactions financières (OpenFeign -> `ms-reservation`, `ms-notification`) |
-| **`ms-notification`** | `3007` | *Réseau privé* | `notification_db` | Envoi d'alertes email et confirmations de réservations |
+| **`ms-reservation`** | `3004` | *Réseau privé* | `reservation_db` | Réservations P04, avis vérifiés & modération P05 (`ms-circuit`, `ms-evenement`, `ms-utilisateur`, `ms-patrimoine`) |
+| **`ms-utilisateur`** | `3005` | *Réseau privé* | `utilisateur_db` | Comptes utilisateurs, RBAC 48 permissions et gestion des profils guides P05 |
+| **`ms-paiement`** | `3006` | *Réseau privé* | `paiement_db` | Simulation des transactions financières (`ms-reservation`, `ms-notification`) |
+| **`ms-notification`** | `3007` | *Réseau privé* | `notification_db` | Notifications métier P05, inbox utilisateur BOLA, idempotence et reprise automatique |
 
 ---
 
@@ -98,12 +98,15 @@ Chaque microservice dispose de profils Spring Boot indépendants de Config Serve
 # 2. Tests d'intégration sur le conteneur PostgreSQL 16 multi-bases (Flyway V1..V4/V6 + Hibernate validate sur les 7 bases)
 eval "$(docker inspect postgres --format '{{range .Config.Env}}{{println "export " .}}{{end}}' | grep '_PASSWORD=')" && ./verify-postgres.sh
 
-# 3. Build de production et tests Vitest du frontend Angular 22 (39 tests sur 15 suites)
+# 3. Build de production et tests Vitest du frontend Angular 22
 npm --prefix frontend-angular run build
 npm --prefix frontend-angular exec ng test -- --no-watch
 ```
 
 Documentation technique détaillée :
+- **Guides, Avis Vérifiés, Modération & Notifications P05** : [docs/P05_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md](docs/P05_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md)
+- **Spécification OpenAPI P05** : [docs/api/OPENAPI_P05_GUIDES_AVIS_NOTIFICATIONS.yaml](docs/api/OPENAPI_P05_GUIDES_AVIS_NOTIFICATIONS.yaml)
+- **Diagrammes PlantUML P05** : [Architecture globale](docs/architecture/p05-architecture-globale.puml) · [États Guide/Avis/Notif](docs/architecture/p05-workflow-guide-etats.puml) · [Séquence Avis & Modération](docs/architecture/p05-sequence-avis-modere-notification.puml)
 - **Réservation & Paiement Simulé P04** : [docs/P04_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md](docs/P04_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md)
 - **Spécification OpenAPI P04** : [docs/api/OPENAPI_P04_RESERVATION_PAIEMENT.yaml](docs/api/OPENAPI_P04_RESERVATION_PAIEMENT.yaml)
 - **Cœur métier touristique P03** : [docs/P03_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md](docs/P03_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md)

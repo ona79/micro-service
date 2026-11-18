@@ -1,0 +1,352 @@
+openapi: 3.1.0
+info:
+  title: API Guides, Avis Vérifiés, Modération & Notifications P05 — Casamance (UASZ)
+  version: 5.0.0
+  description: >
+    Spécification OpenAPI de la Phase P05 pour la Plateforme de Gestion et de Valorisation
+    du Patrimoine Touristique de la Casamance :
+    - Guides touristiques (ms-utilisateur :3005, ms-circuit :3002)
+    - Avis vérifiés & Modération (ms-reservation :3004)
+    - Notifications métier, inbox BOLA, idempotence & retry (ms-notification :3007)
+    Toutes les requêtes client transitent par l'API Gateway (:8090) avec session JWT
+    HttpOnly, protection CSRF et enveloppe HMAC-SHA256 X-Internal-Gateway-Token.
+    Les routes `/internal/**` sont bloquées en HTTP 403 à la Gateway.
+servers:
+  - url: http://localhost:8090
+    description: API Gateway Zero-Trust (Point d'entrée recommandé)
+  - url: http://localhost:3005
+    description: ms-utilisateur (Guides)
+  - url: http://localhost:3002
+    description: ms-circuit (Affectation guide)
+  - url: http://localhost:3004
+    description: ms-reservation (Avis & Modération)
+  - url: http://localhost:3007
+    description: ms-notification (Notifications & Inbox)
+
+paths:
+  /api/guides:
+    get:
+      tags: [Guides P05]
+      summary: Annuaire public des guides touristiques validés et visibles
+      parameters:
+        - { name: zone, in: query, schema: { type: string } }
+        - { name: langue, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        '200': { description: Liste publique masquée des guides validés }
+
+  /api/guides/{id}:
+    get:
+      tags: [Guides P05]
+      summary: Fiche détaillée d'un guide (masquée si public, complète si propriétaire ou admin)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Profil du guide }
+        '404': { description: Guide introuvable ou non public }
+
+  /api/guides/utilisateur/{utilisateurId}:
+    get:
+      tags: [Guides P05]
+      summary: Profil d'un guide par son identifiant utilisateur
+      parameters:
+        - { name: utilisateurId, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Profil du guide }
+
+  /api/guides/mon-profil:
+    get:
+      tags: [Guides P05]
+      summary: Consulter son propre dossier guide (rôle GUIDE / GUIDE:GERER_PROPRE_PROFIL)
+      responses:
+        '200': { description: Profil courant du guide }
+    put:
+      tags: [Guides P05]
+      summary: Créer ou mettre à jour son propre profil guide (rejette toute tentative d'auto-validation 403)
+      responses:
+        '200': { description: Profil enregistré (retourne en BROUILLON si rejeté précédemment) }
+        '403': { description: Tentative d'altération des champs de validation ou rôle non GUIDE }
+
+  /api/guides/mon-profil/soumettre:
+    post:
+      tags: [Guides P05]
+      summary: Soumettre le dossier guide pour validation (EN_ATTENTE_VALIDATION)
+      responses:
+        '200': { description: Dossier soumis et notification outbox émise }
+
+  /api/guides/mon-profil/disponibilite:
+    patch:
+      tags: [Guides P05]
+      summary: Activer/désactiver la disponibilité et la visibilité annuaire
+      responses:
+        '200': { description: Disponibilité mise à jour }
+
+  /api/guides/mon-profil/desactiver:
+    post:
+      tags: [Guides P05]
+      summary: Désactiver son propre profil guide
+      responses:
+        '200': { description: Profil désactivé }
+
+  /api/guides/admin/tous:
+    get:
+      tags: [Guides Administration P05]
+      summary: Liste complète des dossiers guides pour validation/supervision (GUIDE:VALIDER)
+      parameters:
+        - { name: statut, in: query, schema: { type: string } }
+      responses:
+        '200': { description: Liste des dossiers guides }
+
+  /api/guides/{id}/valider:
+    post:
+      tags: [Guides Administration P05]
+      summary: Valider un dossier guide (anti auto-validation 403, transition EN_ATTENTE_VALIDATION -> VALIDE)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Profil guide validé }
+        '403': { description: Auto-validation interdite ou permission manquante }
+
+  /api/guides/{id}/rejeter:
+    post:
+      tags: [Guides Administration P05]
+      summary: Rejeter un dossier guide avec motif obligatoire
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Profil guide rejeté }
+
+  /api/guides/{id}/suspendre:
+    post:
+      tags: [Guides Administration P05]
+      summary: Suspendre un guide validé avec motif obligatoire (GUIDE:SUSPENDRE)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Profil guide suspendu }
+
+  /api/guides/{id}/reactiver:
+    post:
+      tags: [Guides Administration P05]
+      summary: Réactiver un guide suspendu ou désactivé
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Profil guide réactivé }
+
+  /api/guides/{id}/desactiver:
+    post:
+      tags: [Guides Administration P05]
+      summary: Désactiver administrativement un profil guide
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Profil guide désactivé }
+
+  /api/guides/{id}/historique:
+    get:
+      tags: [Guides Administration P05]
+      summary: Historique d'audit immuable des transitions de statut d'un guide
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Liste chronologique des décisions }
+
+  /api/circuits/guide/mes-circuits:
+    get:
+      tags: [Circuits & Guides P05]
+      summary: Circuits affectés au guide authentifié
+      responses:
+        '200': { description: Circuits dont guideResponsableId correspond au guide courant }
+
+  /api/circuits/{id}/guide:
+    patch:
+      tags: [Circuits & Guides P05]
+      summary: Affecter ou retirer le guide responsable d'un circuit (vérifie statut VALIDE + actif)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Circuit mis à jour avec guideResponsableId validé }
+        '400': { description: Guide inexistant ou non validé }
+
+  /api/avis:
+    get:
+      tags: [Avis Vérifiés P05]
+      summary: Lister les avis approuvés d'une cible (PATRIMOINE, CIRCUIT, EVENEMENT, GUIDE)
+      parameters:
+        - { name: cibleType, in: query, required: true, schema: { type: string, enum: [PATRIMOINE, CIRCUIT, EVENEMENT, GUIDE] } }
+        - { name: cibleId, in: query, required: true, schema: { type: integer, format: int64 } }
+        - { name: page, in: query, schema: { type: integer, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, default: 10 } }
+      responses:
+        '200': { description: Page d'avis approuvés }
+    post:
+      tags: [Avis Vérifiés P05]
+      summary: Publier un avis vérifié lié à une réservation CONFIRMEE et réalisée (note 1..5, unicité reservation+cible)
+      responses:
+        '201': { description: Avis créé avec experienceVerifiee=true }
+        '400': { description: Réservation non éligible ou non réalisée }
+        '403': { description: BOLA — réservation appartenant à un autre utilisateur }
+        '409': { description: Avis déjà déposé pour cette réservation et cette cible }
+
+  /api/avis/resume:
+    get:
+      tags: [Avis Vérifiés P05]
+      summary: Agrégat des évaluations approuvées (moyenne, total, répartition 1..5 étoiles)
+      parameters:
+        - { name: cibleType, in: query, required: true, schema: { type: string } }
+        - { name: cibleId, in: query, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Résumé statistique des avis }
+
+  /api/avis/resumes:
+    get:
+      tags: [Avis Vérifiés P05]
+      summary: Agrégats en lot pour listes de cartes UI
+      parameters:
+        - { name: cibleType, in: query, required: true, schema: { type: string } }
+        - { name: cibleIds, in: query, required: true, schema: { type: array, items: { type: integer } } }
+      responses:
+        '200': { description: Liste des résumés par cibleId }
+
+  /api/avis/eligibilite:
+    get:
+      tags: [Avis Vérifiés P05]
+      summary: Vérifier côté serveur l'éligibilité d'un touriste authentifié à évaluer une cible
+      parameters:
+        - { name: cibleType, in: query, required: true, schema: { type: string } }
+        - { name: cibleId, in: query, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Éligibilité calculée avec IDs des réservations éligibles }
+
+  /api/avis/mes-avis:
+    get:
+      tags: [Avis Vérifiés P05]
+      summary: Lister tous les avis publiés par l'utilisateur connecté (tous statuts)
+      responses:
+        '200': { description: Liste des avis personnels }
+
+  /api/avis/{id}:
+    put:
+      tags: [Avis Vérifiés P05]
+      summary: Modifier son propre avis (contrôle BOLA)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Avis modifié }
+        '403': { description: Accès refusé (autre auteur) }
+    delete:
+      tags: [Avis Vérifiés P05]
+      summary: Supprimer son propre avis (contrôle BOLA)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '204': { description: Avis supprimé }
+
+  /api/avis/{id}/signaler:
+    post:
+      tags: [Avis Vérifiés P05]
+      summary: Signaler un avis inapproprié (interdit l'auto-signalement et les doublons ouverts)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '201': { description: Signalement enregistré au statut OUVERT }
+
+  /api/moderation/avis:
+    get:
+      tags: [Modération P05]
+      summary: Lister les avis filtrés par cible et statut de modération (AVIS:MODERER)
+      responses:
+        '200': { description: File des avis modérables }
+
+  /api/moderation/signalements:
+    get:
+      tags: [Modération P05]
+      summary: File des signalements ouverts et traités (AVIS:MODERER)
+      responses:
+        '200': { description: Liste des signalements }
+
+  /api/moderation/avis/{avisId}/decision:
+    post:
+      tags: [Modération P05]
+      summary: Appliquer une décision de modération (APPROUVE, MASQUE, REJETE) avec justification obligatoire
+      parameters:
+        - { name: avisId, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Décision enregistrée, historique tracé et auteur notifié }
+
+  /api/moderation/signalements/{signalementId}/decision:
+    post:
+      tags: [Modération P05]
+      summary: Clôturer un signalement (VALIDE_CONTENU_RETIRE ou REJETE_ABUSIF) avec mise à jour coordonnée de l'avis
+      parameters:
+        - { name: signalementId, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Signalement traité et notifications outbox créées }
+
+  /api/moderation/avis/{avisId}/historique:
+    get:
+      tags: [Modération P05]
+      summary: Historique d'audit des décisions de modération sur un avis
+      parameters:
+        - { name: avisId, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Historique de modération }
+
+  /api/notifications/mes-notifications:
+    get:
+      tags: [Notifications P05]
+      summary: Centre de notifications paginé du compte authentifié (strict BOLA utilisateurId)
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, default: 12 } }
+        - { name: nonLuesOnly, in: query, schema: { type: boolean, default: false } }
+        - { name: typeEvenement, in: query, schema: { type: string } }
+      responses:
+        '200': { description: Page de notifications + unreadCount }
+
+  /api/notifications/mes-notifications/compteur:
+    get:
+      tags: [Notifications P05]
+      summary: Compteur léger de notifications non lues
+      responses:
+        '200': { description: "{ unreadCount }" }
+
+  /api/notifications/{id}/lire:
+    patch:
+      tags: [Notifications P05]
+      summary: Marquer une notification personnelle comme lue (contrôle BOLA)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Notification marquée lue }
+
+  /api/notifications/tout-lire:
+    patch:
+      tags: [Notifications P05]
+      summary: Marquer toutes les notifications non lues du compte courant comme lues
+      responses:
+        '200': { description: "{ marqueesLues, unreadCount: 0 }" }
+
+  /api/notifications/toutes:
+    get:
+      tags: [Notifications Administration P05]
+      summary: Liste paginée globale des notifications système (NOTIFICATION:LIRE_TOUT)
+      responses:
+        '200': { description: Supervision admin des notifications et tentatives }
+
+  /api/notifications/{id}/relancer:
+    post:
+      tags: [Notifications Administration P05]
+      summary: Relancer manuellement une notification en échec (NOTIFICATION:RELANCER)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Résultat de la nouvelle tentative de livraison }
+
+  /api/notifications/relancer-echecs:
+    post:
+      tags: [Notifications Administration P05]
+      summary: Déclencher manuellement le rattrapage des notifications ECHEC_TEMPORAIRE (NOTIFICATION:RELANCER)
+      responses:
+        '200': { description: Nombre de notifications livrées }

@@ -315,11 +315,13 @@ public class PaiementService implements IPaiementService {
             return new Phase1Simulation(saved, saved.getId(), outbox.getId(), reservationLive, shouldNotify);
         });
 
+        boolean delivered = true;
         if (outboxRelayService != null) {
-            outboxRelayService.tenterLivraison(phase1.outboxId());
+            delivered = outboxRelayService.tenterLivraison(phase1.outboxId());
         }
 
-        if (phase1.shouldNotify()) {
+        // Ne jamais notifier avant confirmation effective côté ms-reservation (Section 8)
+        if (delivered && phase1.shouldNotify()) {
             envoyerNotificationNonBloquante(phase1.saved(), phase1.reservationLive());
         }
 
@@ -396,10 +398,13 @@ public class PaiementService implements IPaiementService {
             return new Phase1Remboursement(saved, saved.getId(), outbox.getId());
         });
 
+        boolean delivered = true;
         if (outboxRelayService != null) {
-            outboxRelayService.tenterLivraison(phase1.outboxId());
+            delivered = outboxRelayService.tenterLivraison(phase1.outboxId());
         }
-        envoyerNotificationNonBloquante(phase1.saved(), null);
+        if (delivered) {
+            envoyerNotificationNonBloquante(phase1.saved(), null);
+        }
 
         return executeInReadTx(() -> {
             Paiement reloaded = paiementRepository.findById(phase1.paiementId()).orElse(phase1.saved());
@@ -753,12 +758,29 @@ public class PaiementService implements IPaiementService {
                 case REFUSE -> "Échec du paiement simulé " + saved.getReferenceTransaction();
                 default -> "Mise à jour paiement simulé " + saved.getReferenceTransaction();
             };
+            String eventType = switch (saved.getStatut()) {
+                case ACCEPTE -> "PAIEMENT_ACCEPTE";
+                case REMBOURSE -> "PAIEMENT_REMBOURSE";
+                case REFUSE -> "PAIEMENT_REFUSE";
+                default -> "PAIEMENT_MISE_A_JOUR";
+            };
             String contenu = "Bonjour " + res.getNomClient() + ", statut de votre paiement simulé "
                     + saved.getReferenceTransaction() + " (" + saved.getMontant() + " " + saved.getDevise()
                     + " via " + saved.getModePaiement() + ") pour la réservation #" + saved.getReservationId()
                     + " : " + saved.getStatut() + ". [Mode Simulation P04 - Aucun transfert financier réel]";
-            notificationClient.envoyerNotification(new NotificationRequest(
-                    res.getEmailClient(), sujet, contenu, "EMAIL", saved.getReservationId()));
+            notificationClient.envoyerNotification(NotificationRequest.builder()
+                    .destinataire(res.getEmailClient())
+                    .utilisateurId(saved.getUtilisateurId())
+                    .sujet(sujet)
+                    .contenu(contenu)
+                    .canal("EMAIL")
+                    .reservationId(saved.getReservationId())
+                    .typeEvenement(eventType)
+                    .cibleType("PAIEMENT")
+                    .cibleId(saved.getId())
+                    .correlationId(saved.getCorrelationId())
+                    .idempotencyKey("PAIEMENT:" + saved.getReferenceTransaction() + ":" + saved.getStatut())
+                    .build());
         } catch (Exception ex) {
             log.warn("Impossible d'envoyer la notification de paiement : {}", ex.getMessage());
         }

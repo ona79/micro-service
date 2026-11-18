@@ -123,6 +123,8 @@
                 <a [routerLink]="['/patrimoines', ev.patrimoineId]">Consulter la fiche</a>
               </p>
             }
+
+            <app-ui-avis-section cibleType="EVENEMENT" [cibleId]="ev.id" />
           </div>
         </article>
 

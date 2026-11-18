@@ -39,6 +39,18 @@
               </a>
             </li>
           }
+          @if (authStore.isGuide()) {
+            <li>
+              <a
+                routerLink="/espace-guide"
+                routerLinkActive="nav-link--active"
+                class="nav-link nav-link--staff"
+              >
+                <svg lucideAward [size]="15" aria-hidden="true"></svg>
+                <span>Espace Guide</span>
+              </a>
+            </li>
+          }
         </ul>
       </nav>
 
@@ -68,6 +80,18 @@
         </a>
 
         @if (authStore.user(); as currentUser) {
+          <a
+            routerLink="/notifications"
+            routerLinkActive="notif-bell--active"
+            class="notif-bell"
+            [attr.aria-label]="'Notifications (' + notificationStore.unreadCount() + ' non lue(s))'"
+            title="Centre de notifications"
+          >
+            <svg lucideBell [size]="16" aria-hidden="true"></svg>
+            @if (notificationStore.unreadCount() > 0) {
+              <span class="notif-badge tabular-nums">{{ notificationStore.unreadCount() }}</span>
+            }
+          </a>
           <a
             routerLink="/mon-espace"
             routerLinkActive="user-chip--active"
@@ -153,7 +177,29 @@
                   </a>
                 </li>
               }
+              @if (authStore.isGuide()) {
+                <li>
+                  <a
+                    routerLink="/espace-guide"
+                    routerLinkActive="mobile-nav-link--active"
+                    class="mobile-nav-link"
+                    (click)="closeMenu()"
+                  >
+                    Mon Espace Guide
+                  </a>
+                </li>
+              }
               @if (authStore.user(); as currentUser) {
+                <li>
+                  <a
+                    routerLink="/notifications"
+                    routerLinkActive="mobile-nav-link--active"
+                    class="mobile-nav-link"
+                    (click)="closeMenu()"
+                  >
+                    Notifications ({{ notificationStore.unreadCount() }} non lue(s))
+                  </a>
+                </li>
                 <li>
                   <a
                     routerLink="/mon-espace"

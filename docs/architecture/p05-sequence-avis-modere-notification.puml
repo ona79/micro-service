@@ -1,0 +1,52 @@
+@startuml p05-sequence-avis-modere-notification
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+
+title Séquence Transactionnelle P05 — Avis Vérifié, Signalement, Modération & Outbox Notification
+
+actor Touriste
+actor "Autre Visiteur" as Visiteur
+actor Moderateur as "Admin / Gestionnaire"
+participant "API Gateway\n(:8090)" as GW
+participant "ms-reservation\n(:3004)" as Resa
+participant "ms-circuit / ms-patrimoine /\nms-utilisateur" as Domaines
+participant "reservation_db\n(PG 16)" as DbResa
+participant "ms-notification\n(:3007)" as Notif
+
+== 1. Vérification d'éligibilité & Publication d'un avis ==
+Touriste -> GW : GET /api/avis/eligibilite?cibleType=EVENEMENT&cibleId=1
+GW -> Resa : Enveloppe HMAC (USER #userId)
+Resa -> DbResa : Recherche réservations CONFIRMEE,\npropriétaire, date réalisée, non déjà évaluées
+DbResa --> Resa : reservationsEligiblesIds
+Resa --> Touriste : 200 OK { eligible: true, reservationsEligiblesIds }
+
+Touriste -> GW : POST /api/avis { cibleType, cibleId, reservationId, note, commentaire }
+GW -> Resa : Enveloppe HMAC + CSRF
+Resa -> Resa : Validation note (1..5), BOLA propriété résa,\nstatut CONFIRMEE, réalisation prestation
+Resa -> Domaines : Vérification existence cible (OpenFeign HMAC)
+Domaines --> Resa : Cible valide
+Resa -> DbResa : INSERT INTO avis (UNIQUE reservation_id, cible_type, cible_id)\n+ INSERT reservation_notification_outbox (TX atomique)
+DbResa --> Resa : 201 Created (experienceVerifiee=true)
+Resa -> Notif : Relay Outbox Async -> POST /api/notifications\n(Idempotency-Key + typeEvenement=AVIS_PUBLIE)
+
+== 2. Signalement & Décision de Modération ==
+Visiteur -> GW : POST /api/avis/{avisId}/signaler { categorie, motif }
+GW -> Resa : Enveloppe HMAC
+Resa -> DbResa : Vérifie non auto-signalement + unicité signalement ouvert
+Resa --> Visiteur : 201 Created (statut=OUVERT)
+
+Moderateur -> GW : POST /api/moderation/signalements/{id}/decision\n{ decisionSignalement: VALIDE_CONTENU_RETIRE, commentaire, statutAvisCible: MASQUE }
+GW -> Resa : Vérifie permission AVIS:MODERER + CSRF
+Resa -> DbResa : TX : MAJ signalement + MAJ avis -> MASQUE\n+ INSERT avis_moderation_historique\n+ INSERT reservation_notification_outbox (AVIS_MODERE, SIGNALEMENT_TRAITE)
+Resa --> Moderateur : 200 OK
+Resa -> Notif : Relay Outbox -> POST /api/notifications (auteur & signaleur)
+Notif --> Notif : Vérification idempotencyKey + persistance inbox utilisateur
+
+== 3. Consultation Inbox Utilisateur ==
+Touriste -> GW : GET /api/notifications/mes-notifications\nPATCH /api/notifications/{id}/lire
+GW -> Notif : Enveloppe HMAC (USER #userId)
+Notif -> Notif : Contrôle BOLA utilisateurId == token.userId
+Notif --> Touriste : 200 OK { content, unreadCount }
+
+@enduml

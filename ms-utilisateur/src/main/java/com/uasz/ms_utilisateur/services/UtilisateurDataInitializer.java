@@ -1,18 +1,25 @@
 package com.uasz.ms_utilisateur.services;
 
+import com.uasz.ms_utilisateur.entities.GuideHistoriqueValidation;
+import com.uasz.ms_utilisateur.entities.GuideProfil;
 import com.uasz.ms_utilisateur.entities.Permission;
 import com.uasz.ms_utilisateur.entities.RolePermission;
 import com.uasz.ms_utilisateur.entities.RoleUtilisateur;
+import com.uasz.ms_utilisateur.entities.StatutValidationGuide;
 import com.uasz.ms_utilisateur.entities.Utilisateur;
+import com.uasz.ms_utilisateur.repositories.GuideHistoriqueValidationRepository;
+import com.uasz.ms_utilisateur.repositories.GuideProfilRepository;
 import com.uasz.ms_utilisateur.repositories.PermissionRepository;
 import com.uasz.ms_utilisateur.repositories.RolePermissionRepository;
 import com.uasz.ms_utilisateur.repositories.UtilisateurRepository;
 import com.uasz.ms_utilisateur.security.AuthSessionManager;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +32,12 @@ public class UtilisateurDataInitializer implements CommandLineRunner {
     private final PermissionRepository permissionRepository;
     private final RolePermissionRepository rolePermissionRepository;
     private final PasswordEncoder passwordEncoder;
+
+    @Autowired(required = false)
+    private GuideProfilRepository guideProfilRepository;
+
+    @Autowired(required = false)
+    private GuideHistoriqueValidationRepository guideHistoriqueRepository;
 
     @Override
     public void run(String... args) {
@@ -63,7 +76,21 @@ public class UtilisateurDataInitializer implements CommandLineRunner {
                     Permission.builder().code("UTILISATEUR:CREER_STAFF").module("UTILISATEUR").description("Création de comptes personnel et administrateur").build(),
                     Permission.builder().code("UTILISATEUR:GERER_ROLES").module("UTILISATEUR").description("Attribution et révocation des rôles et statuts").build(),
                     Permission.builder().code("UTILISATEUR:SUPPRIMER").module("UTILISATEUR").description("Suppression d'un compte utilisateur").build(),
-                    Permission.builder().code("AUDIT:LIRE").module("AUDIT").description("Consultation des pistes d'audit de sécurité").build()
+                    Permission.builder().code("AUDIT:LIRE").module("AUDIT").description("Consultation des pistes d'audit de sécurité").build(),
+                    Permission.builder().code("GUIDE:LIRE").module("GUIDE").description("Consultation des profils publics de guides touristiques").build(),
+                    Permission.builder().code("GUIDE:GERER_PROPRE_PROFIL").module("GUIDE").description("Création, édition et soumission de son propre profil de guide").build(),
+                    Permission.builder().code("GUIDE:VALIDER").module("GUIDE").description("Validation ou rejet d'un profil de guide touristique").build(),
+                    Permission.builder().code("GUIDE:SUSPENDRE").module("GUIDE").description("Suspension ou désactivation d'un profil de guide touristique").build(),
+                    Permission.builder().code("AVIS:LIRE").module("AVIS").description("Consultation des avis et évaluations publiés").build(),
+                    Permission.builder().code("AVIS:CREER").module("AVIS").description("Dépôt d'un avis vérifié suite à une prestation réalisée").build(),
+                    Permission.builder().code("AVIS:MODIFIER_PROPRE").module("AVIS").description("Modification de son propre avis").build(),
+                    Permission.builder().code("AVIS:SUPPRIMER_PROPRE").module("AVIS").description("Suppression de son propre avis").build(),
+                    Permission.builder().code("AVIS:SIGNALER").module("AVIS").description("Signalement d'un avis ou contenu inapproprié").build(),
+                    Permission.builder().code("AVIS:MODERER").module("AVIS").description("Examen et décision de modération sur les avis et signalements").build(),
+                    Permission.builder().code("NOTIFICATION:LIRE_PROPRE").module("NOTIFICATION").description("Consultation de ses propres notifications").build(),
+                    Permission.builder().code("NOTIFICATION:GERER_PROPRE").module("NOTIFICATION").description("Marquage lu/non-lu de ses propres notifications").build(),
+                    Permission.builder().code("NOTIFICATION:LIRE_TOUT").module("NOTIFICATION").description("Consultation globale des notifications plateforme").build(),
+                    Permission.builder().code("NOTIFICATION:RELANCER").module("NOTIFICATION").description("Relance des notifications en échec ou en attente").build()
             );
             permissionRepository.saveAll(perms);
         }
@@ -134,6 +161,46 @@ public class UtilisateurDataInitializer implements CommandLineRunner {
                             .dateInscription(LocalDateTime.now().minusDays(8))
                             .build()
             ));
+        }
+
+        if (guideProfilRepository != null && guideProfilRepository.count() == 0) {
+            repository.findByEmail("alassane.badji@zig.univ.sn").ifPresent(guideUser -> {
+                LocalDateTime now = LocalDateTime.now();
+                GuideProfil saved = guideProfilRepository.save(GuideProfil.builder()
+                        .utilisateur(guideUser)
+                        .presentationCourte("Guide certifié du royaume du Kasa, spécialiste de l'écotourisme en pirogue et de l'architecture à impluvium.")
+                        .biographie("Originaire d'Oussouye, Alassane Badji accompagne les visiteurs depuis plus de huit ans à travers les bolongs de Basse-Casamance, les cases à impluvium d'Enampore et l'île historique de Carabane, avec une approche respectueuse des traditions locales.")
+                        .languesParlees("Français, Diola, Wolof, Anglais")
+                        .specialites("Écotourisme en pirogue, Architecture Diola à impluvium, Histoire de Carabane")
+                        .zonesIntervention("Basse-Casamance, Oussouye, Carabane, Ziguinchor")
+                        .anneesExperience(8)
+                        .numeroCarteProfessionnelle("GUIDE-CAS-2026-005")
+                        .documentsJustificatifs("Agrément régional du tourisme de Ziguinchor n° 2024-CAS-05")
+                        .tarifJournalierIndicatif(new BigDecimal("25000.00"))
+                        .devise("XOF")
+                        .disponible(true)
+                        .visibilitePublique(true)
+                        .statutValidation(StatutValidationGuide.VALIDE)
+                        .motifDecision("Profil vérifié et agréé pour la valorisation du patrimoine de Basse-Casamance.")
+                        .valideParId(1L)
+                        .dateSoumission(now.minusDays(15))
+                        .dateValidation(now.minusDays(14))
+                        .createdAt(now.minusDays(15))
+                        .updatedAt(now.minusDays(14))
+                        .build());
+                if (guideHistoriqueRepository != null) {
+                    guideHistoriqueRepository.save(GuideHistoriqueValidation.builder()
+                            .guideProfilId(saved.getId())
+                            .ancienStatut(StatutValidationGuide.EN_ATTENTE_VALIDATION)
+                            .nouveauStatut(StatutValidationGuide.VALIDE)
+                            .acteurId(1L)
+                            .acteurRole("ADMINISTRATEUR")
+                            .motif("Validation initiale du profil de guide de référence.")
+                            .correlationId("SEED-GUIDE-1")
+                            .dateTransition(now.minusDays(14))
+                            .build());
+                }
+            });
         }
     }
 }

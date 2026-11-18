@@ -11,17 +11,21 @@ import {
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import {
+  LucideAward,
   LucideBell,
   LucideCheckCircle2,
   LucideCreditCard,
   LucideLogOut,
   LucideShieldCheck,
+  LucideStar,
   LucideTicket,
 } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { toast } from 'ngx-sonner';
 import { AuthStore } from '../../../../core/auth/auth.store';
 import { extractErrorMessage } from '../../../../core/models/api-error.model';
+import { Avis, formatModerationStatusLabel, moderationBadgeClass } from '../../../../core/models/avis.model';
+import { NotificationItem, formatNotificationEventLabel } from '../../../../core/models/notification.model';
 import {
   ModePaiement,
   Paiement,
@@ -33,10 +37,12 @@ import {
   formatReservationStatusLabel,
   reservationStatusBadgeClass,
 } from '../../../../core/models/reservation.model';
-import { NotificationItem } from '../../../../core/models/utilisateur.model';
 import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confirm-dialog/ui-confirm-dialog.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
+import { AvisApiService } from '../../../avis/data-access/avis-api.service';
+import { NotificationApiService } from '../../../notifications/data-access/notification-api.service';
+import { NotificationStore } from '../../../notifications/data-access/notification.store';
 import { PaiementStore } from '../../../paiements/data-access/paiement.store';
 import { ReservationStore } from '../../../reservations/data-access/reservation.store';
 
@@ -55,6 +61,8 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
     LucideBell,
     LucideCheckCircle2,
     LucideLogOut,
+    LucideAward,
+    LucideStar,
   ],
   template: `
     <div class="page-section">
@@ -89,6 +97,12 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
               @if (authStore.isStaff()) {
                 <a routerLink="/administration" class="btn-admin">
                   Accéder au Back-Office ({{ authStore.roleLabel() }})
+                </a>
+              }
+              @if (authStore.isGuide()) {
+                <a routerLink="/espace-guide" class="btn-admin">
+                  <svg lucideAward [size]="16" aria-hidden="true"></svg>
+                  <span>Mon Espace Guide</span>
                 </a>
               }
               <a routerLink="/reserver" class="btn-primary">
@@ -261,22 +275,52 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
                     <svg lucideBell [size]="18" aria-hidden="true"></svg>
                     <span>Notifications reçues ({{ myNotifications().length }})</span>
                   </h2>
+                  <a routerLink="/notifications" class="account-card__link">Centre complet</a>
                 </div>
 
                 @if (myNotifications().length === 0) {
                   <p class="sidebar-muted">
-                    Aucune notification enregistrée pour votre adresse email pour le moment.
+                    Aucune notification enregistrée pour votre compte pour le moment.
                   </p>
                 } @else {
                   <ul class="notif-list">
-                    @for (n of myNotifications(); track n.id) {
+                    @for (n of myNotifications().slice(0, 5); track n.id) {
                       <li class="notif-item">
                         <div class="notif-item__top">
-                          <span class="ui-badge ui-badge--success">{{ n.canal }}</span>
+                          <span class="ui-badge" [class.ui-badge--terracotta]="!n.lue" [class.ui-badge--success]="n.lue">
+                            {{ formatEventLabel(n.typeEvenement) }}
+                          </span>
                           <span class="notif-item__date">{{ n.dateEnvoi | dateFr }}</span>
                         </div>
                         <p class="notif-item__subject">{{ n.sujet }}</p>
                         <p class="notif-item__body">{{ n.contenu }}</p>
+                      </li>
+                    }
+                  </ul>
+                }
+              </section>
+
+              <section class="account-card" aria-labelledby="my-avis-heading">
+                <div class="account-card__header">
+                  <h2 id="my-avis-heading" class="account-card__title">
+                    <svg lucideStar [size]="18" aria-hidden="true"></svg>
+                    <span>Mes avis vérifiés ({{ mesAvis().length }})</span>
+                  </h2>
+                </div>
+                @if (mesAvis().length === 0) {
+                  <p class="sidebar-muted">Vous n'avez pas encore publié d'avis après réservation.</p>
+                } @else {
+                  <ul class="notif-list">
+                    @for (a of mesAvis().slice(0, 5); track a.id) {
+                      <li class="notif-item">
+                        <div class="notif-item__top">
+                          <span [class]="moderationBadge(a.statutModeration)">
+                            {{ formatModerationLabel(a.statutModeration) }}
+                          </span>
+                          <span class="notif-item__date tabular-nums">{{ a.note }}/5 ★</span>
+                        </div>
+                        <p class="notif-item__subject">{{ a.cibleNom || (a.cibleType + ' #' + a.cibleId) }}</p>
+                        <p class="notif-item__body">{{ a.commentaire }}</p>
                       </li>
                     }
                   </ul>
@@ -566,9 +610,13 @@ export class AccountPageComponent implements OnInit {
   protected readonly authStore = inject(AuthStore);
   protected readonly reservationStore = inject(ReservationStore);
   protected readonly paiementStore = inject(PaiementStore);
+  private readonly notifApi = inject(NotificationApiService);
+  private readonly notifStore = inject(NotificationStore);
+  private readonly avisApi = inject(AvisApiService);
 
   protected readonly paiements = computed(() => this.paiementStore.items());
   protected readonly notifications = signal<NotificationItem[]>([]);
+  protected readonly mesAvis = signal<Avis[]>([]);
   protected readonly payingId = signal<number | null>(null);
   protected readonly selectedModes = signal<Record<number, ModePaiement>>({});
 
@@ -576,6 +624,9 @@ export class AccountPageComponent implements OnInit {
   protected readonly reservationStatusBadgeClass = reservationStatusBadgeClass;
   protected readonly formatPaiementStatusLabel = formatPaiementStatusLabel;
   protected readonly paiementStatusBadgeClass = paiementStatusBadgeClass;
+  protected readonly formatEventLabel = formatNotificationEventLabel;
+  protected readonly formatModerationLabel = formatModerationStatusLabel;
+  protected readonly moderationBadge = moderationBadgeClass;
 
   protected readonly myReservations = computed(() => {
     const user = this.authStore.user();
@@ -592,15 +643,7 @@ export class AccountPageComponent implements OnInit {
     );
   });
 
-  protected readonly myNotifications = computed(() => {
-    const email = this.authStore.user()?.email?.toLowerCase();
-    const all = this.notifications();
-    if (!email) return [];
-    if (this.authStore.isStaff()) {
-      return all;
-    }
-    return all.filter((n) => n.destinataire?.toLowerCase() === email);
-  });
+  protected readonly myNotifications = computed(() => this.notifications());
 
   ngOnInit(): void {
     void this.reservationStore.reload();
@@ -685,11 +728,14 @@ export class AccountPageComponent implements OnInit {
 
   private async loadTransactionsAndNotifications(): Promise<void> {
     await this.paiementStore.reload();
-    try {
-      const notifList = await firstValueFrom(this.http.get<NotificationItem[]>('/notifications'));
-      this.notifications.set(notifList ?? []);
-    } catch {
-      // Les notifications peuvent être indisponibles en environnement isolé
+    const [notifPage, avis] = await Promise.all([
+      firstValueFrom(this.notifApi.getMesNotifications(0, 10)).catch(() => null),
+      firstValueFrom(this.avisApi.getMesAvis()).catch(() => []),
+    ]);
+    if (notifPage) {
+      this.notifications.set(notifPage.content ?? []);
+      this.notifStore.setUnreadCount(notifPage.unreadCount ?? 0);
     }
+    this.mesAvis.set(avis ?? []);
   }
 }

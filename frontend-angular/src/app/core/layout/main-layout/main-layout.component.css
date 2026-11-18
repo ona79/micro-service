@@ -164,6 +164,42 @@
   color: var(--accent-terracotta);
 }
 
+.notif-bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  background-color: var(--surface-elevated);
+  color: var(--ink-primary);
+}
+
+.notif-bell:hover,
+.notif-bell--active {
+  border-color: var(--brand-primary);
+  background-color: var(--brand-soft);
+  color: var(--brand-primary);
+}
+
+.notif-badge {
+  position: absolute;
+  top: -5px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  background-color: var(--accent-terracotta);
+  color: var(--ink-on-dark);
+  font-size: 0.68rem;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
+
 .auth-link {
   display: inline-flex;
   align-items: center;

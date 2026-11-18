@@ -130,12 +130,22 @@
                 }
               </ol>
             }
+
+            <app-ui-avis-section cibleType="CIRCUIT" [cibleId]="cir.id" />
           </section>
         </div>
 
         <aside class="booking-sidebar">
           <p class="booking-sidebar__eyebrow">Tarif indicatif par personne</p>
           <p class="booking-sidebar__price tabular-nums">{{ cir.prix | fcfaPrice }}</p>
+
+          @if (guide(); as g) {
+            <div class="memorial-notice" style="margin-bottom: 0.85rem;">
+              <strong>Guide responsable agréé :</strong><br />
+              <a [routerLink]="['/guides', g.id]">{{ g.prenom }} {{ g.nom }}</a>
+              <span> ({{ g.languesParlees }})</span>
+            </div>
+          }
 
           <dl class="booking-facts">
             <div>

@@ -64,6 +64,40 @@ export const routes: Routes = [
           ).then((m) => m.EvenementDetailPageComponent),
       },
       {
+        path: 'guides',
+        title: 'Guides Touristiques Agréés',
+        loadComponent: () =>
+          import(
+            './features/guides/pages/guides-list-page/guides-list-page.component'
+          ).then((m) => m.GuidesListPageComponent),
+      },
+      {
+        path: 'guides/:id',
+        title: 'Profil du Guide Touristique',
+        loadComponent: () =>
+          import(
+            './features/guides/pages/guide-detail-page/guide-detail-page.component'
+          ).then((m) => m.GuideDetailPageComponent),
+      },
+      {
+        path: 'espace-guide',
+        title: 'Mon Espace Guide',
+        canActivate: [authGuard, roleGuard(['GUIDE'])],
+        loadComponent: () =>
+          import(
+            './features/guides/pages/guide-workspace-page/guide-workspace-page.component'
+          ).then((m) => m.GuideWorkspacePageComponent),
+      },
+      {
+        path: 'notifications',
+        title: 'Centre de Notifications',
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import(
+            './features/notifications/pages/notifications-center-page/notifications-center-page.component'
+          ).then((m) => m.NotificationsCenterPageComponent),
+      },
+      {
         path: 'reserver',
         title: 'Réserver une Visite',
         canActivate: [authGuard],

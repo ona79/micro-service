@@ -32,6 +32,10 @@ circuit:
   url: ${CIRCUIT_URL:http://localhost:3002}
 evenement:
   url: ${EVENEMENT_URL:http://localhost:3003}
+patrimoine:
+  url: ${PATRIMOINE_URL:http://localhost:3001}
+utilisateur:
+  url: ${UTILISATEUR_URL:http://localhost:3005}
 paiement:
   url: ${PAIEMENT_URL:http://localhost:3006}
 notification:
@@ -112,6 +116,19 @@ spring:
     enabled: true
     baseline-on-migrate: false
     locations: classpath:db/migration
+
+circuit:
+  url: ${CIRCUIT_URL:}
+evenement:
+  url: ${EVENEMENT_URL:}
+patrimoine:
+  url: ${PATRIMOINE_URL:}
+utilisateur:
+  url: ${UTILISATEUR_URL:}
+paiement:
+  url: ${PAIEMENT_URL:}
+notification:
+  url: ${NOTIFICATION_URL:}
 
 management:
   endpoints:

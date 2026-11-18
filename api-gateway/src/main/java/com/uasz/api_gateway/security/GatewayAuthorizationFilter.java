@@ -261,6 +261,126 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
                 return;
             }
         }
+        if (isCircuitPath && path.equals("/api/circuits/guide/mes-circuits") && token == null) {
+            writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                    tokenError != null ? tokenError : "Authentification requise.");
+            return;
+        }
+
+        // 2b. Protection RBAC des routes P05 (Guides, Avis, Modération)
+        boolean isGuidePath = path.equals("/api/guides") || path.startsWith("/api/guides/");
+        boolean isAvisPath = path.equals("/api/avis") || path.startsWith("/api/avis/");
+        boolean isModerationPath = path.equals("/api/moderation") || path.startsWith("/api/moderation/");
+
+        if (isGuidePath) {
+            if (path.startsWith("/api/guides/internal/") || path.equals("/api/guides/internal")) {
+                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                        "Accès interdit : les endpoints internes guides ne sont pas accessibles via la Gateway.");
+                return;
+            }
+            boolean isGuideWorkspace = path.equals("/api/guides/mon-profil") || path.startsWith("/api/guides/mon-profil/");
+            boolean isGuideAdminList = path.equals("/api/guides/admin") || path.startsWith("/api/guides/admin/");
+            boolean isGuideValidationDecision = path.endsWith("/valider") || path.endsWith("/rejeter") || path.endsWith("/reactiver");
+            boolean isGuideSuspensionDecision = path.endsWith("/suspendre") || path.endsWith("/desactiver");
+            boolean isGuideHistory = path.endsWith("/historique");
+
+            if (isGuideWorkspace) {
+                if (token == null) {
+                    writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                            tokenError != null ? tokenError : "Authentification requise.");
+                    return;
+                }
+                if (!token.hasPermission("GUIDE:GERER_PROPRE_PROFIL")) {
+                    writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                            "Accès interdit : espace réservé aux guides touristiques (GUIDE:GERER_PROPRE_PROFIL).");
+                    return;
+                }
+            } else if (isGuideAdminList || isGuideValidationDecision) {
+                if (token == null) {
+                    writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                            tokenError != null ? tokenError : "Authentification requise.");
+                    return;
+                }
+                if (!token.hasPermission("GUIDE:VALIDER")) {
+                    writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                            "Accès interdit : permission GUIDE:VALIDER requise.");
+                    return;
+                }
+            } else if (isGuideSuspensionDecision) {
+                if (token == null) {
+                    writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                            tokenError != null ? tokenError : "Authentification requise.");
+                    return;
+                }
+                if (!token.hasPermission("GUIDE:SUSPENDRE")) {
+                    writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                            "Accès interdit : permission GUIDE:SUSPENDRE requise.");
+                    return;
+                }
+            } else if (isGuideHistory || isMutationMethod) {
+                if (token == null) {
+                    writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                            tokenError != null ? tokenError : "Authentification requise.");
+                    return;
+                }
+            }
+        }
+
+        if (isAvisPath) {
+            boolean isMyAvis = path.equals("/api/avis/mes-avis");
+            if (isMyAvis) {
+                if (token == null) {
+                    writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                            tokenError != null ? tokenError : "Authentification requise.");
+                    return;
+                }
+            } else if (isMutationMethod) {
+                if (token == null) {
+                    writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                            tokenError != null ? tokenError : "Authentification requise.");
+                    return;
+                }
+                if (path.endsWith("/signaler") && "POST".equalsIgnoreCase(method)) {
+                    if (!token.hasPermission("AVIS:SIGNALER")) {
+                        writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                                "Accès interdit : permission AVIS:SIGNALER requise.");
+                        return;
+                    }
+                } else if ("POST".equalsIgnoreCase(method)) {
+                    if (!token.hasPermission("AVIS:CREER")) {
+                        writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                                "Accès interdit : permission AVIS:CREER requise.");
+                        return;
+                    }
+                } else if ("PUT".equalsIgnoreCase(method) || "PATCH".equalsIgnoreCase(method)) {
+                    if (!token.hasPermission("AVIS:MODIFIER_PROPRE")) {
+                        writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                                "Accès interdit : permission AVIS:MODIFIER_PROPRE requise.");
+                        return;
+                    }
+                } else if ("DELETE".equalsIgnoreCase(method)) {
+                    if (!token.hasPermission("AVIS:SUPPRIMER_PROPRE")) {
+                        writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                                "Accès interdit : permission AVIS:SUPPRIMER_PROPRE requise.");
+                        return;
+                    }
+                }
+            }
+        }
+
+        if (isModerationPath) {
+            if (token == null) {
+                writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                        tokenError != null ? tokenError : "Authentification requise.");
+                return;
+            }
+            boolean isAvisHistoriqueGet = "GET".equalsIgnoreCase(method) && path.matches("^/api/moderation/avis/\\d+/historique$");
+            if (!isAvisHistoriqueGet && !token.hasPermission("AVIS:MODERER")) {
+                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                        "Accès interdit : permission AVIS:MODERER requise pour accéder aux opérations de modération.");
+                return;
+            }
+        }
 
         // 3. Protection RBAC des routes de Réservation, Paiement et Notification
         boolean isReservationPath = path.equals("/api/reservations") || path.startsWith("/api/reservations/");
@@ -368,9 +488,39 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
                         tokenError != null ? tokenError : "Authentification requise.");
                 return;
             }
-            if (!"ADMINISTRATEUR".equals(token.role())) {
+            boolean isSelfNotificationRoute = path.equals("/api/notifications/mes-notifications")
+                    || path.startsWith("/api/notifications/mes-notifications/")
+                    || path.equals("/api/notifications/tout-lire")
+                    || ("PATCH".equalsIgnoreCase(method) && path.matches("^/api/notifications/\\d+/lire$"));
+            boolean isSingleNotificationGet = "GET".equalsIgnoreCase(method) && path.matches("^/api/notifications/\\d+$");
+            boolean isRetryRoute = "POST".equalsIgnoreCase(method)
+                    && (path.equals("/api/notifications/relancer-echecs")
+                    || path.matches("^/api/notifications/\\d+/relancer$"));
+
+            if (isSelfNotificationRoute) {
+                if (!token.hasPermission("NOTIFICATION:LIRE_PROPRE")
+                        && !token.hasPermission("NOTIFICATION:GERER_PROPRE")) {
+                    writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                            "Accès interdit : permission NOTIFICATION:LIRE_PROPRE requise.");
+                    return;
+                }
+            } else if (isSingleNotificationGet) {
+                if (!token.hasPermission("NOTIFICATION:LIRE_PROPRE")
+                        && !token.hasPermission("NOTIFICATION:LIRE_TOUT")
+                        && !"ADMINISTRATEUR".equals(token.role())) {
+                    writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                            "Accès interdit à cette notification.");
+                    return;
+                }
+            } else if (isRetryRoute) {
+                if (!"ADMINISTRATEUR".equals(token.role()) && !token.hasPermission("NOTIFICATION:RELANCER")) {
+                    writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                            "Accès interdit : permission NOTIFICATION:RELANCER requise.");
+                    return;
+                }
+            } else if (!"ADMINISTRATEUR".equals(token.role()) && !token.hasPermission("NOTIFICATION:LIRE_TOUT")) {
                 writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
-                        "Accès interdit : seul un administrateur peut accéder directement aux notifications.");
+                        "Accès interdit : seul un administrateur peut accéder à la console globale des notifications.");
                 return;
             }
         }
@@ -598,16 +748,23 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
             case "TOURISTE" -> List.of(
                     "PATRIMOINE:LIRE", "CIRCUIT:LIRE", "EVENEMENT:LIRE",
                     "RESERVATION:CREER", "RESERVATION:LIRE_PROPRE", "RESERVATION:ANNULER_PROPRE",
-                    "PAIEMENT:INITIER", "PAIEMENT:LIRE_PROPRE", "UTILISATEUR:LIRE_PROFIL"
+                    "PAIEMENT:INITIER", "PAIEMENT:LIRE_PROPRE", "UTILISATEUR:LIRE_PROFIL",
+                    "GUIDE:LIRE", "AVIS:LIRE", "AVIS:CREER", "AVIS:MODIFIER_PROPRE", "AVIS:SUPPRIMER_PROPRE", "AVIS:SIGNALER",
+                    "NOTIFICATION:LIRE_PROPRE", "NOTIFICATION:GERER_PROPRE"
             );
             case "GUIDE" -> List.of(
                     "PATRIMOINE:LIRE", "CIRCUIT:LIRE", "CIRCUIT:MODIFIER",
-                    "EVENEMENT:LIRE", "RESERVATION:LIRE_PROPRE", "UTILISATEUR:LIRE_PROFIL"
+                    "EVENEMENT:LIRE", "RESERVATION:LIRE_PROPRE", "UTILISATEUR:LIRE_PROFIL",
+                    "GUIDE:LIRE", "GUIDE:GERER_PROPRE_PROFIL",
+                    "AVIS:LIRE", "AVIS:SIGNALER",
+                    "NOTIFICATION:LIRE_PROPRE", "NOTIFICATION:GERER_PROPRE"
             );
             case "CONSERVATEUR" -> List.of(
                     "PATRIMOINE:LIRE", "PATRIMOINE:CREER", "PATRIMOINE:MODIFIER", "PATRIMOINE:SUPPRIMER",
                     "PATRIMOINE:PUBLIER", "PATRIMOINE:ARCHIVER",
-                    "CIRCUIT:LIRE", "EVENEMENT:LIRE", "UTILISATEUR:LIRE_PROFIL"
+                    "CIRCUIT:LIRE", "EVENEMENT:LIRE", "UTILISATEUR:LIRE_PROFIL",
+                    "GUIDE:LIRE", "AVIS:LIRE", "AVIS:SIGNALER",
+                    "NOTIFICATION:LIRE_PROPRE", "NOTIFICATION:GERER_PROPRE"
             );
             case "GESTIONNAIRE_SITE" -> List.of(
                     "PATRIMOINE:LIRE",
@@ -615,7 +772,10 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
                     "CIRCUIT:PUBLIER", "CIRCUIT:ARCHIVER",
                     "EVENEMENT:LIRE", "EVENEMENT:CREER", "EVENEMENT:MODIFIER", "EVENEMENT:SUPPRIMER",
                     "EVENEMENT:PUBLIER", "EVENEMENT:ANNULER", "EVENEMENT:ARCHIVER",
-                    "RESERVATION:LIRE_TOUT", "RESERVATION:GERER", "UTILISATEUR:LIRE_PROFIL"
+                    "RESERVATION:LIRE_TOUT", "RESERVATION:GERER", "UTILISATEUR:LIRE_PROFIL",
+                    "GUIDE:LIRE", "GUIDE:VALIDER", "GUIDE:SUSPENDRE",
+                    "AVIS:LIRE", "AVIS:SIGNALER", "AVIS:MODERER",
+                    "NOTIFICATION:LIRE_PROPRE", "NOTIFICATION:GERER_PROPRE"
             );
             case "ADMINISTRATEUR" -> List.of(
                     "PATRIMOINE:LIRE", "PATRIMOINE:CREER", "PATRIMOINE:MODIFIER", "PATRIMOINE:SUPPRIMER",
@@ -628,7 +788,10 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
                     "RESERVATION:ANNULER_PROPRE", "RESERVATION:GERER",
                     "PAIEMENT:INITIER", "PAIEMENT:LIRE_PROPRE", "PAIEMENT:LIRE_TOUT", "PAIEMENT:REMBOURSER",
                     "UTILISATEUR:LIRE_PROFIL", "UTILISATEUR:LIRE_TOUT", "UTILISATEUR:CREER_STAFF",
-                    "UTILISATEUR:GERER_ROLES", "UTILISATEUR:SUPPRIMER", "AUDIT:LIRE"
+                    "UTILISATEUR:GERER_ROLES", "UTILISATEUR:SUPPRIMER", "AUDIT:LIRE",
+                    "GUIDE:LIRE", "GUIDE:VALIDER", "GUIDE:SUSPENDRE",
+                    "AVIS:LIRE", "AVIS:CREER", "AVIS:MODIFIER_PROPRE", "AVIS:SUPPRIMER_PROPRE", "AVIS:SIGNALER", "AVIS:MODERER",
+                    "NOTIFICATION:LIRE_PROPRE", "NOTIFICATION:GERER_PROPRE", "NOTIFICATION:LIRE_TOUT", "NOTIFICATION:RELANCER"
             );
             default -> Collections.emptyList();
         };

@@ -27,6 +27,9 @@ eureka:
     service-url:
       defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}
 
+notification:
+  url: ${NOTIFICATION_URL:http://localhost:3007}
+
 security:
   cookie:
     secure: ${SECURITY_COOKIE_SECURE:false}
@@ -112,3 +115,6 @@ security:
     secret: ${SECURITY_SESSION_SECRET:?Variable obligatoire SECURITY_SESSION_SECRET manquante pour la production (min 32 octets)}
   interservice:
     secret: ${SECURITY_INTERSERVICE_SECRET:?Variable obligatoire SECURITY_INTERSERVICE_SECRET manquante pour la production (min 32 octets)}
+
+notification:
+  url: ${NOTIFICATION_URL:}

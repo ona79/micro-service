@@ -279,7 +279,7 @@ public class MicroserviceSecurityFilter extends OncePerRequestFilter {
     }
 
     private boolean isCallerServiceAuthorized(String callerService, String method, String normalizedPath) {
-        return ("ms-circuit".equals(callerService) || "ms-evenement".equals(callerService))
+        return ("ms-circuit".equals(callerService) || "ms-evenement".equals(callerService) || "ms-reservation".equals(callerService))
                 && "GET".equalsIgnoreCase(method)
                 && normalizedPath.startsWith("/api/patrimoines");
     }
