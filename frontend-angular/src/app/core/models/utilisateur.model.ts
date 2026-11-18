@@ -31,5 +31,13 @@ export interface InscriptionPayload {
   actif?: boolean;
 }
 
+export interface UpdateProfilePayload {
+  nom: string;
+  prenom: string;
+  email: string;
+  telephone?: string | null;
+  motDePasse?: string;
+}
+
 export type { ModePaiement, Paiement, StatutPaiement } from './paiement.model';
 export type { NotificationItem } from './notification.model';

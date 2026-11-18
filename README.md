@@ -104,6 +104,7 @@ npm --prefix frontend-angular exec ng test -- --no-watch
 ```
 
 Documentation technique détaillée :
+- **Expérience Touristique Publique & Design System Casamance P06** : [frontend-angular/docs/P06_GUIDE_ET_RAPPORT.md](frontend-angular/docs/P06_GUIDE_ET_RAPPORT.md)
 - **Guides, Avis Vérifiés, Modération & Notifications P05** : [docs/P05_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md](docs/P05_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md)
 - **Spécification OpenAPI P05** : [docs/api/OPENAPI_P05_GUIDES_AVIS_NOTIFICATIONS.yaml](docs/api/OPENAPI_P05_GUIDES_AVIS_NOTIFICATIONS.yaml)
 - **Diagrammes PlantUML P05** : [Architecture globale](docs/architecture/p05-architecture-globale.puml) · [États Guide/Avis/Notif](docs/architecture/p05-workflow-guide-etats.puml) · [Séquence Avis & Modération](docs/architecture/p05-sequence-avis-modere-notification.puml)

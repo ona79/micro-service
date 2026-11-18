@@ -1,7 +1,7 @@
 <div class="page-section">
   <div class="container">
     <header class="editorial-header">
-      <p class="editorial-header__eyebrow">Carnet d'itinéraires en Casamance</p>
+      <p class="editorial-header__eyebrow">Carnet d’itinéraires en Casamance</p>
       <h1 class="editorial-header__title">Circuits &amp; Parcours Touristiques</h1>
       <p class="editorial-header__subtitle">
         Suivez des parcours thématiques reliant plusieurs sites patrimoniaux de Casamance, avec
@@ -23,9 +23,24 @@
               class="filter-input filter-input--icon"
               placeholder="Ex: Ziguinchor, Enampore, Carabane, Oussouye..."
               [ngModel]="search()"
-              (ngModelChange)="search.set($event)"
+              (ngModelChange)="onSearchChange($event)"
             />
           </div>
+        </div>
+
+        <div class="filter-field">
+          <label for="cir-zone" class="filter-field__label">Zone</label>
+          <select
+            id="cir-zone"
+            class="filter-input"
+            [ngModel]="zone()"
+            (ngModelChange)="zone.set($event); onFilterImmediate()"
+          >
+            <option value="">Toute la Casamance</option>
+            <option value="BASSE_CASAMANCE">Basse-Casamance</option>
+            <option value="MOYENNE_CASAMANCE">Moyenne-Casamance</option>
+            <option value="HAUTE_CASAMANCE">Haute-Casamance</option>
+          </select>
         </div>
 
         <div class="filter-field">
@@ -34,7 +49,7 @@
             id="cir-diff"
             class="filter-input"
             [ngModel]="difficulte()"
-            (ngModelChange)="difficulte.set($event)"
+            (ngModelChange)="difficulte.set($event); onFilterImmediate()"
           >
             <option value="">Toutes les difficultés</option>
             <option value="FACILE">Facile</option>
@@ -49,7 +64,7 @@
             id="cir-trans"
             class="filter-input"
             [ngModel]="moyenTransport()"
-            (ngModelChange)="moyenTransport.set($event)"
+            (ngModelChange)="moyenTransport.set($event); onFilterImmediate()"
           >
             <option value="">Tous les modes</option>
             <option value="PIED">À pied</option>
@@ -71,7 +86,7 @@
             class="filter-input"
             placeholder="Ex: 240"
             [ngModel]="dureeMax()"
-            (ngModelChange)="dureeMax.set($event)"
+            (ngModelChange)="dureeMax.set($event); onNumericFilterChange()"
           />
         </div>
 
@@ -85,20 +100,33 @@
             class="filter-input"
             placeholder="Ex: 100"
             [ngModel]="distanceMax()"
-            (ngModelChange)="distanceMax.set($event)"
+            (ngModelChange)="distanceMax.set($event); onNumericFilterChange()"
           />
+        </div>
+
+        <div class="filter-field">
+          <label for="cir-sort" class="filter-field__label">Trier par</label>
+          <select
+            id="cir-sort"
+            class="filter-input"
+            [ngModel]="sortBy()"
+            (ngModelChange)="sortBy.set($event); onFilterImmediate()"
+          >
+            <option value="nom_asc">Nom (A → Z)</option>
+            <option value="prix_asc">Tarif croissant</option>
+            <option value="duree_asc">Durée la plus courte</option>
+            <option value="distance_asc">Distance la plus courte</option>
+          </select>
         </div>
       </div>
 
       <div class="filter-panel__footer">
         <p class="filter-panel__count tabular-nums">
-          <strong>{{ filteredCircuits().length }}</strong>
-          circuit{{ filteredCircuits().length > 1 ? 's' : '' }}
-          @if (store.items().length !== filteredCircuits().length) {
-            <span> sur {{ store.items().length }}</span>
-          }
+          <strong>{{ totalElements() }}</strong>
+          circuit{{ totalElements() > 1 ? 's' : '' }} publié{{ totalElements() > 1 ? 's' : '' }}
         </p>
-        @if (search() || difficulte() || moyenTransport() || dureeMax() || distanceMax()) {
+
+        @if (hasActiveFilters()) {
           <button type="button" class="btn-reset" (click)="resetFilters()">
             Réinitialiser les filtres
           </button>
@@ -106,26 +134,26 @@
       </div>
     </section>
 
-    @if (store.loading() && store.items().length === 0) {
-      <app-ui-skeleton-grid [count]="2" variant="rows" label="Chargement des circuits..." />
-    } @else if (store.error() && store.items().length === 0) {
+    @if (loading() && publishedCircuits().length === 0) {
+      <app-ui-skeleton-grid [count]="2" label="Chargement des circuits touristiques..." />
+    } @else if (error() && publishedCircuits().length === 0) {
       <app-ui-error-banner
         title="Erreur lors du chargement des circuits"
-        [message]="store.error()"
+        [message]="error()"
         [showRetry]="true"
-        (retry)="store.reload()"
+        (retry)="reload()"
       />
-    } @else if (filteredCircuits().length === 0) {
+    } @else if (publishedCircuits().length === 0) {
       <app-ui-empty-state
         title="Aucun circuit disponible"
-        description="Aucun circuit ne correspond aux filtres sélectionnés ou aucun parcours n'a encore été créé."
+        description="Aucun circuit ne correspond aux filtres sélectionnés ou aucun parcours n'a encore été publié."
         actionLabel="Réinitialiser les filtres"
         [hasAction]="true"
         (action)="resetFilters()"
       />
     } @else {
       <div class="routes-list">
-        @for (circuit of filteredCircuits(); track circuit.id) {
+        @for (circuit of publishedCircuits(); track circuit.id) {
           @let stops = getOrderedStops(circuit);
           @let firstPat = getFirstPatrimoine(circuit);
           <article class="route-card">
@@ -133,6 +161,7 @@
               <app-ui-patrimoine-image
                 [codePatrimoine]="firstPat?.codePatrimoine"
                 [nomPatrimoine]="firstPat?.nomPatrimoine ?? circuit.nomCircuit"
+                [imageUrl]="circuit.imageUrl || firstPat?.imageUrl"
               />
             </a>
 
@@ -148,6 +177,14 @@
                   @if (circuit.moyenTransport) {
                     <span class="ui-badge">{{ circuit.moyenTransport }}</span>
                   }
+                  @if (getResume(circuit.id); as res) {
+                    @if (res.totalAvis > 0) {
+                      <span class="ui-badge ui-badge--success tabular-nums">
+                        <svg lucideStar [size]="12" aria-hidden="true"></svg>
+                        {{ res.noteMoyenne }}/5 ({{ res.totalAvis }})
+                      </span>
+                    }
+                  }
                 </div>
                 <span class="route-card__price tabular-nums">
                   {{ circuit.prix | fcfaPrice }}
@@ -160,7 +197,8 @@
 
               <p class="route-card__desc">
                 {{
-                  circuit.descriptionCircuit ||
+                  circuit.presentationTouristique ||
+                    circuit.descriptionCircuit ||
                     'Parcours touristique reliant plusieurs sites patrimoniaux majeurs de Casamance.'
                 }}
               </p>
@@ -182,9 +220,9 @@
                     <svg lucideClock [size]="15" aria-hidden="true"></svg>
                     {{ circuit.dureeEstimee | durationMinutes }}
                   </span>
-                  <span title="Distance orthodromique indicative entre étapes">
+                  <span title="Estimation orthodromique indicative à vol d’oiseau entre étapes">
                     <svg lucideRoute [size]="15" aria-hidden="true"></svg>
-                    ~{{ circuit.distanceTotale || 0 }} km (indicatif)
+                    ~{{ circuit.distanceTotale || 0 }} km (vol d’oiseau · indicatif)
                   </span>
                   <span>
                     <svg lucideUsers [size]="15" aria-hidden="true"></svg>
@@ -214,6 +252,34 @@
           </article>
         }
       </div>
+
+      @if (totalPages() > 1) {
+        <nav
+          class="pagination-bar"
+          aria-label="Pagination des circuits"
+          style="display:flex;justify-content:center;align-items:center;gap:0.75rem;margin-top:2rem;"
+        >
+          <button
+            type="button"
+            class="btn-reset"
+            [disabled]="currentPage() <= 1"
+            (click)="goToPage(currentPage() - 1)"
+          >
+            Précédent
+          </button>
+          <span class="tabular-nums" style="font-size:0.875rem;">
+            Page <strong>{{ currentPage() }}</strong> sur <strong>{{ totalPages() }}</strong>
+          </span>
+          <button
+            type="button"
+            class="btn-reset"
+            [disabled]="currentPage() >= totalPages()"
+            (click)="goToPage(currentPage() + 1)"
+          >
+            Suivant
+          </button>
+        </nav>
+      }
     }
   </div>
 </div>

@@ -40,9 +40,21 @@
 
 .agenda-controls__inputs {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr;
   gap: var(--space-4);
   align-items: end;
+}
+
+@media (max-width: 960px) {
+  .agenda-controls__inputs {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .agenda-controls__inputs {
+    grid-template-columns: 1fr;
+  }
 }
 
 .agenda-field {

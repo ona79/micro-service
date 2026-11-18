@@ -26,45 +26,62 @@ describe('EvenementsListPageComponent', () => {
     httpMock.verify();
   });
 
-  it('loads events and filters by event type chip', async () => {
+  it('loads events from server /recherche and filters by event type chip', async () => {
     const fixture = TestBed.createComponent(EvenementsListPageComponent);
     fixture.detectChanges();
 
-    httpMock.expectOne('/api/evenements').flush([
-      {
-        id: 1,
-        nomEvenement: 'Journées de la Casamance',
-        descriptionEvenement: 'Visite guidée',
-        typeEvenement: 'VISITE_GUIDEE',
-        dateDebut: '2026-12-15T09:30:00',
-        dateFin: '2026-12-15T17:00:00',
-        lieu: 'Ziguinchor',
-        capaciteMax: 80,
-        prix: 5000,
-        patrimoineId: 3,
-        patrimoine: null,
-      },
-      {
-        id: 2,
-        nomEvenement: 'Festival de Gorée',
-        descriptionEvenement: 'Musique et patrimoine',
-        typeEvenement: 'FESTIVAL',
-        dateDebut: '2026-12-20T18:00:00',
-        dateFin: '2026-12-20T22:00:00',
-        lieu: 'Gorée',
-        capaciteMax: 120,
-        prix: 0,
-        patrimoineId: 1,
-        patrimoine: null,
-      },
-    ]);
+    httpMock
+      .expectOne(
+        (req) => req.url === '/api/evenements/recherche' && req.params.get('sortBy') === 'dateDebut'
+      )
+      .flush({
+        content: [
+          {
+            id: 1,
+            nomEvenement: 'Journées de la Casamance',
+            descriptionEvenement: 'Visite guidée',
+            typeEvenement: 'VISITE_GUIDEE',
+            dateDebut: '2026-12-15T09:30:00',
+            dateFin: '2026-12-15T17:00:00',
+            lieu: 'Ziguinchor',
+            capaciteMax: 80,
+            prix: 5000,
+            patrimoineId: 3,
+            patrimoine: null,
+            statutEvenement: 'PUBLIE',
+          },
+          {
+            id: 2,
+            nomEvenement: 'Festival de Carabane',
+            descriptionEvenement: 'Musique et patrimoine',
+            typeEvenement: 'FESTIVAL',
+            dateDebut: '2026-12-20T18:00:00',
+            dateFin: '2026-12-20T22:00:00',
+            lieu: 'Carabane',
+            capaciteMax: 120,
+            prix: 0,
+            patrimoineId: 2,
+            patrimoine: null,
+            statutEvenement: 'PUBLIE',
+          },
+        ],
+        page: 0,
+        size: 8,
+        totalElements: 2,
+        totalPages: 1,
+        last: true,
+      });
     httpMock.expectOne('/api/patrimoines').flush([]);
 
-    await fixture.whenStable();
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+
+    httpMock.expectOne('/api/avis/resumes?cibleType=EVENEMENT&cibleIds=1,2').flush([]);
+    await new Promise((r) => setTimeout(r, 0));
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('Journées de la Casamance');
-    expect(fixture.nativeElement.textContent).toContain('Festival de Gorée');
+    expect(fixture.nativeElement.textContent).toContain('Festival de Carabane');
     expect(fixture.nativeElement.textContent).toContain('Gratuit');
 
     const chips = fixture.nativeElement.querySelectorAll('.type-chip') as NodeListOf<HTMLButtonElement>;
@@ -72,7 +89,41 @@ describe('EvenementsListPageComponent', () => {
     festivalChip?.click();
     fixture.detectChanges();
 
-    expect(fixture.nativeElement.textContent).toContain('Festival de Gorée');
+    httpMock
+      .expectOne(
+        (req) => req.url === '/api/evenements/recherche' && req.params.get('type') === 'FESTIVAL'
+      )
+      .flush({
+        content: [
+          {
+            id: 2,
+            nomEvenement: 'Festival de Carabane',
+            descriptionEvenement: 'Musique et patrimoine',
+            typeEvenement: 'FESTIVAL',
+            dateDebut: '2026-12-20T18:00:00',
+            dateFin: '2026-12-20T22:00:00',
+            lieu: 'Carabane',
+            capaciteMax: 120,
+            prix: 0,
+            patrimoineId: 2,
+            patrimoine: null,
+            statutEvenement: 'PUBLIE',
+          },
+        ],
+        page: 0,
+        size: 8,
+        totalElements: 1,
+        totalPages: 1,
+        last: true,
+      });
+
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+    httpMock.expectOne('/api/avis/resumes?cibleType=EVENEMENT&cibleIds=2').flush([]);
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('Festival de Carabane');
     expect(fixture.nativeElement.textContent).not.toContain('Journées de la Casamance');
   });
 });

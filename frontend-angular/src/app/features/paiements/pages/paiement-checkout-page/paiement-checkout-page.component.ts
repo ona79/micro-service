@@ -32,6 +32,7 @@ import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skelet
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
 import { ReservationApiService } from '../../../reservations/data-access/reservation-api.service';
+import { SeoService } from '../../../../core/services/seo.service';
 import { PaiementStore } from '../../data-access/paiement.store';
 
 @Component({
@@ -60,6 +61,7 @@ import { PaiementStore } from '../../data-access/paiement.store';
 export class PaiementCheckoutPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly reservationApi = inject(ReservationApiService);
+  private readonly seo = inject(SeoService);
   protected readonly paiementStore = inject(PaiementStore);
 
   protected readonly reservation = signal<Reservation | null>(null);
@@ -127,6 +129,11 @@ export class PaiementCheckoutPageComponent implements OnInit {
       this.loadError.set('Aucune réservation valide sélectionnée pour le règlement simulé.');
       return;
     }
+    this.seo.update({
+      title: 'Paiement simulé Wave / Orange Money',
+      description: 'Simulation pédagogique de paiement Wave / Orange Money sans débit réel.',
+      canonicalPath: `/paiements/${reservationId}`,
+    });
     void this.loadAll(reservationId);
   }
 

@@ -6,6 +6,7 @@ import {
   ConnexionPayload,
   InscriptionPayload,
   RoleUtilisateur,
+  UpdateProfilePayload,
   Utilisateur,
 } from '../models/utilisateur.model';
 
@@ -170,7 +171,10 @@ export class AuthStore {
     );
   }
 
-  async updateUser(id: number, payload: InscriptionPayload): Promise<Utilisateur> {
+  async updateUser(
+    id: number,
+    payload: InscriptionPayload | UpdateProfilePayload
+  ): Promise<Utilisateur> {
     const updated = await firstValueFrom(
       this.http.put<Utilisateur>(`/api/utilisateurs/${id}`, payload, { withCredentials: true })
     );

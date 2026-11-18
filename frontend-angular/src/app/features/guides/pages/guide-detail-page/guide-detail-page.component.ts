@@ -8,7 +8,6 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import {
   LucideArrowRight,
@@ -19,10 +18,10 @@ import {
   LucideRoute,
 } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
-import { APP_SITE_CONFIG } from '../../../../core/config/site.config';
 import { extractErrorMessage } from '../../../../core/models/api-error.model';
 import { Circuit } from '../../../../core/models/circuit.model';
 import { GuideProfil, formatGuideStatusLabel } from '../../../../core/models/guide.model';
+import { SeoService } from '../../../../core/services/seo.service';
 import { UiAvisSectionComponent } from '../../../../shared/components/ui-avis-section/ui-avis-section.component';
 import {
   BreadcrumbItem,
@@ -345,8 +344,7 @@ export class GuideDetailPageComponent {
   protected readonly formatGuideStatus = formatGuideStatusLabel;
   private readonly guideApi = inject(GuideApiService);
   private readonly circuitStore = inject(CircuitStore);
-  private readonly titleService = inject(Title);
-  private readonly config = inject(APP_SITE_CONFIG);
+  private readonly seo = inject(SeoService);
 
   protected readonly guide = signal<GuideProfil | null>(null);
   protected readonly loading = signal(true);
@@ -382,8 +380,19 @@ export class GuideDetailPageComponent {
     this.error.set(null);
     try {
       const g = await firstValueFrom(this.guideApi.getById(id));
+      if (g.statutValidation !== 'VALIDE' || !g.visibilitePublique) {
+        this.guide.set(null);
+        this.error.set('Ce profil de guide n’est pas accessible publiquement.');
+        return;
+      }
       this.guide.set(g);
-      this.titleService.setTitle(`${g.prenom} ${g.nom} — Guide | ${this.config.siteName}`);
+      this.seo.update({
+        title: `${g.prenom} ${g.nom} — Guide agréé`,
+        description:
+          g.presentationCourte ||
+          `Guide touristique agréé en Casamance (${g.zonesIntervention}). Langues : ${g.languesParlees}.`,
+        canonicalPath: `/guides/${g.id}`,
+      });
     } catch (err) {
       this.error.set(extractErrorMessage(err));
     } finally {

@@ -8,7 +8,6 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import {
   LucideArrowRight,
@@ -17,10 +16,10 @@ import {
   LucideMapPin,
   LucideTicket,
 } from '@lucide/angular';
-import { APP_SITE_CONFIG } from '../../../../core/config/site.config';
 import { extractErrorMessage } from '../../../../core/models/api-error.model';
 import { Evenement } from '../../../../core/models/evenement.model';
 import { Patrimoine } from '../../../../core/models/patrimoine.model';
+import { SeoService } from '../../../../core/services/seo.service';
 import {
   BreadcrumbItem,
   UiBreadcrumbComponent,
@@ -77,8 +76,7 @@ export class EvenementDetailPageComponent {
   protected readonly store = inject(EvenementStore);
   protected readonly patrimoineStore = inject(PatrimoineStore);
   private readonly reservationApi = inject(ReservationApiService);
-  private readonly titleService = inject(Title);
-  private readonly config = inject(APP_SITE_CONFIG);
+  private readonly seo = inject(SeoService);
 
   protected readonly evenement = signal<Evenement | null>(null);
   protected readonly loading = signal(true);
@@ -188,7 +186,13 @@ export class EvenementDetailPageComponent {
       const detail = await this.store.loadById(evtId);
       if (seq !== this.loadSeq) return;
       this.evenement.set(detail);
-      this.titleService.setTitle(`${detail.nomEvenement} — ${this.config.siteName}`);
+      this.seo.update({
+        title: detail.nomEvenement,
+        description:
+          detail.descriptionEvenement ??
+          `Événement culturel ${detail.nomEvenement} en Casamance (${detail.lieu || 'Casamance'}).`,
+        canonicalPath: `/evenements/${detail.id}`,
+      });
     } catch (err) {
       if (seq !== this.loadSeq) return;
       this.evenement.set(null);

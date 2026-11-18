@@ -5,37 +5,38 @@
    ========================================================================== */
 
 :root {
-  /* --- Surfaces papier & lin --- */
-  --surface-canvas: #faf7f2;
+  /* --- Surfaces papier & lin naturel (#F1EBDD) --- */
+  --surface-canvas: #faf7f0;
   --surface-elevated: #ffffff;
-  --surface-sand: #f2ede4;
-  --surface-tinted: #ebe4d8;
-  --surface-forest: #163828;
-  --surface-forest-soft: #204a36;
+  --surface-sand: #f1ebdd;
+  --surface-tinted: #e6decd;
+  --surface-forest: #173d2d;
+  --surface-forest-soft: #245b45;
 
   /* --- Encres & lisibilité (WCAG AA >= 4.5:1) --- */
   --ink-primary: #1c1b18;
   --ink-secondary: #4a463f;
-  --ink-muted: #635d53;
-  --ink-on-dark: #faf7f2;
+  --ink-muted: #5f594f;
+  --ink-on-dark: #faf7f0;
   --ink-on-dark-muted: #d5ded8;
 
-  /* --- Identitaire Vert Casamance --- */
-  --brand-primary: #1f5138;
-  --brand-primary-hover: #143826;
-  --brand-medium: #2d6a4f;
-  --brand-soft: #e3efe7;
-  --brand-border: #b8d3c1;
+  /* --- Identitaire Vert Mangrove Casamance (#245B45) --- */
+  --brand-primary: #245b45;
+  --brand-primary-hover: #194231;
+  --brand-medium: #2e7056;
+  --brand-soft: #e4efe9;
+  --brand-border: #b6d1c3;
 
-  /* --- Accents Latérite & Ocre --- */
-  --accent-terracotta: #b24c29;
-  --accent-terracotta-hover: #8f3b1e;
-  --accent-terracotta-soft: #f9ece7;
-  --accent-terracotta-border: #e5b8a8;
+  /* --- Accents Terre Latérite (#B75F3B) & Ocre (#D9A441) --- */
+  --accent-terracotta: #b75f3b;
+  --accent-terracotta-hover: #964b2c;
+  --accent-terracotta-soft: #f9ece6;
+  --accent-terracotta-border: #e5b7a5;
 
-  --accent-ochre: #8a5a10;
-  --accent-ochre-soft: #fdf4e3;
-  --accent-ochre-border: #e9d19f;
+  --accent-ochre-gold: #d9a441;
+  --accent-ochre: #82560c;
+  --accent-ochre-soft: #fdf4df;
+  --accent-ochre-border: #e7c87e;
 
   /* --- Registre sobre « Lieu de mémoire » --- */
   --memorial-surface: #eef0f2;

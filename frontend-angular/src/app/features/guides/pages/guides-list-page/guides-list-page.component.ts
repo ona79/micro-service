@@ -15,6 +15,7 @@ import { firstValueFrom } from 'rxjs';
 import { extractErrorMessage } from '../../../../core/models/api-error.model';
 import { AvisResume } from '../../../../core/models/avis.model';
 import { GuideProfil } from '../../../../core/models/guide.model';
+import { SeoService } from '../../../../core/services/seo.service';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
 import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skeleton-grid/ui-skeleton-grid.component';
@@ -84,6 +85,15 @@ import { GuideApiService } from '../../data-access/guide-api.service';
               name="langue"
               placeholder="Français, Diola, Wolof..."
             />
+          </label>
+          <label class="filter-field" style="display:flex;align-items:center;gap:0.5rem;padding-bottom:0.45rem;">
+            <input
+              type="checkbox"
+              [(ngModel)]="disponibleOnly"
+              (ngModelChange)="loadGuides()"
+              name="disponibleOnly"
+            />
+            <span class="filter-label" style="margin:0;">Disponibles uniquement</span>
           </label>
           <div class="filter-actions">
             <button type="submit" class="btn-filter">
@@ -351,6 +361,7 @@ import { GuideApiService } from '../../data-access/guide-api.service';
 export class GuidesListPageComponent implements OnInit {
   private readonly guideApi = inject(GuideApiService);
   private readonly avisApi = inject(AvisApiService);
+  private readonly seo = inject(SeoService);
 
   protected readonly guides = signal<GuideProfil[]>([]);
   protected readonly resumesMap = signal<Record<number, AvisResume>>({});
@@ -360,8 +371,15 @@ export class GuidesListPageComponent implements OnInit {
   protected q = '';
   protected zone = '';
   protected langue = '';
+  protected disponibleOnly = false;
 
   ngOnInit(): void {
+    this.seo.update({
+      title: 'Guides Touristiques Agréés',
+      description:
+        'Annuaire officiel des guides touristiques validés en Casamance : zones couvertes, langues parlées, spécialités et avis vérifiés.',
+      canonicalPath: '/guides',
+    });
     void this.loadGuides();
   }
 
@@ -369,6 +387,7 @@ export class GuidesListPageComponent implements OnInit {
     this.q = '';
     this.zone = '';
     this.langue = '';
+    this.disponibleOnly = false;
     void this.loadGuides();
   }
 
@@ -383,14 +402,19 @@ export class GuidesListPageComponent implements OnInit {
           langue: this.langue.trim() || undefined,
         })
       );
-      const safeList = list ?? [];
+      const safeList = (list ?? []).filter(
+        (g) =>
+          g.statutValidation === 'VALIDE' &&
+          g.visibilitePublique &&
+          (!this.disponibleOnly || g.disponible)
+      );
       this.guides.set(safeList);
 
       const userIds = safeList.map((g) => g.utilisateurId).filter((id) => id != null);
       if (userIds.length > 0) {
         const resumes = await firstValueFrom(this.avisApi.getResumesBatch('GUIDE', userIds)).catch(() => []);
         const map: Record<number, AvisResume> = {};
-        for (const r of resumes ?? []) {
+        for (const r of Array.isArray(resumes) ? resumes : []) {
           map[r.cibleId] = r;
         }
         this.resumesMap.set(map);

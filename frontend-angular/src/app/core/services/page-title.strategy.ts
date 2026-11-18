@@ -1,19 +1,31 @@
 import { Injectable, inject } from '@angular/core';
-import { Title } from '@angular/platform-browser';
-import { RouterStateSnapshot, TitleStrategy } from '@angular/router';
-import { APP_SITE_CONFIG } from '../config/site.config';
+import { ActivatedRouteSnapshot, RouterStateSnapshot, TitleStrategy } from '@angular/router';
+import { SeoService } from './seo.service';
 
 @Injectable({ providedIn: 'root' })
 export class PageTitleStrategy extends TitleStrategy {
-  private readonly title = inject(Title);
-  private readonly config = inject(APP_SITE_CONFIG);
+  private readonly seo = inject(SeoService);
 
   override updateTitle(routerState: RouterStateSnapshot): void {
     const routeTitle = this.buildTitle(routerState);
-    if (routeTitle) {
-      this.title.setTitle(`${routeTitle} — ${this.config.siteName}`);
-    } else {
-      this.title.setTitle(`${this.config.siteName} — ${this.config.siteSubtitle}`);
+    const description = this.extractDeepestDescription(routerState.root);
+    this.seo.update({
+      title: routeTitle || undefined,
+      description,
+      canonicalPath: routerState.url,
+    });
+  }
+
+  private extractDeepestDescription(snapshot: ActivatedRouteSnapshot): string | undefined {
+    let cursor: ActivatedRouteSnapshot | null = snapshot;
+    let found: string | undefined;
+    while (cursor) {
+      const desc = cursor.data?.['description'];
+      if (typeof desc === 'string' && desc.trim()) {
+        found = desc.trim();
+      }
+      cursor = cursor.firstChild;
     }
+    return found;
   }
 }
