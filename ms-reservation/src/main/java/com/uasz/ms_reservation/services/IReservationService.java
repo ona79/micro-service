@@ -59,4 +59,10 @@ public interface IReservationService {
     List<ManifesteParticipantDto> getManifesteGuidePourCircuit(Long circuitId);
 
     int expirerReservationsEchues();
+
+    List<com.uasz.ms_reservation.dto.BilletDto> getBilletsByReservation(Long reservationId);
+
+    com.uasz.ms_reservation.dto.ValidationBilletResponse validerBillet(String tokenQr);
+
+    com.uasz.ms_reservation.dto.BilletDto verifierBillet(String tokenQr);
 }

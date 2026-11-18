@@ -31,5 +31,16 @@ export function extractErrorMessage(err: unknown, fallback = 'Une erreur inatten
   if (err instanceof Error && err.message) {
     return err.message;
   }
+  if (typeof err === 'object' && err !== null) {
+    const obj = err as Record<string, unknown>;
+    if (typeof obj['message'] === 'string') return obj['message'];
+    if (typeof obj['error'] === 'string') return obj['error'];
+    if (typeof obj['erreur'] === 'string') return obj['erreur'];
+    if (typeof obj['error'] === 'object' && obj['error'] !== null) {
+      const nested = obj['error'] as Record<string, unknown>;
+      if (typeof nested['message'] === 'string') return nested['message'];
+      if (typeof nested['erreur'] === 'string') return nested['erreur'];
+    }
+  }
   return fallback;
 }

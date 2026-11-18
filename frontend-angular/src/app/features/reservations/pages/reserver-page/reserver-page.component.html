@@ -54,7 +54,8 @@
                 } @else if (created.statut === 'CONFIRMEE') {
                   <span class="ui-badge ui-badge--success">Réservation confirmée (Gratuit)</span>
                   <a [routerLink]="['/reservations', created.id]" class="ui-btn ui-btn--primary">
-                    <span>Voir ma réservation confirmée</span>
+                    <svg lucideTicket [size]="15" aria-hidden="true"></svg>
+                    <span>Voir mes billets d'accès QR</span>
                     <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
                   </a>
                 } @else {

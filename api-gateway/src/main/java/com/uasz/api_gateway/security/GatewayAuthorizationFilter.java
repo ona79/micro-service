@@ -454,8 +454,32 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
 
         // 3. Protection RBAC des routes de Réservation, Paiement et Notification
         boolean isReservationPath = path.equals("/api/reservations") || path.startsWith("/api/reservations/");
+        boolean isVisitePath = path.equals("/api/visites") || path.startsWith("/api/visites/");
         boolean isPaiementPath = path.equals("/api/paiements") || path.startsWith("/api/paiements/");
         boolean isNotificationPath = path.equals("/api/notifications") || path.startsWith("/api/notifications/");
+
+        if (isVisitePath) {
+            if (path.startsWith("/api/visites/internal/") || path.equals("/api/visites/internal")) {
+                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                        "Accès interdit : les endpoints internes ne sont pas accessibles via la Gateway.");
+                return;
+            }
+            if (token == null) {
+                writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                        tokenError != null ? tokenError : "Authentification requise pour effectuer le contrôle d'accès.");
+                return;
+            }
+            if (!token.hasPermission("VISITE:VALIDER")
+                    && !token.hasPermission("PATRIMOINE:VALIDER")
+                    && !token.hasPermission("RESERVATION:GERER")
+                    && !"CONSERVATEUR".equals(token.role())
+                    && !"GESTIONNAIRE_SITE".equals(token.role())
+                    && !"ADMINISTRATEUR".equals(token.role())) {
+                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                        "Accès interdit : permission VISITE:VALIDER requise.");
+                return;
+            }
+        }
 
         if (isReservationPath) {
             if (path.startsWith("/api/reservations/internal/") || path.equals("/api/reservations/internal")) {
@@ -840,6 +864,7 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
                     "PATRIMOINE:PUBLIER", "PATRIMOINE:ARCHIVER",
                     "CIRCUIT:LIRE", "EVENEMENT:LIRE", "UTILISATEUR:LIRE_PROFIL",
                     "GUIDE:LIRE", "GUIDE:VALIDER", "GUIDE:SUSPENDRE",
+                    "VISITE:VALIDER",
                     "AVIS:LIRE", "AVIS:SIGNALER",
                     "NOTIFICATION:LIRE_PROPRE", "NOTIFICATION:GERER_PROPRE"
             );
@@ -851,6 +876,7 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
                     "EVENEMENT:PUBLIER", "EVENEMENT:ANNULER", "EVENEMENT:ARCHIVER",
                     "RESERVATION:LIRE_TOUT", "RESERVATION:GERER", "UTILISATEUR:LIRE_PROFIL",
                     "GUIDE:LIRE", "GUIDE:VALIDER", "GUIDE:SUSPENDRE",
+                    "VISITE:VALIDER",
                     "AVIS:LIRE", "AVIS:SIGNALER", "AVIS:MODERER",
                     "NOTIFICATION:LIRE_PROPRE", "NOTIFICATION:GERER_PROPRE"
             );
@@ -863,6 +889,7 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
                     "EVENEMENT:PUBLIER", "EVENEMENT:ANNULER", "EVENEMENT:ARCHIVER",
                     "RESERVATION:CREER", "RESERVATION:LIRE_PROPRE", "RESERVATION:LIRE_TOUT",
                     "RESERVATION:ANNULER_PROPRE", "RESERVATION:GERER",
+                    "VISITE:VALIDER",
                     "PAIEMENT:INITIER", "PAIEMENT:LIRE_PROPRE", "PAIEMENT:LIRE_TOUT", "PAIEMENT:REMBOURSER",
                     "UTILISATEUR:LIRE_PROFIL", "UTILISATEUR:LIRE_TOUT", "UTILISATEUR:CREER_STAFF",
                     "UTILISATEUR:GERER_ROLES", "UTILISATEUR:SUPPRIMER", "AUDIT:LIRE",

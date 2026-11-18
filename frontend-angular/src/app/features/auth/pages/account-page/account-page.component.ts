@@ -238,6 +238,13 @@ type AccountTab = 'reservations' | 'paiements' | 'avis' | 'notifications' | 'pro
                           <span>Détail</span>
                         </a>
 
+                        @if (res.statut === 'CONFIRMEE') {
+                          <a [routerLink]="['/reservations', res.id]" class="btn-tickets-sm" title="Voir mes billets électroniques et QR codes">
+                            <svg lucideTicket [size]="14" aria-hidden="true"></svg>
+                            <span>Billets QR</span>
+                          </a>
+                        }
+
                         @if (res.statut === 'EN_ATTENTE_PAIEMENT') {
                           <label [attr.for]="'pay-mode-' + res.id" class="sr-only">
                             Portefeuille simulé
@@ -632,6 +639,21 @@ type AccountTab = 'reservations' | 'paiements' | 'avis' | 'notifications' | 'pro
       color: var(--ink-primary);
       border: 1px solid var(--border-strong);
       font-size: var(--text-xs);
+    }
+
+    .btn-tickets-sm {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.45rem 0.85rem;
+      background-color: var(--brand-primary);
+      color: #ffffff;
+      border: 1px solid var(--brand-primary);
+      border-radius: var(--radius-pill);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
     }
 
     .btn-logout {

@@ -30,4 +30,8 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     expect(fixture.componentInstance).toBeTruthy();
   });
+
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
 });

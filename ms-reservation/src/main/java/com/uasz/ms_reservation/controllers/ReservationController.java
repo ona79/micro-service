@@ -102,6 +102,11 @@ public class ReservationController {
         return ResponseEntity.ok(reservationService.getByIdReservation(id));
     }
 
+    @GetMapping("/{id}/billets")
+    public ResponseEntity<List<com.uasz.ms_reservation.dto.BilletDto>> getBilletsByReservation(@PathVariable Long id) {
+        return ResponseEntity.ok(reservationService.getBilletsByReservation(id));
+    }
+
     @PutMapping("/{id}/annuler")
     public ResponseEntity<ReservationDto> annulerReservation(
             @PathVariable Long id,

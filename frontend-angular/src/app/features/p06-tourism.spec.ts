@@ -36,6 +36,7 @@ describe('P06 PatrimoinesListPage Server Filtering & Draft Isolation', () => {
 
   afterEach(() => {
     httpMock.verify();
+    TestBed.resetTestingModule();
   });
 
   it('filters out non-PUBLIE drafts and paginates server results', async () => {
@@ -113,6 +114,7 @@ describe('P06 Expérience Touristique Publique & Espace Personnel', () => {
 
   afterEach(() => {
     httpMock.verify();
+    TestBed.resetTestingModule();
   });
 
   it('CircuitsListPageComponent displays indicative orthodromic caveat and review scores', async () => {
@@ -230,6 +232,8 @@ describe('P06 Expérience Touristique Publique & Espace Personnel', () => {
     });
     httpMock.expectOne('/api/paiements/reservation/42').flush([]);
 
+    await flush();
+    httpMock.expectOne('/api/reservations/42/billets').flush([]);
     await flush();
     fixture.detectChanges();
 
