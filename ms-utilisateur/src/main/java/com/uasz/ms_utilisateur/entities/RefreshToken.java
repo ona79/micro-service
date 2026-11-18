@@ -28,6 +28,9 @@ public class RefreshToken {
     @Column(name = "token_hash", unique = true, nullable = false, length = 64)
     private String tokenHash;
 
+    @Column(name = "parent_token_hash", unique = true, length = 64)
+    private String parentTokenHash;
+
     @Column(name = "family_id", nullable = false, length = 64)
     private String familyId;
 

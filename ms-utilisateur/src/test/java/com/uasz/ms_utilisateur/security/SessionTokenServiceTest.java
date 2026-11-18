@@ -1,10 +1,14 @@
 package com.uasz.ms_utilisateur.security;
 
+import com.uasz.ms_utilisateur.TestEphemeralSecretsPostProcessor;
 import com.uasz.ms_utilisateur.dto.UtilisateurDto;
 import com.uasz.ms_utilisateur.entities.RoleUtilisateur;
+import com.uasz.ms_utilisateur.exceptions.ForbiddenException;
 import com.uasz.ms_utilisateur.exceptions.UnauthorizedException;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
 
 import java.util.List;
 
@@ -13,12 +17,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SessionTokenServiceTest {
 
-    private static final String SECRET = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    private String secret;
     private SessionTokenService tokenService;
 
     @BeforeEach
     void setUp() {
-        tokenService = new SessionTokenService(SECRET);
+        secret = TestEphemeralSecretsPostProcessor.generateRandomSecret();
+        tokenService = new SessionTokenService(secret);
     }
 
     @Test
@@ -57,7 +62,6 @@ class SessionTokenServiceTest {
 
         String token = tokenService.createToken(user);
         String[] parts = token.split("\\.");
-        // Altère le dernier caractère de la signature
         char lastChar = parts[2].charAt(parts[2].length() - 1);
         char altered = (lastChar == 'A') ? 'B' : 'A';
         String tamperedToken = parts[0] + "." + parts[1] + "." + parts[2].substring(0, parts[2].length() - 1) + altered;
@@ -75,12 +79,53 @@ class SessionTokenServiceTest {
                 .role(RoleUtilisateur.TOURISTE)
                 .build();
 
-        // Expire il y a 10 secondes
         String expiredToken = tokenService.createToken(user, "sess-1", List.of(), -10);
 
         assertThatThrownBy(() -> tokenService.verifyToken(expiredToken))
                 .isInstanceOf(UnauthorizedException.class)
                 .hasMessageContaining("expiré");
+    }
+
+    @Test
+    void extractRefreshToken_litExclusivementDepuisCookieEtIgnoreHeaderXRefreshToken() {
+        MockHttpServletRequest reqHeaderOnly = new MockHttpServletRequest("POST", "/api/utilisateurs/refresh");
+        reqHeaderOnly.addHeader("X-Refresh-Token", "tentative-injection-header");
+        assertThat(tokenService.extractRefreshToken(reqHeaderOnly)).isNull();
+
+        MockHttpServletRequest reqWithCookie = new MockHttpServletRequest("POST", "/api/utilisateurs/refresh");
+        reqWithCookie.setCookies(new Cookie(SessionTokenService.REFRESH_COOKIE_NAME, "cookie-refresh-valide"));
+        reqWithCookie.addHeader("X-Refresh-Token", "tentative-injection-header");
+        assertThat(tokenService.extractRefreshToken(reqWithCookie)).isEqualTo("cookie-refresh-valide");
+    }
+
+    @Test
+    void generateAndVerifyCsrfToken_valideOuRejetteCorrectement() {
+        String csrf = tokenService.generateCsrfToken("sess-77", 12L);
+
+        // 1. Valide avec header + cookie correspondants
+        MockHttpServletRequest validReq = new MockHttpServletRequest("PUT", "/api/utilisateurs/12");
+        validReq.setCookies(new Cookie(SessionTokenService.CSRF_COOKIE_NAME, csrf));
+        validReq.addHeader(SessionTokenService.CSRF_HEADER_NAME, csrf);
+        tokenService.verifyCsrfToken(validReq, "sess-77", 12L);
+
+        // 2. Sans header -> ForbiddenException
+        MockHttpServletRequest noHeaderReq = new MockHttpServletRequest("PUT", "/api/utilisateurs/12");
+        noHeaderReq.setCookies(new Cookie(SessionTokenService.CSRF_COOKIE_NAME, csrf));
+        assertThatThrownBy(() -> tokenService.verifyCsrfToken(noHeaderReq, "sess-77", 12L))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("manquant");
+
+        // 3. Signature falsifiée -> ForbiddenException
+        MockHttpServletRequest tamperedReq = new MockHttpServletRequest("PUT", "/api/utilisateurs/12");
+        tamperedReq.addHeader(SessionTokenService.CSRF_HEADER_NAME, csrf + "X");
+        assertThatThrownBy(() -> tokenService.verifyCsrfToken(tamperedReq, "sess-77", 12L))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("Signature");
+
+        // 4. Autre session -> ForbiddenException
+        assertThatThrownBy(() -> tokenService.verifyCsrfToken(validReq, "sess-autre", 12L))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("session courante");
     }
 
     @Test
@@ -104,9 +149,17 @@ class SessionTokenServiceTest {
     }
 
     @Test
-    void secretTropCourt_declencheIllegalStateException() {
+    void validationSecret_rejetteCleCourteOuPrevisibleOuFaibleEntropie() {
         assertThatThrownBy(() -> new SessionTokenService("court"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("au moins 32 octets");
+
+        assertThatThrownBy(() -> new SessionTokenService("dev-secret-key-patrimoine-casamance-uasz-32bytes!"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("DEV-SECRET");
+
+        assertThatThrownBy(() -> new SessionTokenService("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("entropie insuffisante");
     }
 }

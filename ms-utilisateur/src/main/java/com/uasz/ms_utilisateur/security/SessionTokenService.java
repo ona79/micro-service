@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.uasz.ms_utilisateur.dto.UtilisateurDto;
 import com.uasz.ms_utilisateur.entities.RoleUtilisateur;
+import com.uasz.ms_utilisateur.exceptions.ForbiddenException;
 import com.uasz.ms_utilisateur.exceptions.UnauthorizedException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,6 +21,7 @@ import java.util.Base64;
 import java.util.Collections;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -28,12 +30,20 @@ public class SessionTokenService {
 
     public static final String COOKIE_NAME = "PATRIMOINE_SESSION";
     public static final String REFRESH_COOKIE_NAME = "PATRIMOINE_REFRESH";
+    public static final String CSRF_COOKIE_NAME = "XSRF-TOKEN";
+    public static final String CSRF_HEADER_NAME = "X-XSRF-TOKEN";
     public static final String ISSUER = "casamance-auth-service";
 
     private static final String HMAC_ALGO = "HmacSHA256";
     public static final long ACCESS_TOKEN_TTL_SECONDS = 15 * 60L; // 15 minutes
     public static final long REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 3600L; // 7 jours
     private static final int MIN_SECRET_BYTES = 32;
+    private static final int MIN_DISTINCT_CHARS = 10;
+
+    private static final List<String> FORBIDDEN_SECRET_PATTERNS = List.of(
+            "CHANGE_ME", "REPLACE_ME", "DEV-SECRET", "DEV-INTERSERVICE",
+            "DEFAULT", "EXAMPLE", "PASSWORD", "12345678"
+    );
 
     private static final String JWT_HEADER_B64 = Base64.getUrlEncoder().withoutPadding()
             .encodeToString("{\"alg\":\"HS256\",\"typ\":\"JWT\"}".getBytes(StandardCharsets.UTF_8));
@@ -45,13 +55,28 @@ public class SessionTokenService {
     public SessionTokenService(
             @Value("${security.session.secret}") String secret
     ) {
-        if (secret == null || secret.trim().isEmpty() || secret.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_BYTES) {
-            throw new IllegalStateException("Le secret HMAC de session doit être configuré et comporter au moins 32 octets (256 bits d'entropie).");
-        }
-        if (secret.toUpperCase().contains("CHANGE_ME") || secret.toUpperCase().contains("REPLACE_ME")) {
-            throw new IllegalStateException("Le secret HMAC de session ne peut pas être un marqueur d'exemple (CHANGE_ME). Définissez une clé cryptographique aléatoire.");
-        }
+        validateCryptographicSecret(secret, "security.session.secret");
         this.secretKey = secret.getBytes(StandardCharsets.UTF_8);
+    }
+
+    public static void validateCryptographicSecret(String secret, String propertyName) {
+        if (secret == null || secret.trim().isEmpty()) {
+            throw new IllegalStateException("Le secret cryptographique '" + propertyName + "' est obligatoire et ne peut pas être vide.");
+        }
+        byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException("Le secret cryptographique '" + propertyName + "' doit comporter au moins 32 octets (256 bits).");
+        }
+        String upper = secret.toUpperCase(Locale.ROOT);
+        for (String forbidden : FORBIDDEN_SECRET_PATTERNS) {
+            if (upper.contains(forbidden)) {
+                throw new IllegalStateException("Le secret cryptographique '" + propertyName + "' contient un motif interdit ou prévisible (" + forbidden + "). Utilisez une clé générée via CSPRNG.");
+            }
+        }
+        long distinctChars = secret.chars().distinct().count();
+        if (distinctChars < MIN_DISTINCT_CHARS) {
+            throw new IllegalStateException("Le secret cryptographique '" + propertyName + "' présente une entropie insuffisante (trop peu de caractères distincts).");
+        }
     }
 
     public record SessionClaims(
@@ -109,7 +134,6 @@ public class SessionTokenService {
         }
         String[] parts = token.split("\\.");
         if (parts.length != 3) {
-            // Compatibilité avec l'ancien format 2 parties si nécessaire
             if (parts.length == 2) {
                 return verifyLegacyToken(parts[0], parts[1]);
             }
@@ -189,6 +213,81 @@ public class SessionTokenService {
         }
     }
 
+    /**
+     * Génère un jeton CSRF signé cryptographiquement et lié à la session et à l'utilisateur.
+     */
+    public String generateCsrfToken(String sessionId, Long userId) {
+        String effectiveSession = (sessionId != null && !sessionId.isBlank()) ? sessionId : "ANON";
+        String effectiveUser = (userId != null) ? String.valueOf(userId) : "0";
+        String nonce = UUID.randomUUID().toString();
+        String rawPayload = effectiveSession + "|" + effectiveUser + "|" + nonce;
+        String encodedPayload = Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(rawPayload.getBytes(StandardCharsets.UTF_8));
+        String sig = sign("CSRF|" + encodedPayload);
+        return encodedPayload + "." + sig;
+    }
+
+    /**
+     * Valide le jeton CSRF pour les opérations mutatives authentifiées par cookie.
+     */
+    public void verifyCsrfToken(HttpServletRequest request, String expectedSessionId, Long expectedUserId) {
+        if (request == null) {
+            throw new ForbiddenException("Requête invalide : vérification CSRF impossible.");
+        }
+        String headerToken = request.getHeader(CSRF_HEADER_NAME);
+        if (headerToken == null || headerToken.isBlank()) {
+            headerToken = request.getHeader("X-CSRF-TOKEN");
+        }
+        if (headerToken == null || headerToken.isBlank()) {
+            throw new ForbiddenException("Jeton CSRF (X-XSRF-TOKEN) manquant pour cette opération sensible.");
+        }
+        headerToken = headerToken.trim();
+
+        String cookieToken = extractCookieValue(request, CSRF_COOKIE_NAME);
+        if (cookieToken != null && !cookieToken.isBlank()) {
+            if (!MessageDigest.isEqual(
+                    headerToken.getBytes(StandardCharsets.UTF_8),
+                    cookieToken.trim().getBytes(StandardCharsets.UTF_8))) {
+                throw new ForbiddenException("Jeton CSRF incohérent avec le cookie XSRF-TOKEN.");
+            }
+        }
+
+        String[] parts = headerToken.split("\\.");
+        if (parts.length != 2) {
+            throw new ForbiddenException("Format de jeton CSRF invalide.");
+        }
+        String expectedSig = sign("CSRF|" + parts[0]);
+        if (!MessageDigest.isEqual(
+                parts[1].getBytes(StandardCharsets.UTF_8),
+                expectedSig.getBytes(StandardCharsets.UTF_8))) {
+            throw new ForbiddenException("Signature du jeton CSRF invalide ou falsifiée.");
+        }
+
+        try {
+            String decoded = new String(Base64.getUrlDecoder().decode(parts[0]), StandardCharsets.UTF_8);
+            String[] fields = decoded.split("\\|", 3);
+            if (fields.length != 3) {
+                throw new ForbiddenException("Structure du jeton CSRF invalide.");
+            }
+            if (expectedSessionId != null && !expectedSessionId.isBlank() && !expectedSessionId.equals(fields[0])) {
+                throw new ForbiddenException("Le jeton CSRF n'appartient pas à la session courante.");
+            }
+            if (expectedUserId != null && !String.valueOf(expectedUserId).equals(fields[1])) {
+                throw new ForbiddenException("Le jeton CSRF n'appartient pas à l'utilisateur courant.");
+            }
+        } catch (ForbiddenException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new ForbiddenException("Jeton CSRF illisible ou corrompu.");
+        }
+    }
+
+    public boolean isAuthenticatedViaCookie(HttpServletRequest request) {
+        if (request == null) return false;
+        return extractCookieValue(request, COOKIE_NAME) != null
+                || extractCookieValue(request, REFRESH_COOKIE_NAME) != null;
+    }
+
     public String generateOpaqueRefreshToken() {
         byte[] randomBytes = new byte[32]; // 256 bits d'entropie
         secureRandom.nextBytes(randomBytes);
@@ -207,13 +306,9 @@ public class SessionTokenService {
 
     public String extractToken(HttpServletRequest request) {
         if (request == null) return null;
-        Cookie[] cookies = request.getCookies();
-        if (cookies != null) {
-            for (Cookie cookie : cookies) {
-                if (COOKIE_NAME.equals(cookie.getName()) && cookie.getValue() != null && !cookie.getValue().isBlank()) {
-                    return cookie.getValue().trim();
-                }
-            }
+        String cookieVal = extractCookieValue(request, COOKIE_NAME);
+        if (cookieVal != null) {
+            return cookieVal;
         }
         String authHeader = request.getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
@@ -222,19 +317,23 @@ public class SessionTokenService {
         return null;
     }
 
+    /**
+     * Extrait le Refresh Token EXCLUSIVEMENT depuis le cookie HttpOnly PATRIMOINE_REFRESH.
+     * Aucun en-tête X-Refresh-Token n'est accepté ni exposé.
+     */
     public String extractRefreshToken(HttpServletRequest request) {
         if (request == null) return null;
+        return extractCookieValue(request, REFRESH_COOKIE_NAME);
+    }
+
+    private String extractCookieValue(HttpServletRequest request, String cookieName) {
         Cookie[] cookies = request.getCookies();
         if (cookies != null) {
             for (Cookie cookie : cookies) {
-                if (REFRESH_COOKIE_NAME.equals(cookie.getName()) && cookie.getValue() != null && !cookie.getValue().isBlank()) {
+                if (cookieName.equals(cookie.getName()) && cookie.getValue() != null && !cookie.getValue().isBlank()) {
                     return cookie.getValue().trim();
                 }
             }
-        }
-        String header = request.getHeader("X-Refresh-Token");
-        if (header != null && !header.isBlank()) {
-            return header.trim();
         }
         return null;
     }

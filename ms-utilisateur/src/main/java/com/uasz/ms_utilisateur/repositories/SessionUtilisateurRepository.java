@@ -16,15 +16,25 @@ public interface SessionUtilisateurRepository extends JpaRepository<SessionUtili
 
     List<SessionUtilisateur> findByUtilisateurIdAndActiveTrue(Long utilisateurId);
 
-    @Modifying
-    @Query("UPDATE SessionUtilisateur s SET s.active = false WHERE s.sessionId = :sessionId")
+    List<SessionUtilisateur> findByUtilisateurId(Long utilisateurId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE SessionUtilisateur s SET s.active = false, s.revokedAt = CURRENT_TIMESTAMP WHERE s.sessionId = :sessionId")
     int deactivateSession(@Param("sessionId") String sessionId);
 
-    @Modifying
-    @Query("UPDATE SessionUtilisateur s SET s.active = false WHERE s.utilisateurId = :utilisateurId")
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE SessionUtilisateur s SET s.active = false, s.revokedAt = CURRENT_TIMESTAMP, s.revocationReason = :reason WHERE s.sessionId = :sessionId")
+    int deactivateSessionWithReason(@Param("sessionId") String sessionId, @Param("reason") String reason);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE SessionUtilisateur s SET s.active = false, s.revokedAt = CURRENT_TIMESTAMP WHERE s.utilisateurId = :utilisateurId")
     int deactivateAllUserSessions(@Param("utilisateurId") Long utilisateurId);
 
-    @Modifying
-    @Query("UPDATE SessionUtilisateur s SET s.active = false WHERE s.expiresAt < :now AND s.active = true")
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE SessionUtilisateur s SET s.active = false, s.revokedAt = CURRENT_TIMESTAMP, s.revocationReason = :reason WHERE s.utilisateurId = :utilisateurId")
+    int deactivateAllUserSessionsWithReason(@Param("utilisateurId") Long utilisateurId, @Param("reason") String reason);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE SessionUtilisateur s SET s.active = false, s.revokedAt = CURRENT_TIMESTAMP WHERE s.expiresAt < :now AND s.active = true")
     int deactivateExpiredSessions(@Param("now") LocalDateTime now);
 }

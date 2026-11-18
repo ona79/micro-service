@@ -15,8 +15,9 @@ import com.uasz.ms_utilisateur.services.AuditSecuriteService;
 import com.uasz.ms_utilisateur.services.IUtilisateurService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -28,15 +29,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/utilisateurs")
-@RequiredArgsConstructor
 @Slf4j
 public class UtilisateurController {
 
@@ -48,6 +49,46 @@ public class UtilisateurController {
     private final SessionUtilisateurRepository sessionRepository;
     private final RefreshTokenRepository refreshTokenRepository;
 
+    private final boolean forceSecureCookies;
+    private final String cookieSameSite;
+
+    @Autowired
+    public UtilisateurController(
+            IUtilisateurService utilisateurService,
+            SessionTokenService sessionTokenService,
+            AuthSessionManager authSessionManager,
+            LoginRateLimiterService rateLimiterService,
+            AuditSecuriteService auditSecuriteService,
+            SessionUtilisateurRepository sessionRepository,
+            RefreshTokenRepository refreshTokenRepository,
+            @Value("${security.cookie.secure:false}") boolean forceSecureCookies,
+            @Value("${security.cookie.same-site:Strict}") String cookieSameSite
+    ) {
+        this.utilisateurService = utilisateurService;
+        this.sessionTokenService = sessionTokenService;
+        this.authSessionManager = authSessionManager;
+        this.rateLimiterService = rateLimiterService;
+        this.auditSecuriteService = auditSecuriteService;
+        this.sessionRepository = sessionRepository;
+        this.refreshTokenRepository = refreshTokenRepository;
+        this.forceSecureCookies = forceSecureCookies;
+        this.cookieSameSite = cookieSameSite;
+    }
+
+    public UtilisateurController(
+            IUtilisateurService utilisateurService,
+            SessionTokenService sessionTokenService,
+            AuthSessionManager authSessionManager,
+            LoginRateLimiterService rateLimiterService,
+            AuditSecuriteService auditSecuriteService,
+            SessionUtilisateurRepository sessionRepository,
+            RefreshTokenRepository refreshTokenRepository
+    ) {
+        this(utilisateurService, sessionTokenService, authSessionManager,
+                rateLimiterService, auditSecuriteService, sessionRepository,
+                refreshTokenRepository, false, "Strict");
+    }
+
     @PostMapping
     public ResponseEntity<UtilisateurDto> inscrire(@Valid @RequestBody UtilisateurDto utilisateurDto,
                                                    HttpServletRequest request) {
@@ -58,22 +99,30 @@ public class UtilisateurController {
         UtilisateurDto created = utilisateurService.inscrireUtilisateur(utilisateurDto);
         AuthSessionManager.SessionAuthResult session = authSessionManager.createSession(created, ip, userAgent);
 
-        ResponseCookie sessionCookie = buildSessionCookie(session.accessToken(), Duration.ofSeconds(SessionTokenService.ACCESS_TOKEN_TTL_SECONDS));
-        ResponseCookie refreshCookie = buildRefreshCookie(session.refreshToken(), Duration.ofSeconds(SessionTokenService.REFRESH_TOKEN_TTL_SECONDS));
+        boolean secure = isSecureRequest(request);
+        String csrfToken = session.csrfToken() != null
+                ? session.csrfToken()
+                : sessionTokenService.generateCsrfToken(session.sessionId(), created.getId());
+
+        ResponseCookie sessionCookie = buildSessionCookie(session.accessToken(), Duration.ofSeconds(SessionTokenService.ACCESS_TOKEN_TTL_SECONDS), secure);
+        ResponseCookie refreshCookie = buildRefreshCookie(session.refreshToken(), Duration.ofSeconds(SessionTokenService.REFRESH_TOKEN_TTL_SECONDS), secure);
+        ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, Duration.ofSeconds(SessionTokenService.ACCESS_TOKEN_TTL_SECONDS), secure);
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .header(HttpHeaders.SET_COOKIE, sessionCookie.toString())
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, csrfCookie.toString())
                 .header("Authorization", "Bearer " + session.accessToken())
-                .header("X-Refresh-Token", session.refreshToken())
+                .header(SessionTokenService.CSRF_HEADER_NAME, csrfToken)
                 .body(created);
     }
 
     @PostMapping("/admin")
     public ResponseEntity<UtilisateurDto> creerParAdmin(@Valid @RequestBody UtilisateurDto utilisateurDto,
                                                         HttpServletRequest request) {
-        SessionTokenService.SessionClaims claims = requireAuthenticated(request);
-        if (claims.role() != RoleUtilisateur.ADMINISTRATEUR) {
+        SessionTokenService.SessionClaims claims = requireAuthenticated(request, true);
+        if (claims.role() != RoleUtilisateur.ADMINISTRATEUR
+                && (claims.permissions() == null || !claims.permissions().contains("UTILISATEUR:CREER_STAFF"))) {
             auditSecuriteService.logAccessDenied(claims.userId(), claims.email(), extractClientIp(request), "CREER_STAFF");
             throw new ForbiddenException("Accès interdit : seul un administrateur peut créer des comptes avec rôle spécifique.");
         }
@@ -106,19 +155,25 @@ public class UtilisateurController {
             AuthSessionManager.SessionAuthResult session = authSessionManager.createSession(connected, ip, userAgent);
             auditSecuriteService.logLoginSuccess(connected.getId(), connected.getEmail(), ip, session.sessionId());
 
-            ResponseCookie sessionCookie = buildSessionCookie(session.accessToken(), Duration.ofSeconds(SessionTokenService.ACCESS_TOKEN_TTL_SECONDS));
-            ResponseCookie refreshCookie = buildRefreshCookie(session.refreshToken(), Duration.ofSeconds(SessionTokenService.REFRESH_TOKEN_TTL_SECONDS));
+            boolean secure = isSecureRequest(request);
+            String csrfToken = session.csrfToken() != null
+                    ? session.csrfToken()
+                    : sessionTokenService.generateCsrfToken(session.sessionId(), connected.getId());
+
+            ResponseCookie sessionCookie = buildSessionCookie(session.accessToken(), Duration.ofSeconds(SessionTokenService.ACCESS_TOKEN_TTL_SECONDS), secure);
+            ResponseCookie refreshCookie = buildRefreshCookie(session.refreshToken(), Duration.ofSeconds(SessionTokenService.REFRESH_TOKEN_TTL_SECONDS), secure);
+            ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, Duration.ofSeconds(SessionTokenService.ACCESS_TOKEN_TTL_SECONDS), secure);
 
             return ResponseEntity.ok()
                     .header(HttpHeaders.SET_COOKIE, sessionCookie.toString())
                     .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                    .header(HttpHeaders.SET_COOKIE, csrfCookie.toString())
                     .header("Authorization", "Bearer " + session.accessToken())
-                    .header("X-Refresh-Token", session.refreshToken())
+                    .header(SessionTokenService.CSRF_HEADER_NAME, csrfToken)
                     .body(connected);
         } catch (UnauthorizedException | ForbiddenException ex) {
             rateLimiterService.recordFailedAttempt(ip, email);
             auditSecuriteService.logLoginFailure(email, ip, "Échec d'authentification");
-            // Message générique anti-énumération (SEC-VULN-11)
             throw new UnauthorizedException("Identifiants invalides. Vérifiez votre adresse email et votre mot de passe.");
         }
     }
@@ -130,40 +185,65 @@ public class UtilisateurController {
         String rawRefreshToken = sessionTokenService.extractRefreshToken(request);
 
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
-            throw new UnauthorizedException("Jeton de renouvellement absent. Veuillez vous reconnecter.");
+            throw new UnauthorizedException("Jeton de renouvellement absent (cookie HttpOnly PATRIMOINE_REFRESH requis). Veuillez vous reconnecter.");
+        }
+
+        // Si le client fournit un en-tête ou cookie CSRF, on vérifie sa validité cryptographique
+        String csrfHeader = request.getHeader(SessionTokenService.CSRF_HEADER_NAME);
+        if (csrfHeader == null || csrfHeader.isBlank()) {
+            csrfHeader = request.getHeader("X-CSRF-TOKEN");
+        }
+        if (csrfHeader != null && !csrfHeader.isBlank()) {
+            sessionTokenService.verifyCsrfToken(request, null, null);
         }
 
         AuthSessionManager.SessionAuthResult result = authSessionManager.refreshSession(rawRefreshToken, ip, userAgent);
 
-        ResponseCookie sessionCookie = buildSessionCookie(result.accessToken(), Duration.ofSeconds(SessionTokenService.ACCESS_TOKEN_TTL_SECONDS));
-        ResponseCookie refreshCookie = buildRefreshCookie(result.refreshToken(), Duration.ofSeconds(SessionTokenService.REFRESH_TOKEN_TTL_SECONDS));
+        boolean secure = isSecureRequest(request);
+        String csrfToken = result.csrfToken() != null
+                ? result.csrfToken()
+                : sessionTokenService.generateCsrfToken(result.sessionId(), result.userDto().getId());
+
+        ResponseCookie sessionCookie = buildSessionCookie(result.accessToken(), Duration.ofSeconds(SessionTokenService.ACCESS_TOKEN_TTL_SECONDS), secure);
+        ResponseCookie refreshCookie = buildRefreshCookie(result.refreshToken(), Duration.ofSeconds(SessionTokenService.REFRESH_TOKEN_TTL_SECONDS), secure);
+        ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, Duration.ofSeconds(SessionTokenService.ACCESS_TOKEN_TTL_SECONDS), secure);
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, sessionCookie.toString())
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, csrfCookie.toString())
                 .header("Authorization", "Bearer " + result.accessToken())
-                .header("X-Refresh-Token", result.refreshToken())
+                .header(SessionTokenService.CSRF_HEADER_NAME, csrfToken)
                 .body(result.userDto());
     }
 
     @GetMapping("/me")
     public ResponseEntity<UtilisateurDto> getCurrentSession(HttpServletRequest request) {
-        SessionTokenService.SessionClaims claims = requireAuthenticated(request);
-        // Vérification de la session persistante en base
-        if (claims.sessionId() != null && !authSessionManager.isSessionActive(claims.sessionId())) {
-            throw new UnauthorizedException("Cette session a été fermée ou révoquée. Veuillez vous reconnecter.");
-        }
+        SessionTokenService.SessionClaims claims = requireAuthenticated(request, false);
         UtilisateurDto user = utilisateurService.getByIdUtilisateur(claims.userId());
         if (!user.isActif()) {
             throw new ForbiddenException("Ce compte utilisateur a été désactivé.");
         }
-        return ResponseEntity.ok(user);
+        if (claims.role() != null && user.getRole() != claims.role()) {
+            authSessionManager.revokeAllUserSessions(claims.userId(), "ROLE_CHANGED_INVALIDATION");
+            throw new UnauthorizedException("Vos privilèges ont été modifiés. Veuillez vous reconnecter.");
+        }
+
+        boolean secure = isSecureRequest(request);
+        String csrfToken = sessionTokenService.generateCsrfToken(claims.sessionId(), claims.userId());
+        ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, Duration.ofSeconds(SessionTokenService.ACCESS_TOKEN_TTL_SECONDS), secure);
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, csrfCookie.toString())
+                .header(SessionTokenService.CSRF_HEADER_NAME, csrfToken)
+                .body(user);
     }
 
     @PostMapping("/deconnexion")
     public ResponseEntity<Void> deconnecter(HttpServletRequest request) {
         String ip = extractClientIp(request);
         String token = sessionTokenService.extractToken(request);
+        String rawRefreshToken = sessionTokenService.extractRefreshToken(request);
         String sessionId = null;
         Long userId = null;
 
@@ -176,34 +256,59 @@ public class UtilisateurController {
             }
         }
 
-        authSessionManager.logoutSession(sessionId, userId, ip);
+        authSessionManager.logoutSession(sessionId, rawRefreshToken, userId, ip);
 
-        ResponseCookie clearSession = buildSessionCookie("", Duration.ZERO);
-        ResponseCookie clearRefresh = buildRefreshCookie("", Duration.ZERO);
+        boolean secure = isSecureRequest(request);
+        ResponseCookie clearSession = buildSessionCookie("", Duration.ZERO, secure);
+        ResponseCookie clearRefresh = buildRefreshCookie("", Duration.ZERO, secure);
+        ResponseCookie clearCsrf = buildCsrfCookie("", Duration.ZERO, secure);
 
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, clearSession.toString())
                 .header(HttpHeaders.SET_COOKIE, clearRefresh.toString())
+                .header(HttpHeaders.SET_COOKIE, clearCsrf.toString())
                 .build();
     }
 
     @PostMapping("/{id}/revoquer-sessions")
     public ResponseEntity<Void> revoquerSessions(@PathVariable Long id, HttpServletRequest request) {
-        SessionTokenService.SessionClaims claims = requireAuthenticated(request);
+        SessionTokenService.SessionClaims claims = requireAuthenticated(request, true);
         if (claims.role() != RoleUtilisateur.ADMINISTRATEUR) {
             throw new ForbiddenException("Accès interdit : seul un administrateur peut forcer la révocation des sessions.");
         }
-        LocalDateTime now = LocalDateTime.now();
-        sessionRepository.deactivateAllUserSessions(id);
-        refreshTokenRepository.revokeAllByUtilisateurId(id, now);
+        authSessionManager.revokeAllUserSessions(id, "ADMIN_FORCED_REVOCATION");
         auditSecuriteService.logAdminAction("REVOKE_USER_SESSIONS", claims.userId(), extractClientIp(request),
                 "Révocation forcée de toutes les sessions actives de l'utilisateur ID " + id);
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Endpoint interne de vérification d'état de session et de cohérence de rôle.
+     */
+    @GetMapping("/internal/sessions/{sessionId}")
+    public ResponseEntity<Map<String, Object>> verifySessionState(
+            @PathVariable String sessionId,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String role) {
+        boolean active = authSessionManager.isSessionActive(sessionId);
+        if (!active) {
+            return ResponseEntity.ok(Map.of("active", false, "reason", "SESSION_REVOKED_OR_EXPIRED"));
+        }
+        if (userId != null) {
+            UtilisateurDto user = utilisateurService.getByIdUtilisateur(userId);
+            if (!user.isActif()) {
+                return ResponseEntity.ok(Map.of("active", false, "reason", "USER_DEACTIVATED"));
+            }
+            if (role != null && !role.equals(user.getRole().name())) {
+                return ResponseEntity.ok(Map.of("active", false, "reason", "ROLE_CHANGED", "currentRole", user.getRole().name()));
+            }
+        }
+        return ResponseEntity.ok(Map.of("active", true));
+    }
+
     @GetMapping
     public ResponseEntity<List<UtilisateurDto>> getAll(HttpServletRequest request) {
-        SessionTokenService.SessionClaims claims = requireAuthenticated(request);
+        SessionTokenService.SessionClaims claims = requireAuthenticated(request, false);
         if (claims.role() != RoleUtilisateur.ADMINISTRATEUR) {
             throw new ForbiddenException("Accès interdit : seul un administrateur peut consulter la liste des utilisateurs.");
         }
@@ -212,7 +317,7 @@ public class UtilisateurController {
 
     @GetMapping("/{id}")
     public ResponseEntity<UtilisateurDto> getById(@PathVariable Long id, HttpServletRequest request) {
-        SessionTokenService.SessionClaims claims = requireAuthenticated(request);
+        SessionTokenService.SessionClaims claims = requireAuthenticated(request, false);
         if (claims.role() != RoleUtilisateur.ADMINISTRATEUR && !claims.userId().equals(id)) {
             throw new ForbiddenException("Accès interdit : vous ne pouvez consulter que votre propre profil.");
         }
@@ -223,52 +328,122 @@ public class UtilisateurController {
     public ResponseEntity<UtilisateurDto> update(@PathVariable Long id,
                                                  @Valid @RequestBody UtilisateurDto utilisateurDto,
                                                  HttpServletRequest request) {
-        SessionTokenService.SessionClaims claims = requireAuthenticated(request);
+        SessionTokenService.SessionClaims claims = requireAuthenticated(request, true);
         boolean isAdmin = claims.role() == RoleUtilisateur.ADMINISTRATEUR;
         if (!isAdmin && !claims.userId().equals(id)) {
             throw new ForbiddenException("Accès interdit : vous ne pouvez modifier que votre propre profil.");
         }
+
+        UtilisateurDto beforeUpdate = utilisateurService.getByIdUtilisateur(id);
+        RoleUtilisateur previousRole = beforeUpdate != null ? beforeUpdate.getRole() : null;
+        boolean previousActif = beforeUpdate == null || beforeUpdate.isActif();
+
         UtilisateurDto updated = utilisateurService.updateUtilisateur(id, utilisateurDto, isAdmin);
-        if (isAdmin && utilisateurDto.getRole() != null) {
-            auditSecuriteService.logRoleChange(id, "ANCIEN", updated.getRole().name(), claims.userId(), extractClientIp(request));
+
+        if (isAdmin && updated != null) {
+            boolean roleChanged = previousRole != null && updated.getRole() != null && previousRole != updated.getRole();
+            boolean deactivated = previousActif && !updated.isActif();
+
+            if (roleChanged) {
+                authSessionManager.revokeAllUserSessions(id, "ROLE_CHANGED:" + previousRole + "->" + updated.getRole());
+                auditSecuriteService.logRoleChange(id, previousRole.name(), updated.getRole().name(), claims.userId(), extractClientIp(request));
+            } else if (deactivated) {
+                authSessionManager.revokeAllUserSessions(id, "ACCOUNT_DEACTIVATED");
+                auditSecuriteService.logAdminAction("DEACTIVATE_USER", claims.userId(), extractClientIp(request),
+                        "Désactivation du compte et révocation des sessions de l'utilisateur ID " + id);
+            }
         }
         return ResponseEntity.ok(updated);
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id, HttpServletRequest request) {
-        SessionTokenService.SessionClaims claims = requireAuthenticated(request);
+        SessionTokenService.SessionClaims claims = requireAuthenticated(request, true);
         if (claims.role() != RoleUtilisateur.ADMINISTRATEUR) {
             throw new ForbiddenException("Accès interdit : seul un administrateur peut supprimer un compte utilisateur.");
         }
         if (claims.userId().equals(id)) {
             throw new BadRequestException("Action refusée : vous ne pouvez pas supprimer votre propre compte administrateur actif.");
         }
+        authSessionManager.revokeAllUserSessions(id, "USER_DELETED");
         utilisateurService.deleteUtilisateur(id);
         auditSecuriteService.logAdminAction("DELETE_USER", claims.userId(), extractClientIp(request), "Suppression de l'utilisateur ID " + id);
         return ResponseEntity.noContent().build();
     }
 
-    private SessionTokenService.SessionClaims requireAuthenticated(HttpServletRequest request) {
+    private SessionTokenService.SessionClaims requireAuthenticated(HttpServletRequest request, boolean isMutating) {
         String token = sessionTokenService.extractToken(request);
-        return sessionTokenService.verifyToken(token);
+        SessionTokenService.SessionClaims claims = sessionTokenService.verifyToken(token);
+
+        // Vérification CSRF si la requête mutative est authentifiée par Cookie (et non par Authorization Bearer)
+        String authHeader = request != null ? request.getHeader("Authorization") : null;
+        boolean cookieAuthOnly = (authHeader == null || !authHeader.startsWith("Bearer "))
+                && sessionTokenService.isAuthenticatedViaCookie(request);
+        if (isMutating && cookieAuthOnly) {
+            sessionTokenService.verifyCsrfToken(request, claims.sessionId(), claims.userId());
+        }
+
+        // Vérification de la session persistante en base et de la cohérence du rôle actif
+        if (claims.sessionId() != null && !claims.sessionId().isBlank()) {
+            if (!authSessionManager.isSessionActive(claims.sessionId())) {
+                throw new UnauthorizedException("Cette session a été fermée ou révoquée. Veuillez vous reconnecter.");
+            }
+        }
+        UtilisateurDto currentUser = utilisateurService.getByIdUtilisateur(claims.userId());
+        if (currentUser != null) {
+            if (!currentUser.isActif()) {
+                authSessionManager.revokeAllUserSessions(claims.userId(), "USER_INACTIVE");
+                throw new ForbiddenException("Ce compte utilisateur a été désactivé.");
+            }
+            if (claims.role() != null && currentUser.getRole() != null && currentUser.getRole() != claims.role()) {
+                authSessionManager.revokeAllUserSessions(claims.userId(), "STALE_ROLE_DETECTED");
+                throw new UnauthorizedException("Vos privilèges ont été modifiés. Veuillez vous reconnecter.");
+            }
+        }
+        return claims;
     }
 
-    private ResponseCookie buildSessionCookie(String token, Duration maxAge) {
+    private boolean isSecureRequest(HttpServletRequest request) {
+        if (forceSecureCookies) {
+            return true;
+        }
+        if (request == null) {
+            return false;
+        }
+        if (request.isSecure()) {
+            return true;
+        }
+        String proto = request.getHeader("X-Forwarded-Proto");
+        return "https".equalsIgnoreCase(proto);
+    }
+
+    private ResponseCookie buildSessionCookie(String token, Duration maxAge, boolean secure) {
         return ResponseCookie.from(SessionTokenService.COOKIE_NAME, token)
                 .httpOnly(true)
+                .secure(secure)
                 .path("/")
                 .maxAge(maxAge)
-                .sameSite("Lax")
+                .sameSite(cookieSameSite)
                 .build();
     }
 
-    private ResponseCookie buildRefreshCookie(String token, Duration maxAge) {
+    private ResponseCookie buildRefreshCookie(String token, Duration maxAge, boolean secure) {
         return ResponseCookie.from(SessionTokenService.REFRESH_COOKIE_NAME, token)
                 .httpOnly(true)
+                .secure(secure)
+                .path("/api/utilisateurs")
+                .maxAge(maxAge)
+                .sameSite(cookieSameSite)
+                .build();
+    }
+
+    private ResponseCookie buildCsrfCookie(String csrfToken, Duration maxAge, boolean secure) {
+        return ResponseCookie.from(SessionTokenService.CSRF_COOKIE_NAME, csrfToken)
+                .httpOnly(false)
+                .secure(secure)
                 .path("/")
                 .maxAge(maxAge)
-                .sameSite("Lax")
+                .sameSite(cookieSameSite)
                 .build();
     }
 

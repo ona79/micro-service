@@ -48,4 +48,10 @@ public class SessionUtilisateur {
 
     @Column(name = "last_activity_at", nullable = false)
     private LocalDateTime lastActivityAt;
+
+    @Column(name = "revoked_at")
+    private LocalDateTime revokedAt;
+
+    @Column(name = "revocation_reason", length = 255)
+    private String revocationReason;
 }
