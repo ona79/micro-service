@@ -221,7 +221,7 @@ jobs:
             local NAME="$1"
             local PORT="$2"
             local PID="$3"
-            local MAX_ATTEMPTS=30
+            local MAX_ATTEMPTS=45
             local SLEEP_SEC=2
 
             echo "Attente de disponibilité de $NAME (: $PORT, PID: $PID)..."
@@ -269,6 +269,7 @@ jobs:
             local USER_EMAIL="$7"
             local BODY="$8"
             local OUT_FILE="$9"
+            local IDEM_KEY="${10:-}"
 
             local TS
             TS=$(date +%s)
@@ -283,6 +284,11 @@ jobs:
             SIG=$(printf '%s' "$CANONICAL" | openssl dgst -sha256 -hmac "$SECURITY_SESSION_SECRET" -binary | base64 | tr '+/' '-_' | tr -d '=\n\r')
             local GW_TOKEN="${TS}.${NONCE}.${SIG}"
 
+            local EXTRA_HEADERS=()
+            if [ -n "$IDEM_KEY" ]; then
+              EXTRA_HEADERS+=(-H "Idempotency-Key: $IDEM_KEY")
+            fi
+
             if [ -n "$BODY" ]; then
               curl -s -w "%{http_code}" -X "$METHOD" "$URL" \
                 -H "Content-Type: application/json" \
@@ -293,6 +299,7 @@ jobs:
                 -H "X-User-Session-Id: $SESSION_ID" \
                 -H "X-Content-SHA256: $BODY_SHA256" \
                 -H "X-Internal-Gateway-Token: $GW_TOKEN" \
+                "${EXTRA_HEADERS[@]}" \
                 -d "$BODY" \
                 -o "$OUT_FILE"
             else
@@ -304,6 +311,7 @@ jobs:
                 -H "X-User-Session-Id: $SESSION_ID" \
                 -H "X-Content-SHA256: $BODY_SHA256" \
                 -H "X-Internal-Gateway-Token: $GW_TOKEN" \
+                "${EXTRA_HEADERS[@]}" \
                 -o "$OUT_FILE"
             fi
           }
@@ -453,10 +461,10 @@ jobs:
           fi
           echo ">>> Succès : Circuit créé avec id=$CIRCUIT_ID, dureeEstimee=105 min (60min + 45min)."
 
-          echo -e "\n4. Création d'une réservation vérifiant la disponibilité du circuit (:3004 -> :3002)"
+          echo -e "\n4. Création d'une réservation P04 vérifiant disponibilité + tarification serveur (:3004 -> :3002)"
           TARGET_CIRCUIT_ID="${CIRCUIT_ID:-1}"
           RESA_PAYLOAD="{\"nomClient\":\"Test CI\",\"emailClient\":\"ci@zig.univ.sn\",\"nombrePlaces\":4,\"typeReservation\":\"CIRCUIT\",\"circuitId\":$TARGET_CIRCUIT_ID}"
-          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3004/api/reservations" "/api/reservations" "2" "TOURISTE" "RESERVATION:CREER,RESERVATION:LIRE_PROPRE" "ci@zig.univ.sn" "$RESA_PAYLOAD" "/tmp/resp_reservation.json")
+          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3004/api/reservations" "/api/reservations" "2" "TOURISTE" "RESERVATION:CREER,RESERVATION:LIRE_PROPRE,RESERVATION:ANNULER_PROPRE" "ci@zig.univ.sn" "$RESA_PAYLOAD" "/tmp/resp_reservation.json" "ci-e2e-res-1")
           if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
             echo "[ÉCHEC] POST /api/reservations a retourné HTTP $HTTP_CODE (attendu: 200 ou 201)" >&2
             cat /tmp/resp_reservation.json >&2
@@ -464,17 +472,72 @@ jobs:
             exit 1
           fi
           MONTANT=$(jq -r '.montantTotal // empty' /tmp/resp_reservation.json 2>/dev/null)
+          STATUT_RES=$(jq -r '.statut // empty' /tmp/resp_reservation.json 2>/dev/null)
           RESA_ID=$(jq -r '.id // empty' /tmp/resp_reservation.json 2>/dev/null)
-          if [ "$MONTANT" != "20000.0" ] && [ "$MONTANT" != "20000" ]; then
-            echo "[ÉCHEC] Montant total incorrect : '$MONTANT' (attendu: 20000.0)" >&2
+          if ! jq -e '(.montantTotal | tonumber) == 20000' /tmp/resp_reservation.json >/dev/null 2>&1 || [ "$STATUT_RES" != "EN_ATTENTE_PAIEMENT" ]; then
+            echo "[ÉCHEC] Réservation P04 invalide : montant='$MONTANT' (attendu: 20000.00), statut='$STATUT_RES' (attendu: EN_ATTENTE_PAIEMENT)" >&2
             cat /tmp/resp_reservation.json >&2
-            dump_diagnostics "Création de réservation - vérification montant"
+            dump_diagnostics "Création de réservation - vérification montant/statut"
             exit 1
           fi
-          echo ">>> Succès : Réservation créée avec id=$RESA_ID, montantTotal=$MONTANT (4 places x 5000.0 FCFA)."
+          echo ">>> Succès : Réservation créée id=$RESA_ID, statut=$STATUT_RES, montantTotal=$MONTANT XOF (4 places x 5000.00 FCFA)."
+
+          echo -e "\n5. Initiation du paiement Wave simulé avec idempotence (:3006 -> :3004)"
+          PAY_INIT_PAYLOAD="{\"reservationId\":$RESA_ID,\"modePaiement\":\"WAVE\",\"numeroTelephoneSimule\":\"+221771234567\"}"
+          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3006/api/paiements" "/api/paiements" "2" "TOURISTE" "PAIEMENT:INITIER,PAIEMENT:LIRE_PROPRE" "ci@zig.univ.sn" "$PAY_INIT_PAYLOAD" "/tmp/resp_paiement_init.json" "ci-e2e-pay-1")
+          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
+            echo "[ÉCHEC] POST /api/paiements a retourné HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_paiement_init.json >&2
+            dump_diagnostics "Initiation paiement simulé"
+            exit 1
+          fi
+          PAY_ID=$(jq -r '.id // empty' /tmp/resp_paiement_init.json 2>/dev/null)
+          if ! jq -e '.statut == "EN_COURS" and .estSimule == true and (.montant | tonumber) == 20000' /tmp/resp_paiement_init.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Paiement simulé initié invalide" >&2
+            cat /tmp/resp_paiement_init.json >&2
+            dump_diagnostics "Vérification paiement initié"
+            exit 1
+          fi
+          echo ">>> Succès : Paiement simulé initié id=$PAY_ID (WAVE, EN_COURS, estSimule=true, montant=20000 XOF)."
+
+          echo -e "\n6. Simulation acceptation Wave + confirmation inter-services + notification (:3006 -> :3004 -> :3007)"
+          SIM_PAYLOAD='{"decision":"ACCEPTER","motif":"Validation OTP Wave CI E2E"}'
+          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3006/api/paiements/$PAY_ID/simuler" "/api/paiements/$PAY_ID/simuler" "2" "TOURISTE" "PAIEMENT:INITIER,PAIEMENT:LIRE_PROPRE" "ci@zig.univ.sn" "$SIM_PAYLOAD" "/tmp/resp_paiement_sim.json")
+          if [ "$HTTP_CODE" != "200" ] || ! jq -e '.statut == "ACCEPTE"' /tmp/resp_paiement_sim.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Simulation acceptation paiement échouée : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_paiement_sim.json >&2
+            dump_diagnostics "Simulation acceptation Wave"
+            exit 1
+          fi
+          HTTP_CODE=$(gateway_signed_curl "GET" "http://localhost:3004/api/reservations/$RESA_ID" "/api/reservations/$RESA_ID" "2" "TOURISTE" "RESERVATION:LIRE_PROPRE" "ci@zig.univ.sn" "" "/tmp/resp_resa_after_pay.json")
+          if [ "$HTTP_CODE" != "200" ] || ! jq -e '.statut == "CONFIRMEE"' /tmp/resp_resa_after_pay.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Réservation #$RESA_ID non confirmée après paiement accepté : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_resa_after_pay.json >&2
+            dump_diagnostics "Confirmation réservation post-paiement"
+            exit 1
+          fi
+          echo ">>> Succès : Paiement id=$PAY_ID ACCEPTE et réservation #$RESA_ID automatiquement CONFIRMEE."
+
+          echo -e "\n7. Vérification RBAC remboursement simulé (non-admin 403 -> admin 200 REMBOURSE)"
+          REFUND_BODY='{"motif":"Test CI E2E RBAC remboursement"}'
+          DENIED_CODE=$(gateway_signed_curl "POST" "http://localhost:3006/api/paiements/$PAY_ID/rembourser" "/api/paiements/$PAY_ID/rembourser" "3" "GESTIONNAIRE_SITE" "PAIEMENT:LIRE_TOUT" "awa.sagna@zig.univ.sn" "$REFUND_BODY" "/tmp/resp_refund_denied.json")
+          if [ "$DENIED_CODE" != "403" ]; then
+            echo "[ÉCHEC SÉCURITÉ] Remboursement par GESTIONNAIRE_SITE doit être rejeté 403, reçu HTTP $DENIED_CODE" >&2
+            cat /tmp/resp_refund_denied.json >&2
+            dump_diagnostics "RBAC remboursement non-admin"
+            exit 1
+          fi
+          ADMIN_CODE=$(gateway_signed_curl "POST" "http://localhost:3006/api/paiements/$PAY_ID/rembourser" "/api/paiements/$PAY_ID/rembourser" "1" "ADMINISTRATEUR" "PAIEMENT:REMBOURSER,PAIEMENT:LIRE_TOUT" "admin@zig.univ.sn" "$REFUND_BODY" "/tmp/resp_refund_ok.json")
+          if [ "$ADMIN_CODE" != "200" ] || ! jq -e '.statut == "REMBOURSE"' /tmp/resp_refund_ok.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Remboursement ADMINISTRATEUR a échoué : HTTP $ADMIN_CODE" >&2
+            cat /tmp/resp_refund_ok.json >&2
+            dump_diagnostics "Remboursement ADMINISTRATEUR"
+            exit 1
+          fi
+          echo ">>> Succès : Contrôle RBAC PAIEMENT:REMBOURSER validé (403 -> 200 REMBOURSE)."
 
           echo -e "\n=================================================================="
-          echo " SUCCÈS COMPLET : Tous les tests d'intégration E2E ont réussi !"
+          echo " SUCCÈS COMPLET : Tous les tests d'intégration E2E P04 ont réussi !"
           echo "=================================================================="
 
       - name: Conservation des journaux et captures E2E
