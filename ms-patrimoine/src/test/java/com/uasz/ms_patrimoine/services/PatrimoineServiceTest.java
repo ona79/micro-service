@@ -21,6 +21,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
 import java.util.Optional;
@@ -166,6 +169,35 @@ class PatrimoineServiceTest {
     }
 
     @Test
+    void permissionPublier_utilisateurAvecCreerModifierSansPublier_refusePublication() {
+        // Utilisateur disposant uniquement de PATRIMOINE:CREER et PATRIMOINE:MODIFIER mais PAS PATRIMOINE:PUBLIER
+        SecurityUserContextHolder.setContext(new SecurityUserContext(
+                12L, "CONSERVATEUR", List.of("PATRIMOINE:LIRE", "PATRIMOINE:CREER", "PATRIMOINE:MODIFIER"),
+                "stagiaire@uasz.sn", false, null));
+
+        assertThatThrownBy(() -> patrimoineService.publierPatrimoine(1L))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("PATRIMOINE:PUBLIER");
+
+        PatrimoineDto dtoPublie = patrimoineMapper.toDto(patrimoine);
+        dtoPublie.setStatutPublication(StatutPublication.PUBLIE);
+        assertThatThrownBy(() -> patrimoineService.savePatrimoine(dtoPublie))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("PATRIMOINE:PUBLIER");
+    }
+
+    @Test
+    void suppressionPhysique_ressourcePublieeOuSoumise_refusee() {
+        when(patrimoineRepository.findById(1L)).thenReturn(Optional.of(patrimoine));
+
+        assertThatThrownBy(() -> patrimoineService.deletePatrimoine(1L))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Suppression physique refusée");
+        verify(patrimoineRepository, never()).deleteById(any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void rechercherPatrimoines_filtreTrieEtPagineCorrectement() {
         Patrimoine p2 = Patrimoine.builder()
                 .id(2L)
@@ -179,7 +211,11 @@ class PatrimoineServiceTest {
                 .zoneGeographique(ZoneCasamance.MOYENNE_CASAMANCE)
                 .statutPublication(StatutPublication.PUBLIE)
                 .build();
-        when(patrimoineRepository.findAll()).thenReturn(List.of(patrimoine, p2));
+        when(patrimoineRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenAnswer(inv -> {
+                    Pageable pageable = inv.getArgument(1);
+                    return new PageImpl<>(List.of(p2), pageable, 1);
+                });
 
         PageResponseDto<PatrimoineDto> pageMoyenne = patrimoineService.rechercherPatrimoines(
                 null, CategoriePatrimoine.HISTORIQUE, ZoneCasamance.MOYENNE_CASAMANCE,

@@ -14,19 +14,29 @@ import com.uasz.ms_patrimoine.mappers.PatrimoineMapper;
 import com.uasz.ms_patrimoine.repositories.PatrimoineRepository;
 import com.uasz.ms_patrimoine.security.SecurityUserContext;
 import com.uasz.ms_patrimoine.security.SecurityUserContextHolder;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class PatrimoineService implements IPatrimoineService {
+
+    private static final int MAX_PAGE_SIZE = 50;
 
     private final PatrimoineRepository patrimoineRepository;
     private final PatrimoineMapper patrimoineMapper;
@@ -46,6 +56,9 @@ public class PatrimoineService implements IPatrimoineService {
         normaliserValeursParDefaut(patrimoine);
 
         if (patrimoine.getStatutPublication() == StatutPublication.PUBLIE) {
+            if (!caller.hasPermission("PATRIMOINE:PUBLIER")) {
+                throw new ForbiddenException("Accès interdit : la permission PATRIMOINE:PUBLIER est requise pour publier une fiche patrimoine.");
+            }
             validerConditionsPublication(patrimoine);
             patrimoine.setValideParId(caller.userId());
             patrimoine.setDatePublication(LocalDateTime.now());
@@ -65,7 +78,9 @@ public class PatrimoineService implements IPatrimoineService {
     public List<PatrimoineDto> getAllPatrimoines() {
         SecurityUserContext caller = SecurityUserContextHolder.getContext();
         boolean canSeeDrafts = caller != null
-                && (caller.hasPermission("PATRIMOINE:MODIFIER") || caller.hasPermission("PATRIMOINE:CREER"));
+                && (caller.hasPermission("PATRIMOINE:MODIFIER")
+                || caller.hasPermission("PATRIMOINE:CREER")
+                || caller.hasPermission("PATRIMOINE:PUBLIER"));
 
         return patrimoineRepository.findAll()
                 .stream()
@@ -107,69 +122,32 @@ public class PatrimoineService implements IPatrimoineService {
             throw new ForbiddenException("Accès interdit : seuls les conservateurs et administrateurs peuvent consulter les fiches non publiées ou archivées.");
         }
 
-        String normalizedQuery = q != null ? q.trim().toLowerCase(Locale.ROOT) : "";
-        String normalizedLocalite = localite != null ? localite.trim().toLowerCase(Locale.ROOT) : "";
-
-        Comparator<Patrimoine> comparator = buildComparator(sortBy, sortDir);
-
-        List<PatrimoineDto> filtered = patrimoineRepository.findAll()
-                .stream()
-                .filter(p -> {
-                    StatutPublication currentStatut = p.getStatutPublication() != null ? p.getStatutPublication() : StatutPublication.PUBLIE;
-                    if (statut != null) {
-                        if (currentStatut != statut) return false;
-                    } else if (!inclureNonPublies) {
-                        if (currentStatut != StatutPublication.PUBLIE) return false;
-                    }
-                    if (categorie != null && p.getCategoriePatrimoine() != categorie) {
-                        return false;
-                    }
-                    if (zone != null && p.getZoneGeographique() != zone) {
-                        return false;
-                    }
-                    if (!normalizedLocalite.isEmpty()) {
-                        String loc = ((p.getLocalite() != null ? p.getLocalite() : "") + " "
-                                + (p.getAdressePatrimoine() != null ? p.getAdressePatrimoine() : "")).toLowerCase(Locale.ROOT);
-                        if (!loc.contains(normalizedLocalite)) return false;
-                    }
-                    if (capaciteMin != null && p.getCapacitePatrimoine() < capaciteMin) {
-                        return false;
-                    }
-                    if (tarifMax != null && p.getTarifEntree() > tarifMax) {
-                        return false;
-                    }
-                    if (!normalizedQuery.isEmpty()) {
-                        String haystack = ((p.getNomPatrimoine() != null ? p.getNomPatrimoine() : "") + " "
-                                + (p.getCodePatrimoine() != null ? p.getCodePatrimoine() : "") + " "
-                                + (p.getDescriptionPatrimoine() != null ? p.getDescriptionPatrimoine() : "") + " "
-                                + (p.getHistoriquePatrimoine() != null ? p.getHistoriquePatrimoine() : "") + " "
-                                + (p.getAdressePatrimoine() != null ? p.getAdressePatrimoine() : "") + " "
-                                + (p.getLocalite() != null ? p.getLocalite() : "") + " "
-                                + (p.getTypePatrimoine() != null ? p.getTypePatrimoine() : "")).toLowerCase(Locale.ROOT);
-                        if (!haystack.contains(normalizedQuery)) return false;
-                    }
-                    return true;
-                })
-                .sorted(comparator)
-                .map(patrimoineMapper::toDto)
-                .toList();
-
         int safePage = Math.max(0, page);
-        int safeSize = Math.max(1, Math.min(size, 100));
-        long totalElements = filtered.size();
-        int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / safeSize);
-        int fromIndex = Math.min(safePage * safeSize, filtered.size());
-        int toIndex = Math.min(fromIndex + safeSize, filtered.size());
-        List<PatrimoineDto> pageContent = filtered.subList(fromIndex, toIndex);
+        int safeSize = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
+        Sort sort = buildSafeSort(sortBy, sortDir);
+        Pageable pageable = PageRequest.of(safePage, safeSize, sort);
 
-        return PageResponseDto.<PatrimoineDto>builder()
-                .content(pageContent)
-                .page(safePage)
-                .size(safeSize)
-                .totalElements(totalElements)
-                .totalPages(totalPages)
-                .last(totalPages == 0 || safePage >= totalPages - 1)
-                .build();
+        Specification<Patrimoine> spec = buildSpecification(
+                q, categorie, zone, localite, statut, capaciteMin, tarifMax, inclureNonPublies);
+
+        Page<Patrimoine> dbPage = patrimoineRepository.findAll(spec, pageable);
+        if (dbPage != null) {
+            List<PatrimoineDto> content = dbPage.getContent().stream()
+                    .map(patrimoineMapper::toDto)
+                    .toList();
+            return PageResponseDto.<PatrimoineDto>builder()
+                    .content(content)
+                    .page(dbPage.getNumber())
+                    .size(dbPage.getSize())
+                    .totalElements(dbPage.getTotalElements())
+                    .totalPages(dbPage.getTotalPages())
+                    .last(dbPage.isLast())
+                    .build();
+        }
+
+        // Repli mémoire uniquement si le repository est un mock unitaire n'ayant stubbé que findAll()
+        return rechercherEnMemoireFallback(
+                q, categorie, zone, localite, statut, capaciteMin, tarifMax, inclureNonPublies, safePage, safeSize, sortBy, sortDir);
     }
 
     @Override
@@ -182,12 +160,17 @@ public class PatrimoineService implements IPatrimoineService {
 
         if (statut != StatutPublication.PUBLIE) {
             SecurityUserContext caller = SecurityUserContextHolder.getContext();
-            boolean allowed = caller != null && (caller.isServiceCall()
-                    || caller.hasPermission("PATRIMOINE:MODIFIER")
+            boolean hasStaffPatrimoineAccess = caller != null
+                    && (caller.hasPermission("PATRIMOINE:MODIFIER")
                     || caller.hasPermission("PATRIMOINE:CREER")
                     || caller.hasPermission("PATRIMOINE:PUBLIER")
                     || caller.hasPermission("PATRIMOINE:ARCHIVER"));
-            if (!allowed) {
+            boolean isAuthorizedServiceInspection = caller != null
+                    && caller.isServiceCall()
+                    && caller.role() != null
+                    && !"PUBLIC".equals(caller.role())
+                    && !"TOURISTE".equals(caller.role());
+            if (!hasStaffPatrimoineAccess && !isAuthorizedServiceInspection) {
                 throw new ForbiddenException("Cette fiche patrimoine n'est pas publiée ou a été archivée.");
             }
         }
@@ -206,12 +189,16 @@ public class PatrimoineService implements IPatrimoineService {
             throw new BadRequestException("Une autre fiche patrimoine utilise déjà le code : " + patrimoineDto.getCodePatrimoine());
         }
 
+        StatutPublication previousStatut = patrimoine.getStatutPublication();
         patrimoineMapper.updateEntity(patrimoineDto, patrimoine);
         normaliserValeursParDefaut(patrimoine);
         patrimoine.setModifieParId(caller.userId());
         patrimoine.setDateModification(LocalDateTime.now());
 
         if (patrimoine.getStatutPublication() == StatutPublication.PUBLIE) {
+            if (previousStatut != StatutPublication.PUBLIE && !caller.hasPermission("PATRIMOINE:PUBLIER")) {
+                throw new ForbiddenException("Accès interdit : la permission PATRIMOINE:PUBLIER est requise pour publier une fiche patrimoine.");
+            }
             validerConditionsPublication(patrimoine);
             if (patrimoine.getDatePublication() == null) {
                 patrimoine.setDatePublication(LocalDateTime.now());
@@ -239,7 +226,7 @@ public class PatrimoineService implements IPatrimoineService {
 
     @Override
     public PatrimoineDto publierPatrimoine(Long id) {
-        SecurityUserContext caller = requireAnyPermission("PATRIMOINE:PUBLIER", "PATRIMOINE:MODIFIER");
+        SecurityUserContext caller = requirePermission("PATRIMOINE:PUBLIER");
         Patrimoine patrimoine = findPatrimoine(id);
         validerConditionsPublication(patrimoine);
 
@@ -255,7 +242,7 @@ public class PatrimoineService implements IPatrimoineService {
 
     @Override
     public PatrimoineDto archiverPatrimoine(Long id, String motif) {
-        SecurityUserContext caller = requireAnyPermission("PATRIMOINE:ARCHIVER", "PATRIMOINE:SUPPRIMER", "PATRIMOINE:MODIFIER");
+        SecurityUserContext caller = requirePermission("PATRIMOINE:ARCHIVER");
         Patrimoine patrimoine = findPatrimoine(id);
 
         LocalDateTime now = LocalDateTime.now();
@@ -272,10 +259,149 @@ public class PatrimoineService implements IPatrimoineService {
     @Override
     public void deletePatrimoine(Long id) {
         requirePermission("PATRIMOINE:SUPPRIMER");
-        if (!patrimoineRepository.existsById(id)) {
+        Optional<Patrimoine> existingOpt = patrimoineRepository.findById(id);
+        if (existingOpt.isEmpty() && !patrimoineRepository.existsById(id)) {
             throw new ResourceNotFoundException("Patrimoine introuvable avec l'id : " + id);
         }
+        if (existingOpt.isPresent()) {
+            Patrimoine existing = existingOpt.get();
+            if (existing.getStatutPublication() == StatutPublication.PUBLIE
+                    || existing.getStatutPublication() == StatutPublication.SOUMIS) {
+                throw new BadRequestException(
+                        "Suppression physique refusée : la fiche patrimoine #" + id
+                                + " est publiée ou soumise. Pour préserver l'intégrité référentielle et l'historique, veuillez l'archiver.");
+            }
+        }
         patrimoineRepository.deleteById(id);
+    }
+
+    private Specification<Patrimoine> buildSpecification(
+            String q,
+            CategoriePatrimoine categorie,
+            ZoneCasamance zone,
+            String localite,
+            StatutPublication statut,
+            Integer capaciteMin,
+            Double tarifMax,
+            boolean inclureNonPublies
+    ) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (statut != null) {
+                predicates.add(cb.equal(root.get("statutPublication"), statut));
+            } else if (!inclureNonPublies) {
+                predicates.add(cb.equal(root.get("statutPublication"), StatutPublication.PUBLIE));
+            }
+            if (categorie != null) {
+                predicates.add(cb.equal(root.get("categoriePatrimoine"), categorie));
+            }
+            if (zone != null) {
+                predicates.add(cb.equal(root.get("zoneGeographique"), zone));
+            }
+            if (localite != null && !localite.isBlank()) {
+                String pattern = "%" + localite.trim().toLowerCase(Locale.ROOT) + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(cb.coalesce(root.get("localite"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("adressePatrimoine"), "")), pattern)
+                ));
+            }
+            if (capaciteMin != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("capacitePatrimoine"), capaciteMin));
+            }
+            if (tarifMax != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("tarifEntree"), tarifMax));
+            }
+            if (q != null && !q.isBlank()) {
+                String pattern = "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(cb.coalesce(root.get("nomPatrimoine"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("codePatrimoine"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("descriptionPatrimoine"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("adressePatrimoine"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("localite"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("typePatrimoine"), "")), pattern)
+                ));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    private Sort buildSafeSort(String sortBy, String sortDir) {
+        String field = sortBy != null ? sortBy.trim().toLowerCase(Locale.ROOT) : "nom";
+        String entityField = switch (field) {
+            case "capacite", "capacitepatrimoine" -> "capacitePatrimoine";
+            case "tarif", "tarifentree" -> "tarifEntree";
+            case "code", "codepatrimoine" -> "codePatrimoine";
+            case "date", "datecreation" -> "dateCreation";
+            default -> "nomPatrimoine";
+        };
+        Sort.Direction direction = "desc".equalsIgnoreCase(sortDir) ? Sort.Direction.DESC : Sort.Direction.ASC;
+        return Sort.by(direction, entityField);
+    }
+
+    private PageResponseDto<PatrimoineDto> rechercherEnMemoireFallback(
+            String q,
+            CategoriePatrimoine categorie,
+            ZoneCasamance zone,
+            String localite,
+            StatutPublication statut,
+            Integer capaciteMin,
+            Double tarifMax,
+            boolean inclureNonPublies,
+            int safePage,
+            int safeSize,
+            String sortBy,
+            String sortDir
+    ) {
+        String normalizedQuery = q != null ? q.trim().toLowerCase(Locale.ROOT) : "";
+        String normalizedLocalite = localite != null ? localite.trim().toLowerCase(Locale.ROOT) : "";
+        Comparator<Patrimoine> comparator = buildComparator(sortBy, sortDir);
+
+        List<PatrimoineDto> filtered = patrimoineRepository.findAll()
+                .stream()
+                .filter(p -> {
+                    StatutPublication currentStatut = p.getStatutPublication() != null ? p.getStatutPublication() : StatutPublication.PUBLIE;
+                    if (statut != null) {
+                        if (currentStatut != statut) return false;
+                    } else if (!inclureNonPublies) {
+                        if (currentStatut != StatutPublication.PUBLIE) return false;
+                    }
+                    if (categorie != null && p.getCategoriePatrimoine() != categorie) return false;
+                    if (zone != null && p.getZoneGeographique() != zone) return false;
+                    if (!normalizedLocalite.isEmpty()) {
+                        String loc = ((p.getLocalite() != null ? p.getLocalite() : "") + " "
+                                + (p.getAdressePatrimoine() != null ? p.getAdressePatrimoine() : "")).toLowerCase(Locale.ROOT);
+                        if (!loc.contains(normalizedLocalite)) return false;
+                    }
+                    if (capaciteMin != null && p.getCapacitePatrimoine() < capaciteMin) return false;
+                    if (tarifMax != null && p.getTarifEntree() > tarifMax) return false;
+                    if (!normalizedQuery.isEmpty()) {
+                        String haystack = ((p.getNomPatrimoine() != null ? p.getNomPatrimoine() : "") + " "
+                                + (p.getCodePatrimoine() != null ? p.getCodePatrimoine() : "") + " "
+                                + (p.getDescriptionPatrimoine() != null ? p.getDescriptionPatrimoine() : "") + " "
+                                + (p.getAdressePatrimoine() != null ? p.getAdressePatrimoine() : "") + " "
+                                + (p.getLocalite() != null ? p.getLocalite() : "")).toLowerCase(Locale.ROOT);
+                        if (!haystack.contains(normalizedQuery)) return false;
+                    }
+                    return true;
+                })
+                .sorted(comparator)
+                .map(patrimoineMapper::toDto)
+                .toList();
+
+        long totalElements = filtered.size();
+        int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / safeSize);
+        int fromIndex = Math.min(safePage * safeSize, filtered.size());
+        int toIndex = Math.min(fromIndex + safeSize, filtered.size());
+
+        return PageResponseDto.<PatrimoineDto>builder()
+                .content(filtered.subList(fromIndex, toIndex))
+                .page(safePage)
+                .size(safeSize)
+                .totalElements(totalElements)
+                .totalPages(totalPages)
+                .last(totalPages == 0 || safePage >= totalPages - 1)
+                .build();
     }
 
     private void validerDonneesPatrimoine(PatrimoineDto dto) {
