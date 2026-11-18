@@ -62,7 +62,7 @@
             type="search"
             name="headerSearch"
             [(ngModel)]="searchQuery"
-            placeholder="Gorée, Ziguinchor..."
+            placeholder="Ziguinchor, Carabane, Oussouye..."
             class="header-search__input"
           />
           <button
@@ -263,13 +263,13 @@
       <div class="site-footer__brand">
         <h2 class="site-footer__title">{{ config.siteName }}</h2>
         <p class="site-footer__desc">
-          {{ config.siteSlogan }}. Une plateforme dédiée à la découverte des sites
-          historiques, des itinéraires culturels et de l'agenda patrimonial du Sénégal.
+          {{ config.siteSlogan }}. Découvrez Basse-Casamance (Ziguinchor, Oussouye, Carabane),
+          Moyenne-Casamance (Sédhiou) et Haute-Casamance (Kolda) avec nos circuits et guides agréés.
         </p>
       </div>
 
       <div>
-        <h3 class="site-footer__heading">Explorer &amp; Compte</h3>
+        <h3 class="site-footer__heading">Explorer &amp; Réserver</h3>
         <ul class="site-footer__links">
           @for (item of navItems; track item.to) {
             <li>
@@ -277,10 +277,19 @@
             </li>
           }
           <li>
+            <a [routerLink]="['/patrimoines']" [queryParams]="{ zone: 'BASSE_CASAMANCE' }">Basse-Casamance</a>
+          </li>
+          <li>
+            <a [routerLink]="['/patrimoines']" [queryParams]="{ zone: 'MOYENNE_CASAMANCE' }">Moyenne-Casamance</a>
+          </li>
+          <li>
+            <a [routerLink]="['/patrimoines']" [queryParams]="{ zone: 'HAUTE_CASAMANCE' }">Haute-Casamance</a>
+          </li>
+          <li>
             <a routerLink="/reserver">Réserver une visite</a>
           </li>
           <li>
-            <a routerLink="/connexion">Espace Membre &amp; Administration</a>
+            <a routerLink="/connexion">Espace Touriste &amp; Comptes</a>
           </li>
         </ul>
       </div>
