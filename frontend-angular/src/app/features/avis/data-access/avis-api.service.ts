@@ -59,6 +59,10 @@ export class AvisApiService {
     return this.http.put<Avis>(`/avis/${id}`, payload);
   }
 
+  repondreAvis(id: number, reponse: string): Observable<Avis> {
+    return this.http.post<Avis>(`/avis/${id}/reponse`, { reponse });
+  }
+
   supprimerAvis(id: number): Observable<void> {
     return this.http.delete<void>(`/avis/${id}`);
   }

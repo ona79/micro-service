@@ -347,4 +347,45 @@ class PatrimoineServiceTest {
         assertThat(fullStats.getBrouillons()).isEqualTo(1L);
         assertThat(fullStats.getPublies()).isEqualTo(1L);
     }
+
+    @Test
+    void getPatrimoinesProximite_calculeDistanceHaversineEtFiltreParRayon() {
+        Patrimoine ziguinchor = Patrimoine.builder()
+                .id(1L)
+                .nomPatrimoine("Mémorial du Joola")
+                .codePatrimoine("MEM-JOOLA")
+                .latitudePatrimoine(12.5833f)
+                .longitudePatrimoine(-16.2667f)
+                .statutPublication(com.uasz.ms_patrimoine.entities.StatutPublication.PUBLIE)
+                .build();
+        Patrimoine oussouye = Patrimoine.builder()
+                .id(2L)
+                .nomPatrimoine("Royaume d'Oussouye")
+                .codePatrimoine("ROY-OUSSOUYE")
+                .latitudePatrimoine(12.4850f)
+                .longitudePatrimoine(-16.5450f)
+                .statutPublication(com.uasz.ms_patrimoine.entities.StatutPublication.PUBLIE)
+                .build();
+        Patrimoine capSkirring = Patrimoine.builder()
+                .id(3L)
+                .nomPatrimoine("Falaises de Djimbéring")
+                .codePatrimoine("FAL-DJIMBERING")
+                .latitudePatrimoine(12.4000f)
+                .longitudePatrimoine(-16.7600f)
+                .statutPublication(com.uasz.ms_patrimoine.entities.StatutPublication.PUBLIE)
+                .build();
+
+        when(patrimoineRepository.findByStatutPublication(com.uasz.ms_patrimoine.entities.StatutPublication.PUBLIE))
+                .thenReturn(List.of(ziguinchor, oussouye, capSkirring));
+
+        // Depuis Ziguinchor (12.5833, -16.2667) avec rayon de 35 km
+        var resultats = patrimoineService.getPatrimoinesProximite(12.5833, -16.2667, 35.0, 10);
+
+        // Ziguinchor est à 0 km, Oussouye à environ 32 km, Cap Skirring est à plus de 50 km (exclu)
+        assertThat(resultats).hasSize(2);
+        assertThat(resultats.get(0).getNomPatrimoine()).isEqualTo("Mémorial du Joola");
+        assertThat(resultats.get(0).getDistanceKm()).isLessThanOrEqualTo(0.5);
+        assertThat(resultats.get(1).getNomPatrimoine()).isEqualTo("Royaume d'Oussouye");
+        assertThat(resultats.get(1).getDistanceKm()).isBetween(25.0, 35.0);
+    }
 }

@@ -98,4 +98,12 @@ public class AvisController {
     ) {
         return ResponseEntity.status(HttpStatus.CREATED).body(avisModerationService.signalerAvis(id, request));
     }
+
+    @PostMapping("/{id}/reponse")
+    public ResponseEntity<AvisDto> repondre(
+            @PathVariable Long id,
+            @Valid @RequestBody com.uasz.ms_reservation.dto.AvisReponseGuideRequest request
+    ) {
+        return ResponseEntity.ok(avisModerationService.repondreAvis(id, request));
+    }
 }

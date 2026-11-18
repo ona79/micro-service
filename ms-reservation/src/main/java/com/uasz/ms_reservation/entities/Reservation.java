@@ -85,6 +85,10 @@ public class Reservation {
     /** Renseigné si typeReservation == CIRCUIT */
     private Long circuitId;
 
+    /** Guide responsable affecté lors de la réservation (pour circuits) */
+    @Column(name = "guide_id")
+    private Long guideId;
+
     /** Renseigné si typeReservation == EVENEMENT */
     private Long evenementId;
 

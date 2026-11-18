@@ -30,4 +30,8 @@ public class AvisDto {
     private LocalDateTime datePublication;
     private LocalDateTime dateModification;
     private LocalDateTime dateModeration;
+    private String reponseGuide;
+    private LocalDateTime dateReponseGuide;
+    private Long guideRepondeurId;
+    private String guideRepondeurNom;
 }

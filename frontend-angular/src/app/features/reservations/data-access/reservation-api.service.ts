@@ -4,6 +4,8 @@ import { Observable } from 'rxjs';
 import { PageResponse } from '../../../core/models/patrimoine.model';
 import {
   DisponibilitePrestation,
+  GuideAgendaItem,
+  GuideDisponibilite,
   ManifesteParticipant,
   Reservation,
   ReservationCreatePayload,
@@ -96,5 +98,25 @@ export class ReservationApiService {
 
   getManifesteGuide(circuitId: number): Observable<ManifesteParticipant[]> {
     return this.http.get<ManifesteParticipant[]>(`/reservations/guide/circuits/${circuitId}`);
+  }
+
+  getGuideAgenda(dateDebut?: string, dateFin?: string, guideId?: number): Observable<GuideAgendaItem[]> {
+    let params = new HttpParams();
+    if (guideId) params = params.set('guideId', String(guideId));
+    if (dateDebut) params = params.set('dateDebut', dateDebut);
+    if (dateFin) params = params.set('dateFin', dateFin);
+    return this.http.get<GuideAgendaItem[]>('/reservations/guide/agenda', { params });
+  }
+
+  verifierDisponibiliteGuide(
+    guideId: number,
+    date: string,
+    creneau?: string,
+    circuitIdExclu?: number
+  ): Observable<GuideDisponibilite> {
+    let params = new HttpParams().set('date', date);
+    if (creneau) params = params.set('creneau', creneau);
+    if (circuitIdExclu) params = params.set('circuitIdExclu', String(circuitIdExclu));
+    return this.http.get<GuideDisponibilite>(`/reservations/guide/${guideId}/disponibilite`, { params });
   }
 }

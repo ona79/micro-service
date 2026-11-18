@@ -65,4 +65,8 @@ public interface IReservationService {
     com.uasz.ms_reservation.dto.ValidationBilletResponse validerBillet(String tokenQr);
 
     com.uasz.ms_reservation.dto.BilletDto verifierBillet(String tokenQr);
+
+    List<com.uasz.ms_reservation.dto.GuideAgendaItemDto> getGuideAgenda(Long guideId, LocalDate dateDebut, LocalDate dateFin);
+
+    com.uasz.ms_reservation.dto.GuideDisponibiliteDto verifierDisponibiliteGuide(Long guideId, LocalDate date, String creneau, Long circuitIdExclu);
 }

@@ -537,6 +537,39 @@ public class PatrimoineService implements IPatrimoineService {
         return desc ? comp.reversed() : comp;
     }
 
+    @Override
+    public List<PatrimoineDto> getPatrimoinesProximite(double latitude, double longitude, Double rayonKm, Integer limit) {
+        double maxRayon = (rayonKm != null && rayonKm > 0) ? rayonKm : 50.0;
+        int maxLimit = (limit != null && limit > 0) ? Math.min(limit, 50) : 10;
+
+        List<Patrimoine> publies = patrimoineRepository.findByStatutPublication(StatutPublication.PUBLIE);
+
+        return publies.stream()
+                .filter(p -> p.getLatitudePatrimoine() != 0.0f || p.getLongitudePatrimoine() != 0.0f)
+                .map(p -> {
+                    double dist = calculateHaversineDistance(latitude, longitude, p.getLatitudePatrimoine(), p.getLongitudePatrimoine());
+                    PatrimoineDto dto = patrimoineMapper.toDto(p);
+                    dto.setDistanceKm(dist);
+                    return dto;
+                })
+                .filter(dto -> dto.getDistanceKm() <= maxRayon)
+                .sorted(Comparator.comparingDouble(PatrimoineDto::getDistanceKm))
+                .limit(maxLimit)
+                .toList();
+    }
+
+    public static double calculateHaversineDistance(double lat1, double lon1, double lat2, double lon2) {
+        final double R = 6371.0; // Rayon moyen de la Terre en km
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        double distance = R * c;
+        return Math.round(distance * 10.0) / 10.0; // Arrondi à 1 décimale
+    }
+
     private SecurityUserContext requirePermission(String permission) {
         return requireAnyPermission(permission);
     }

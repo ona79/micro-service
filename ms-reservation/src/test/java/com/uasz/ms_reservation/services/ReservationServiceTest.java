@@ -536,4 +536,74 @@ class ReservationServiceTest {
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("propres billets");
     }
+
+    @Test
+    void getGuideAgenda_detecteEtMarqueConflitDeCreneaux() {
+        SecurityUserContextHolder.setContext(new SecurityUserContext(5L, "GUIDE", "moussa.guide@casamance.sn", false, null));
+        LocalDate date = LocalDate.of(2026, 12, 10);
+
+        Reservation res1 = Reservation.builder()
+                .id(1L)
+                .referenceReservation("RES-001")
+                .circuitId(10L)
+                .guideId(5L)
+                .datePrestation(date)
+                .creneauPrestation("Matin (09h00)")
+                .nombrePlaces(3)
+                .statut(StatutReservation.CONFIRMEE)
+                .build();
+
+        Reservation res2 = Reservation.builder()
+                .id(2L)
+                .referenceReservation("RES-002")
+                .circuitId(20L) // Autre circuit !
+                .guideId(5L)
+                .datePrestation(date)
+                .creneauPrestation("Matin (09h00)") // Même créneau !
+                .nombrePlaces(2)
+                .statut(StatutReservation.CONFIRMEE)
+                .build();
+
+        when(reservationRepository.findGuideReservationsBetweenDates(eq(5L), any(), eq(date), any()))
+                .thenReturn(List.of(res1, res2));
+        when(circuitClient.getCircuitsByGuide(5L)).thenReturn(List.of(
+                CircuitDto.builder().id(10L).nomCircuit("Circuit 1").placesMax(10).build(),
+                CircuitDto.builder().id(20L).nomCircuit("Circuit 2").placesMax(10).build()
+        ));
+
+        var agenda = reservationService.getGuideAgenda(5L, date, date.plusDays(1));
+
+        assertThat(agenda).hasSize(2);
+        assertThat(agenda.get(0).isConflit()).isTrue();
+        assertThat(agenda.get(1).isConflit()).isTrue();
+    }
+
+    @Test
+    void verifierDisponibiliteGuide_detecteConflitCreneauExistant() {
+        LocalDate date = LocalDate.of(2026, 12, 10);
+        Reservation existing = Reservation.builder()
+                .id(1L)
+                .circuitId(10L)
+                .guideId(5L)
+                .datePrestation(date)
+                .creneauPrestation("Matin (09h00)")
+                .statut(StatutReservation.CONFIRMEE)
+                .build();
+
+        when(reservationRepository.findByGuideIdAndDatePrestationAndStatutIn(eq(5L), eq(date), any()))
+                .thenReturn(List.of(existing));
+
+        // Test pour le même créneau sur un autre circuit (circuitIdExclu = 99L)
+        var dispoMatin = reservationService.verifierDisponibiliteGuide(5L, date, "Matin (09h00)", 99L);
+        assertThat(dispoMatin.isDisponible()).isFalse();
+        assertThat(dispoMatin.getMotif()).contains("Conflit d'agenda");
+
+        // Test pour un créneau sans conflit (Après-midi)
+        var dispoAprem = reservationService.verifierDisponibiliteGuide(5L, date, "Après-midi (15h00)", 99L);
+        assertThat(dispoAprem.isDisponible()).isTrue();
+
+        // Test pour le même circuit (circuitIdExclu = 10L) -> pas de conflit
+        var dispoMemeCircuit = reservationService.verifierDisponibiliteGuide(5L, date, "Matin (09h00)", 10L);
+        assertThat(dispoMemeCircuit.isDisponible()).isTrue();
+    }
 }

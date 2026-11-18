@@ -33,6 +33,15 @@ export class PatrimoineApiService {
     return this.http.get<Patrimoine[]>('/patrimoines');
   }
 
+  getProximite(lat: number, lon: number, rayonKm = 50, limit = 12): Observable<Patrimoine[]> {
+    const params = new HttpParams()
+      .set('lat', String(lat))
+      .set('lon', String(lon))
+      .set('rayonKm', String(rayonKm))
+      .set('limit', String(limit));
+    return this.http.get<Patrimoine[]>('/patrimoines/proximite', { params });
+  }
+
   rechercher(params: PatrimoineSearchParams = {}): Observable<PageResponse<Patrimoine>> {
     let httpParams = new HttpParams();
     if (params.q) httpParams = httpParams.set('q', params.q);

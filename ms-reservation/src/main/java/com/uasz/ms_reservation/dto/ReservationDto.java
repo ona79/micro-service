@@ -67,6 +67,8 @@ public class ReservationDto {
 
     private Long circuitId;
 
+    private Long guideId;
+
     private Long evenementId;
 
     private String referencePaiement;

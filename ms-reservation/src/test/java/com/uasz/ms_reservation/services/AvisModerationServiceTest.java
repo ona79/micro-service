@@ -299,4 +299,52 @@ class AvisModerationServiceTest {
         assertThat(stats.getSignalementsOuverts()).isEqualTo(1L);
         assertThat(stats.getSignalementsFondes()).isEqualTo(1L);
     }
+
+    @Test
+    void repondreAvis_guideResponsable_enregistreReponseAvecSucces() {
+        SecurityUserContextHolder.setContext(new SecurityUserContext(5L, "GUIDE", "moussa.guide@casamance.sn", false, null));
+        Avis avis = Avis.builder()
+                .id(15L)
+                .auteurId(10L)
+                .cibleType(CibleAvis.CIRCUIT)
+                .cibleId(100L)
+                .note(4)
+                .commentaire("Superbe balade en pirogue")
+                .statutModeration(StatutModerationAvis.APPROUVE)
+                .datePublication(LocalDateTime.now())
+                .build();
+
+        when(avisRepository.findById(15L)).thenReturn(Optional.of(avis));
+        when(circuitClient.getCircuitById(100L)).thenReturn(
+                CircuitDto.builder().id(100L).nomCircuit("Carabane Express").guideResponsableId(5L).build());
+        when(avisRepository.save(any(Avis.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        AvisDto result = service.repondreAvis(15L, new com.uasz.ms_reservation.dto.AvisReponseGuideRequest(
+                "Merci pour votre confiance, ravi que la visite vous ait plu !"));
+
+        assertThat(result.getReponseGuide()).isEqualTo("Merci pour votre confiance, ravi que la visite vous ait plu !");
+        assertThat(result.getGuideRepondeurId()).isEqualTo(5L);
+        assertThat(result.getGuideRepondeurNom()).isEqualTo("moussa.guide@casamance.sn");
+        assertThat(result.getDateReponseGuide()).isNotNull();
+    }
+
+    @Test
+    void repondreAvis_guideNonResponsable_rejeteAvecBOLA403() {
+        SecurityUserContextHolder.setContext(new SecurityUserContext(8L, "GUIDE", "autre.guide@casamance.sn", false, null));
+        Avis avis = Avis.builder()
+                .id(15L)
+                .auteurId(10L)
+                .cibleType(CibleAvis.CIRCUIT)
+                .cibleId(100L)
+                .statutModeration(StatutModerationAvis.APPROUVE)
+                .build();
+
+        when(avisRepository.findById(15L)).thenReturn(Optional.of(avis));
+        when(circuitClient.getCircuitById(100L)).thenReturn(
+                CircuitDto.builder().id(100L).nomCircuit("Carabane Express").guideResponsableId(5L).build());
+
+        assertThatThrownBy(() -> service.repondreAvis(15L, new com.uasz.ms_reservation.dto.AvisReponseGuideRequest("Réponse non autorisée")))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("BOLA");
+    }
 }

@@ -352,6 +352,26 @@ public class CircuitService implements ICircuitService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<CircuitDto> getCircuitsByGuide(Long guideId) {
+        if (guideId == null) {
+            return List.of();
+        }
+        SecurityUserContext caller = SecurityUserContextHolder.getContext();
+        boolean isAuthorized = caller != null && (caller.isServiceCall()
+                || Objects.equals(caller.userId(), guideId)
+                || caller.hasPermission("CIRCUIT:CONSULTER")
+                || caller.hasPermission("CIRCUIT:MODIFIER")
+                || caller.hasPermission("CIRCUIT:PUBLIER"));
+        if (!isAuthorized) {
+            throw new ForbiddenException("Accès interdit aux circuits de ce guide.");
+        }
+        return circuitRepository.findByGuideResponsableIdOrderByIdDesc(guideId).stream()
+                .map(circuitMapper::toDto)
+                .toList();
+    }
+
+    @Override
     public CircuitDto affecterGuideResponsable(Long circuitId, Long guideUtilisateurId) {
         SecurityUserContext caller = requirePermission("CIRCUIT:MODIFIER");
         if ("GUIDE".equals(caller.role())) {

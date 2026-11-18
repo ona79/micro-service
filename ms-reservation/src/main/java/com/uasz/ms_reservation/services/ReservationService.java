@@ -10,6 +10,8 @@ import com.uasz.ms_reservation.dto.DisponibiliteDto;
 import com.uasz.ms_reservation.dto.EvenementDto;
 import com.uasz.ms_reservation.dto.EvenementPaiementAckDto;
 import com.uasz.ms_reservation.dto.EvenementPaiementNotificationRequest;
+import com.uasz.ms_reservation.dto.GuideAgendaItemDto;
+import com.uasz.ms_reservation.dto.GuideDisponibiliteDto;
 import com.uasz.ms_reservation.dto.ManifesteParticipantDto;
 import com.uasz.ms_reservation.dto.NotificationRequest;
 import com.uasz.ms_reservation.dto.PageResponseDto;
@@ -72,7 +74,9 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -711,6 +715,175 @@ public class ReservationService implements IReservationService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<GuideAgendaItemDto> getGuideAgenda(Long requestedGuideId, LocalDate dateDebut, LocalDate dateFin) {
+        SecurityUserContext caller = requireAuthenticatedContext(false);
+        Long effectiveGuideId;
+        if ("GUIDE".equals(caller.role())) {
+            if (requestedGuideId != null && !Objects.equals(requestedGuideId, caller.userId())) {
+                throw new ForbiddenException("Accès interdit (BOLA) : vous ne pouvez consulter que votre propre agenda.");
+            }
+            effectiveGuideId = caller.userId();
+        } else if (caller.hasPermission("RESERVATION:LIRE_TOUT") || caller.hasPermission("RESERVATION:GERER") || caller.isStaffOrAdmin()) {
+            if (requestedGuideId == null) {
+                throw new BadRequestException("L'identifiant du guide (guideId) est obligatoire pour les gestionnaires.");
+            }
+            effectiveGuideId = requestedGuideId;
+        } else {
+            throw new ForbiddenException("Accès interdit : consultation de l'agenda réservée au guide ou au personnel.");
+        }
+
+        LocalDate start = dateDebut != null ? dateDebut : LocalDate.now(Reservation.CASAMANCE_ZONE);
+        LocalDate end = dateFin != null ? dateFin : start.plusMonths(1);
+
+        List<Reservation> reservations = reservationRepository.findGuideReservationsBetweenDates(
+                effectiveGuideId, ACTIVE_SEAT_HOLDING_STATUTS, start, end);
+
+        Map<Long, CircuitDto> circuitCache = new HashMap<>();
+        try {
+            List<CircuitDto> circuitsGuide = circuitClient.getCircuitsByGuide(effectiveGuideId);
+            if (circuitsGuide != null) {
+                circuitsGuide.forEach(c -> circuitCache.put(c.getId(), c));
+            }
+        } catch (Exception ex) {
+            log.warn("Impossible de récupérer la liste des circuits du guide {} : {}", effectiveGuideId, ex.getMessage());
+        }
+
+        record SlotKey(LocalDate date, String creneau, Long circuitId) {}
+        Map<SlotKey, List<Reservation>> slots = new LinkedHashMap<>();
+
+        for (Reservation r : reservations) {
+            LocalDate d = r.getDatePrestation() != null ? r.getDatePrestation() : r.getDateReservation().toLocalDate();
+            String c = (r.getCreneauPrestation() != null && !r.getCreneauPrestation().isBlank())
+                    ? r.getCreneauPrestation().trim()
+                    : "Journée";
+            SlotKey key = new SlotKey(d, c, r.getCircuitId());
+            slots.computeIfAbsent(key, k -> new ArrayList<>()).add(r);
+        }
+
+        List<GuideAgendaItemDto> items = new ArrayList<>();
+        for (Map.Entry<SlotKey, List<Reservation>> entry : slots.entrySet()) {
+            SlotKey key = entry.getKey();
+            List<Reservation> resList = entry.getValue();
+
+            final CircuitDto finalCircuit = (key.circuitId != null)
+                    ? circuitCache.computeIfAbsent(key.circuitId, this::recupererCircuitSilencieux)
+                    : null;
+
+            int placesOccupees = resList.stream().mapToInt(Reservation::getNombrePlaces).sum();
+            int placesMax = finalCircuit != null ? finalCircuit.getPlacesMax() : 0;
+            String nomCircuit = finalCircuit != null ? finalCircuit.getNomCircuit() : ("Circuit #" + key.circuitId);
+
+            List<ReservationDto> dtoList = resList.stream()
+                    .map(r -> enrichirDto(r, finalCircuit, null, false))
+                    .toList();
+
+            items.add(GuideAgendaItemDto.builder()
+                    .date(key.date)
+                    .creneau(key.creneau)
+                    .circuitId(key.circuitId)
+                    .nomCircuit(nomCircuit)
+                    .placesOccupees(placesOccupees)
+                    .placesMax(placesMax)
+                    .nombreReservations(resList.size())
+                    .reservations(dtoList)
+                    .conflit(false)
+                    .build());
+        }
+
+        detecterEtMarquerConflits(items);
+        return items;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public GuideDisponibiliteDto verifierDisponibiliteGuide(Long guideId, LocalDate date, String creneau, Long circuitIdExclu) {
+        if (guideId == null || date == null) {
+            throw new BadRequestException("L'identifiant du guide (guideId) et la date sont obligatoires.");
+        }
+        String targetCreneau = creneau != null && !creneau.isBlank() ? creneau.trim() : "Journée";
+
+        List<Reservation> reservations = reservationRepository.findByGuideIdAndDatePrestationAndStatutIn(
+                guideId, date, ACTIVE_SEAT_HOLDING_STATUTS);
+
+        for (Reservation r : reservations) {
+            if (circuitIdExclu != null && Objects.equals(r.getCircuitId(), circuitIdExclu)) {
+                continue;
+            }
+            if (estCreneauEnConflit(targetCreneau, r.getCreneauPrestation())) {
+                String nomCircuit = "Circuit #" + r.getCircuitId();
+                CircuitDto c = recupererCircuitSilencieux(r.getCircuitId());
+                if (c != null && c.getNomCircuit() != null) {
+                    nomCircuit = c.getNomCircuit();
+                }
+                return GuideDisponibiliteDto.builder()
+                        .guideId(guideId)
+                        .date(date)
+                        .creneau(targetCreneau)
+                        .disponible(false)
+                        .motif("Conflit d'agenda : le guide a déjà une prestation programmée le "
+                                + date + " (" + (r.getCreneauPrestation() != null ? r.getCreneauPrestation() : "créneau réservé")
+                                + ") pour le circuit « " + nomCircuit + " ».")
+                        .build();
+            }
+        }
+
+        return GuideDisponibiliteDto.builder()
+                .guideId(guideId)
+                .date(date)
+                .creneau(targetCreneau)
+                .disponible(true)
+                .motif("Le guide est entièrement disponible pour cette date et ce créneau.")
+                .build();
+    }
+
+    private void detecterEtMarquerConflits(List<GuideAgendaItemDto> items) {
+        for (int i = 0; i < items.size(); i++) {
+            GuideAgendaItemDto a = items.get(i);
+            for (int j = i + 1; j < items.size(); j++) {
+                GuideAgendaItemDto b = items.get(j);
+                if (a.getDate() != null && a.getDate().equals(b.getDate())) {
+                    if (!Objects.equals(a.getCircuitId(), b.getCircuitId()) && estCreneauEnConflit(a.getCreneau(), b.getCreneau())) {
+                        a.setConflit(true);
+                        b.setConflit(true);
+                    }
+                }
+            }
+        }
+    }
+
+    private boolean estCreneauEnConflit(String creneau1, String creneau2) {
+        if (creneau1 == null || creneau2 == null) {
+            return true;
+        }
+        String c1 = creneau1.trim().toLowerCase(Locale.ROOT);
+        String c2 = creneau2.trim().toLowerCase(Locale.ROOT);
+
+        if (c1.contains("journée") || c2.contains("journée") || c1.contains("journee") || c2.contains("journee") || c1.contains("full") || c2.contains("full")) {
+            return true;
+        }
+        boolean c1Matin = c1.contains("matin") || c1.contains("09h");
+        boolean c2Matin = c2.contains("matin") || c2.contains("09h");
+        if (c1Matin && c2Matin) return true;
+
+        boolean c1Aprem = c1.contains("après") || c1.contains("apres") || c1.contains("14h") || c1.contains("15h");
+        boolean c2Aprem = c2.contains("après") || c2.contains("apres") || c2.contains("14h") || c2.contains("15h");
+        if (c1Aprem && c2Aprem) return true;
+
+        return c1.equalsIgnoreCase(c2);
+    }
+
+    private CircuitDto recupererCircuitSilencieux(Long circuitId) {
+        if (circuitId == null) return null;
+        try {
+            return circuitClient.getCircuitById(circuitId);
+        } catch (Exception ex) {
+            log.debug("Impossible de récupérer le circuit {} : {}", circuitId, ex.getMessage());
+            return null;
+        }
+    }
+
+    @Override
     @Scheduled(fixedDelay = 30000)
     public int expirerReservationsEchues() {
         LocalDateTime now = LocalDateTime.now(Reservation.CASAMANCE_ZONE);
@@ -846,6 +1019,16 @@ public class ReservationService implements IReservationService {
                     : LocalDate.now(Reservation.CASAMANCE_ZONE);
             if (effectiveDate.isBefore(LocalDate.now(Reservation.CASAMANCE_ZONE))) {
                 throw new BadRequestException("La date de prestation du circuit ne peut pas être dans le passé.");
+            }
+            if (circuit.getGuideResponsableId() != null) {
+                String targetCreneau = (dto.getCreneauPrestation() != null && !dto.getCreneauPrestation().isBlank())
+                        ? dto.getCreneauPrestation().trim()
+                        : "Journée";
+                GuideDisponibiliteDto disp = verifierDisponibiliteGuide(
+                        circuit.getGuideResponsableId(), effectiveDate, targetCreneau, circuit.getId());
+                if (!disp.isDisponible()) {
+                    throw new ConflictException(disp.getMotif());
+                }
             }
             return new PrestationValidation(
                     dto.getCircuitId(),
@@ -1034,6 +1217,7 @@ public class ReservationService implements IReservationService {
                 .montantTotal(montantTotal)
                 .devise(DEVISE_XOF)
                 .circuitId(dto.getTypeReservation() == TypeReservation.CIRCUIT ? ctx.prestationId() : null)
+                .guideId(dto.getTypeReservation() == TypeReservation.CIRCUIT && ctx.circuit() != null ? ctx.circuit().getGuideResponsableId() : null)
                 .evenementId(dto.getTypeReservation() == TypeReservation.EVENEMENT ? ctx.prestationId() : null)
                 .expiresAt(targetStatut == StatutReservation.EN_ATTENTE_PAIEMENT ? now.plusMinutes(Math.max(1, expirationMinutes)) : null)
                 .referencePaiement(targetStatut == StatutReservation.CONFIRMEE ? "GRATUIT-" + ref : null)

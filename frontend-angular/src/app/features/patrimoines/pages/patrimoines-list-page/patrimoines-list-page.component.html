@@ -81,7 +81,30 @@
         </p>
 
         <div class="controls-bar__actions">
-          @if (hasActiveFilters()) {
+          @if (!gpsLocation()) {
+            <button
+              type="button"
+              class="btn-gps"
+              (click)="activerGeolocalisation()"
+              [disabled]="gpsLoading()"
+              title="Trier par proximité depuis votre position"
+            >
+              <svg lucideMapPin [size]="15" aria-hidden="true"></svg>
+              <span>{{ gpsLoading() ? 'Localisation…' : 'Autour de moi (GPS)' }}</span>
+            </button>
+          } @else {
+            <button
+              type="button"
+              class="btn-gps btn-gps--active"
+              (click)="desactiverGeolocalisation()"
+              title="Désactiver le filtre de proximité"
+            >
+              <svg lucideMapPin [size]="15" aria-hidden="true"></svg>
+              <span>Proximité active (✕)</span>
+            </button>
+          }
+
+          @if (hasActiveFilters() || gpsLocation()) {
             <button type="button" class="btn-reset" (click)="resetFilters()">
               Réinitialiser les filtres
             </button>
@@ -118,6 +141,10 @@
           </div>
         </div>
       </div>
+
+      @if (gpsError()) {
+        <p class="gps-error-banner" role="alert">{{ gpsError() }}</p>
+      }
     </section>
 
     @if (loading() && publishedItems().length === 0) {
@@ -162,6 +189,9 @@
             <div class="map-preview-card__body">
               <div class="heritage-card__badges">
                 <span class="ui-badge">{{ pat.codePatrimoine }}</span>
+                @if (pat.distanceKm != null) {
+                  <span class="ui-badge ui-badge--success" title="Distance approximative">📍 ~{{ pat.distanceKm }} km</span>
+                }
                 <span class="ui-badge ui-badge--ochre">
                   {{ formatCategorie(pat.categoriePatrimoine) }}
                 </span>
@@ -211,6 +241,9 @@
             <div class="pat-card__body">
               <div class="pat-card__badges">
                 <span class="ui-badge">{{ pat.codePatrimoine }}</span>
+                @if (pat.distanceKm != null) {
+                  <span class="ui-badge ui-badge--success" title="Distance approximative">📍 ~{{ pat.distanceKm }} km</span>
+                }
                 @if (pat.categoriePatrimoine) {
                   <span class="ui-badge ui-badge--ochre">
                     {{ formatCategorie(pat.categoriePatrimoine) }}

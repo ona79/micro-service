@@ -82,4 +82,16 @@ public class Avis {
 
     @Column(name = "date_moderation")
     private LocalDateTime dateModeration;
+
+    @Column(name = "reponse_guide", length = 2000)
+    private String reponseGuide;
+
+    @Column(name = "date_reponse_guide")
+    private LocalDateTime dateReponseGuide;
+
+    @Column(name = "guide_repondeur_id")
+    private Long guideRepondeurId;
+
+    @Column(name = "guide_repondeur_nom", length = 160)
+    private String guideRepondeurNom;
 }

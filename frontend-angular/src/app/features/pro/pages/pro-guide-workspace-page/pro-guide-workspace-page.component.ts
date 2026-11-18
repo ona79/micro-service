@@ -2,7 +2,7 @@ import { Dialog } from '@angular/cdk/dialog';
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { LucideAward, LucideCheckCircle2, LucideSend } from '@lucide/angular';
+import { LucideAlertCircle, LucideAward, LucideCalendar, LucideCheckCircle2, LucideSend } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { toast } from 'ngx-sonner';
 import { AuthStore } from '../../../../core/auth/auth.store';
@@ -13,11 +13,13 @@ import {
   formatGuideStatusLabel,
   guideStatusBadgeClass,
 } from '../../../../core/models/guide.model';
+import { GuideAgendaItem } from '../../../../core/models/reservation.model';
 import { UiAvisSectionComponent } from '../../../../shared/components/ui-avis-section/ui-avis-section.component';
 import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confirm-dialog/ui-confirm-dialog.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { GuideApiService } from '../../../guides/data-access/guide-api.service';
+import { ReservationApiService } from '../../../reservations/data-access/reservation-api.service';
 
 @Component({
   selector: 'app-pro-guide-workspace-page',
@@ -32,6 +34,8 @@ import { GuideApiService } from '../../../guides/data-access/guide-api.service';
     LucideAward,
     LucideSend,
     LucideCheckCircle2,
+    LucideCalendar,
+    LucideAlertCircle,
   ],
   template: `
     <header class="bo-header">
@@ -202,6 +206,88 @@ import { GuideApiService } from '../../../guides/data-access/guide-api.service';
         </section>
       </div>
 
+      <section class="bo-panel" style="margin-top: var(--space-6);">
+        <div class="bo-panel__head">
+          <div>
+            <h2 class="bo-panel__title" style="display: flex; align-items: center; gap: var(--space-2);">
+              <svg lucideCalendar [size]="18" aria-hidden="true"></svg>
+              <span>Mon Agenda &amp; Calendrier des Prestations</span>
+            </h2>
+            <p class="bo-cell-sub">
+              Vue chronologique de vos visites guidées, occupation des places et alertes de conflits d’horaires.
+            </p>
+          </div>
+          <button type="button" class="bo-btn" (click)="loadAgenda()" [disabled]="loadingAgenda()">
+            <span>Actualiser l'agenda</span>
+          </button>
+        </div>
+
+        @if (loadingAgenda()) {
+          <p class="bo-cell-sub">Chargement de votre planning...</p>
+        } @else if (agendaError()) {
+          <app-ui-error-banner [message]="agendaError()!" (retry)="loadAgenda()" />
+        } @else if (agenda().length === 0) {
+          <div style="padding: var(--space-6); text-align: center; color: var(--ink-muted);">
+            <p style="margin: 0; font-size: var(--text-sm);">
+              Aucune prestation réservée ou programmée sur vos circuits pour le mois à venir.
+            </p>
+          </div>
+        } @else {
+          <div class="bo-table-wrap">
+            <table class="bo-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Créneau</th>
+                  <th>Circuit</th>
+                  <th>Places réservées</th>
+                  <th>Réservations</th>
+                  <th>Statut d'agenda</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of agenda(); track item.circuitId + '-' + item.date + '-' + item.creneau) {
+                  <tr [style.background-color]="item.conflit ? 'rgba(239, 68, 68, 0.08)' : null">
+                    <td>
+                      <strong>{{ item.date | dateFr: 'EEE d MMM yyyy' }}</strong>
+                    </td>
+                    <td>
+                      <span class="ui-badge ui-badge--neutral">{{ item.creneau }}</span>
+                    </td>
+                    <td>
+                      <strong>{{ item.nomCircuit }}</strong>
+                      <span class="bo-cell-sub" style="display: block;">Réf circuit #{{ item.circuitId }}</span>
+                    </td>
+                    <td class="tabular-nums">
+                      <strong>{{ item.placesOccupees }}</strong>
+                      @if (item.placesMax > 0) {
+                        <span class="bo-cell-sub"> / {{ item.placesMax }} max</span>
+                      }
+                    </td>
+                    <td class="tabular-nums">
+                      {{ item.nombreReservations }} dossier(s)
+                    </td>
+                    <td>
+                      @if (item.conflit) {
+                        <span class="ui-badge ui-badge--danger" style="display: inline-flex; align-items: center; gap: 4px;" title="Attention : deux circuits différents sont programmés sur la même plage horaire !">
+                          <svg lucideAlertCircle [size]="12" aria-hidden="true"></svg>
+                          Conflit détecté
+                        </span>
+                      } @else {
+                        <span class="ui-badge ui-badge--success" style="display: inline-flex; align-items: center; gap: 4px;">
+                          <svg lucideCheckCircle2 [size]="12" aria-hidden="true"></svg>
+                          Confirmé
+                        </span>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+
       @if (authStore.user(); as u) {
         <section class="bo-panel">
           <app-ui-avis-section cibleType="GUIDE" [cibleId]="u.id" />
@@ -215,6 +301,7 @@ export class ProGuideWorkspacePageComponent implements OnInit {
   private readonly dialog = inject(Dialog);
   protected readonly authStore = inject(AuthStore);
   private readonly guideApi = inject(GuideApiService);
+  private readonly reservationApi = inject(ReservationApiService);
 
   protected readonly loading = signal(true);
   protected readonly busy = signal(false);
@@ -223,6 +310,10 @@ export class ProGuideWorkspacePageComponent implements OnInit {
 
   protected readonly profil = signal<GuideProfil | null>(null);
   protected readonly historique = signal<GuideHistorique[]>([]);
+
+  protected readonly agenda = signal<GuideAgendaItem[]>([]);
+  protected readonly loadingAgenda = signal(false);
+  protected readonly agendaError = signal<string | null>(null);
 
   protected readonly formatStatus = formatGuideStatusLabel;
   protected readonly badgeClass = guideStatusBadgeClass;
@@ -241,6 +332,7 @@ export class ProGuideWorkspacePageComponent implements OnInit {
 
   ngOnInit(): void {
     void this.loadWorkspace();
+    void this.loadAgenda();
   }
 
   async loadWorkspace(): Promise<void> {
@@ -385,6 +477,19 @@ export class ProGuideWorkspacePageComponent implements OnInit {
       this.actionError.set(extractErrorMessage(err));
     } finally {
       this.busy.set(false);
+    }
+  }
+
+  async loadAgenda(): Promise<void> {
+    this.loadingAgenda.set(true);
+    this.agendaError.set(null);
+    try {
+      const items = await firstValueFrom(this.reservationApi.getGuideAgenda());
+      this.agenda.set(items ?? []);
+    } catch (err) {
+      this.agendaError.set(extractErrorMessage(err));
+    } finally {
+      this.loadingAgenda.set(false);
     }
   }
 }

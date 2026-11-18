@@ -246,7 +246,51 @@ import { DateFrPipe } from '../../pipes/date-fr.pipe';
                 <p class="avis-card__body">{{ item.commentaire }}</p>
               }
 
+              @if (item.reponseGuide) {
+                <div class="avis-guide-reply">
+                  <div class="avis-guide-reply__header">
+                    <span class="guide-badge-pill">Réponse officielle</span>
+                    <strong class="guide-author">{{ item.guideRepondeurNom || 'Guide Casamance' }}</strong>
+                    @if (item.dateReponseGuide) {
+                      <span class="guide-date">· {{ item.dateReponseGuide | dateFr: 'd MMM yyyy' }}</span>
+                    }
+                  </div>
+                  <p class="avis-guide-reply__content">{{ item.reponseGuide }}</p>
+                </div>
+              }
+
+              @if (replyingId() === item.id) {
+                <div class="reply-box">
+                  <p class="reply-box__title">Répondre officiellement en tant que guide :</p>
+                  <textarea
+                    class="field-input"
+                    rows="3"
+                    [(ngModel)]="replyText"
+                    placeholder="Rédigez votre réponse officielle au voyageur..."
+                  ></textarea>
+                  <div class="inline-actions">
+                    <button
+                      type="button"
+                      class="btn-mini btn-mini--save"
+                      [disabled]="!replyText.trim() || replySubmitting()"
+                      (click)="submitReply(item.id)"
+                    >
+                      {{ replySubmitting() ? 'Envoi…' : 'Publier la réponse' }}
+                    </button>
+                    <button type="button" class="btn-mini" (click)="replyingId.set(null)">
+                      Annuler
+                    </button>
+                  </div>
+                </div>
+              }
+
               <div class="avis-card__footer">
+                @if (canReply(item) && !item.reponseGuide && replyingId() !== item.id) {
+                  <button type="button" class="action-link action-link--reply" (click)="startReply(item.id)">
+                    <svg lucideMessageSquare [size]="13" aria-hidden="true"></svg>
+                    <span>Répondre à cet avis</span>
+                  </button>
+                }
                 @if (isOwnAvis(item)) {
                   <button type="button" class="action-link" (click)="startEdit(item)">
                     <svg lucidePencil [size]="13" aria-hidden="true"></svg>
@@ -614,6 +658,60 @@ import { DateFrPipe } from '../../pipes/date-fr.pipe';
       color: var(--ink-on-dark);
       border-color: var(--brand-primary);
     }
+    .avis-guide-reply {
+      margin-top: 0.5rem;
+      padding: 0.75rem 1rem;
+      background: var(--surface-sand, #f8f6f0);
+      border-left: 3px solid var(--brand-primary, #0d9488);
+      border-radius: 0 var(--radius-sm, 6px) var(--radius-sm, 6px) 0;
+    }
+    .avis-guide-reply__header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.35rem;
+      font-size: var(--text-xs);
+    }
+    .guide-badge-pill {
+      background: var(--brand-primary, #0d9488);
+      color: #fff;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.15rem 0.45rem;
+      border-radius: var(--radius-pill, 9999px);
+      text-transform: uppercase;
+    }
+    .guide-author {
+      color: var(--ink-primary);
+    }
+    .guide-date {
+      color: var(--ink-muted);
+    }
+    .avis-guide-reply__content {
+      margin: 0;
+      font-size: var(--text-sm);
+      color: var(--ink-secondary);
+      line-height: 1.5;
+    }
+    .reply-box {
+      margin-top: 0.5rem;
+      padding: 0.75rem;
+      background: var(--surface-sand, #f8f6f0);
+      border: 1px dashed var(--brand-primary, #0d9488);
+      border-radius: var(--radius-sm, 6px);
+      display: grid;
+      gap: 0.5rem;
+    }
+    .reply-box__title {
+      margin: 0;
+      font-size: var(--text-xs);
+      font-weight: 700;
+      color: var(--brand-primary, #0d9488);
+    }
+    .action-link--reply {
+      color: var(--brand-primary, #0d9488);
+      font-weight: 600;
+    }
     .btn-mini--warn {
       background: var(--accent-terracotta);
       color: var(--ink-on-dark);
@@ -666,6 +764,10 @@ export class UiAvisSectionComponent {
   protected readonly flaggingId = signal<number | null>(null);
   protected flagCategorie: CategorieSignalement = 'CONTENU_INAPPROPRIE';
   protected flagMotif = '';
+
+  protected readonly replyingId = signal<number | null>(null);
+  protected replyText = '';
+  protected readonly replySubmitting = signal(false);
 
   constructor() {
     effect(() => {
@@ -803,6 +905,42 @@ export class UiAvisSectionComponent {
       toast.success('Signalement transmis à l’équipe de modération.');
     } catch (err) {
       toast.error(extractErrorMessage(err));
+    }
+  }
+
+  protected canReply(item: Avis): boolean {
+    const user = this.authStore.user ? this.authStore.user() : null;
+    if (!user) return false;
+    const role = user.role;
+    if (role === 'ADMINISTRATEUR' || role === 'GESTIONNAIRE_SITE') return true;
+    if (role === 'GUIDE') {
+      return this.cibleType() === 'CIRCUIT' || this.cibleType() === 'GUIDE';
+    }
+    return false;
+  }
+
+  protected startReply(avisId: number): void {
+    this.replyingId.set(avisId);
+    this.replyText = '';
+  }
+
+  protected async submitReply(avisId: number): Promise<void> {
+    const text = this.replyText.trim();
+    if (!text) {
+      toast.error('La réponse ne peut pas être vide.');
+      return;
+    }
+    this.replySubmitting.set(true);
+    try {
+      const updated = await firstValueFrom(this.avisApi.repondreAvis(avisId, text));
+      this.avisList.update((list) => list.map((a) => (a.id === avisId ? updated : a)));
+      this.replyingId.set(null);
+      this.replyText = '';
+      toast.success('Votre réponse de guide a été publiée.');
+    } catch (err) {
+      toast.error(extractErrorMessage(err));
+    } finally {
+      this.replySubmitting.set(false);
     }
   }
 }

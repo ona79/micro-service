@@ -183,6 +183,24 @@ class PatrimoineControllerTest {
     }
 
     @Test
+    void getProximite_retourne200AvecDistances() throws Exception {
+        PatrimoineDto p = dto(1L, 150);
+        p.setDistanceKm(12.4);
+        when(patrimoineService.getPatrimoinesProximite(eq(12.5), eq(-16.2), eq(30.0), eq(5)))
+                .thenReturn(List.of(p));
+
+        mockMvc.perform(get(URL + "/proximite")
+                        .param("lat", "12.5")
+                        .param("lon", "-16.2")
+                        .param("rayonKm", "30.0")
+                        .param("limit", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].nomPatrimoine").value("Mémorial du Joola"))
+                .andExpect(jsonPath("$[0].distanceKm").value(12.4));
+    }
+
+    @Test
     void delete_retourne204() throws Exception {
         mockMvc.perform(delete(URL + "/1"))
                 .andExpect(status().isNoContent());

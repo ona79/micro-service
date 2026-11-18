@@ -122,4 +122,43 @@ describe('PatrimoinesListPageComponent', () => {
     expect(fixture.nativeElement.textContent).not.toContain('Mémorial de la Tragédie du Joola');
     expect(fixture.nativeElement.textContent).toContain('Fort de Sédhiou');
   });
+
+  it('charge les sites de proximité via getProximite et affiche le badge distance', async () => {
+    const fixture = TestBed.createComponent(PatrimoinesListPageComponent);
+    fixture.detectChanges();
+
+    // Rejet de la première requête initiale standard
+    httpMock.expectOne((req) => req.url.startsWith('/api/patrimoines/recherche')).flush({
+      content: [],
+      page: 0,
+      size: 9,
+      totalElements: 0,
+      totalPages: 1,
+      last: true,
+    });
+    await new Promise((r) => setTimeout(r, 0));
+
+    // Simulation de l'appel direct à loadProximite
+    const proxItem = {
+      ...MOCK_PATRIMOINES[0],
+      distanceKm: 8.5,
+    };
+    void (fixture.componentInstance as any).loadProximite(12.58, -16.27);
+
+    const proxReq = httpMock.expectOne(
+      (req) => req.url === '/api/patrimoines/proximite' && req.params.get('lat') === '12.58'
+    );
+    proxReq.flush([proxItem]);
+
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+
+    httpMock.expectOne('/api/avis/resumes?cibleType=PATRIMOINE&cibleIds=1').flush([]);
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Mémorial de la Tragédie du Joola');
+    expect(text).toContain('8.5 km');
+  });
 });

@@ -63,6 +63,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 @Slf4j
@@ -385,6 +386,54 @@ public class AvisModerationService implements IAvisModerationService {
             throw new ForbiddenException("Accès interdit (BOLA) : vous ne pouvez supprimer que vos propres avis.");
         }
         avisRepository.delete(avis);
+    }
+
+    @Override
+    public AvisDto repondreAvis(Long id, com.uasz.ms_reservation.dto.AvisReponseGuideRequest req) {
+        if (req == null || req.getReponse() == null || req.getReponse().isBlank()) {
+            throw new BadRequestException("La réponse ne peut pas être vide.");
+        }
+        SecurityUserContext caller = requireAuthenticatedUser();
+        Avis avis = findAvisOrThrow(id);
+
+        boolean isStaff = caller.hasPermission("AVIS:MODERER") || "ADMINISTRATEUR".equals(caller.role());
+        boolean isGuideEligible = false;
+
+        if ("GUIDE".equals(caller.role())) {
+            if (avis.getCibleType() == CibleAvis.CIRCUIT) {
+                try {
+                    CircuitDto circuit = circuitClient.getCircuitById(avis.getCibleId());
+                    if (circuit != null && Objects.equals(circuit.getGuideResponsableId(), caller.userId())) {
+                        isGuideEligible = true;
+                    }
+                } catch (Exception ex) {
+                    log.warn("Impossible de vérifier le circuit {} pour le droit de réponse : {}", avis.getCibleId(), ex.getMessage());
+                }
+            } else if (avis.getCibleType() == CibleAvis.GUIDE) {
+                if (Objects.equals(avis.getCibleId(), caller.userId())) {
+                    isGuideEligible = true;
+                }
+            }
+        }
+
+        if (!isStaff && !isGuideEligible) {
+            throw new ForbiddenException("Accès interdit (BOLA) : vous n'êtes pas autorisé à apporter un droit de réponse à cet avis.");
+        }
+
+        String rep = req.getReponse().trim();
+        if (rep.length() > 2000) {
+            throw new BadRequestException("La réponse ne peut pas dépasser 2000 caractères.");
+        }
+
+        avis.setReponseGuide(rep);
+        avis.setDateReponseGuide(LocalDateTime.now(Reservation.CASAMANCE_ZONE));
+        avis.setGuideRepondeurId(caller.userId());
+        avis.setGuideRepondeurNom(caller.email() != null && !caller.email().isBlank()
+                ? caller.email()
+                : "Guide officiel Casamance");
+
+        Avis updated = avisRepository.save(avis);
+        return toDetailedDto(updated);
     }
 
     @Override
@@ -921,6 +970,10 @@ public class AvisModerationService implements IAvisModerationService {
                 .statutModeration(a.getStatutModeration())
                 .datePublication(a.getDatePublication())
                 .dateModification(a.getDateModification())
+                .reponseGuide(a.getReponseGuide())
+                .dateReponseGuide(a.getDateReponseGuide())
+                .guideRepondeurId(a.getGuideRepondeurId())
+                .guideRepondeurNom(a.getGuideRepondeurNom())
                 .build();
     }
 
@@ -942,6 +995,10 @@ public class AvisModerationService implements IAvisModerationService {
                 .datePublication(a.getDatePublication())
                 .dateModification(a.getDateModification())
                 .dateModeration(a.getDateModeration())
+                .reponseGuide(a.getReponseGuide())
+                .dateReponseGuide(a.getDateReponseGuide())
+                .guideRepondeurId(a.getGuideRepondeurId())
+                .guideRepondeurNom(a.getGuideRepondeurNom())
                 .build();
     }
 

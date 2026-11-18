@@ -28,6 +28,10 @@ export interface Avis {
   datePublication: string;
   dateModification?: string | null;
   dateModeration?: string | null;
+  reponseGuide?: string | null;
+  dateReponseGuide?: string | null;
+  guideRepondeurId?: number | null;
+  guideRepondeurNom?: string | null;
 }
 
 export interface AvisCreatePayload {

@@ -100,6 +100,9 @@ public class PatrimoineDto {
     private LocalDateTime datePublication;
     private LocalDateTime dateArchivage;
 
+    /** Distance indicative en kilomètres par rapport à la position GPS demandée */
+    private Double distanceKm;
+
     /**
      * Constructeur de compatibilité ascendante P01/P02 (9 paramètres).
      */
