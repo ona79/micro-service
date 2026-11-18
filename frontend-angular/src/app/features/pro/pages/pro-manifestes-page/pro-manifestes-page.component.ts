@@ -59,7 +59,7 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
               <option [ngValue]="null">-- Choisir un circuit --</option>
               @for (c of circuits(); track c.id) {
                 <option [ngValue]="c.id">
-                  #{{ c.id }} — {{ c.nomCircuit }} ({{ c.statutCircuit || 'PUBLIE' }})
+                  {{ c.id }} — {{ c.nomCircuit }} ({{ c.statutCircuit || 'PUBLIE' }})
                 </option>
               }
             </select>
@@ -101,7 +101,7 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
                   <tr>
                     <td>
                       <strong class="tabular-nums">{{ m.referenceReservation }}</strong>
-                      <span class="bo-cell-sub">Résa #{{ m.reservationId }}</span>
+                      <span class="bo-cell-sub">Résa {{ m.reservationId }}</span>
                     </td>
                     <td>
                       <span class="bo-cell-title">{{ m.nomClient }}</span>

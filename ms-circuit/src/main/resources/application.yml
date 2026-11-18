@@ -114,6 +114,8 @@ management:
       exposure:
         include: 'health,info'
 
+patrimoine:
+  url: ${PATRIMOINE_URL:}
 utilisateur:
   url: ${UTILISATEUR_URL:}
 notification:

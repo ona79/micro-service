@@ -88,6 +88,9 @@ jobs:
             echo ">>> Tentative $attempt/3 d'initialisation de ./mvnw échouée, nouvelle tentative..."
             sleep 5
           done
+          if [ -d "${HOME}/.m2/repository" ]; then
+            find "${HOME}/.m2/repository" -name "*.lastUpdated" -delete || true
+          fi
           if [ -z "$MVN_CMD" ]; then
             echo ">>> Wrapper Maven indisponible sur le réseau, bascule vers Maven système."
             MVN_CMD="mvn"
@@ -99,9 +102,9 @@ jobs:
             echo ">>> Échec Maven transitoire détecté, nouvelle tentative dans 10s..."
             sleep 10
             if [ -d "${HOME}/.m2/repository" ]; then
-              find "${HOME}/.m2/repository" -name "_remote.repositories" -delete || true
+              find "${HOME}/.m2/repository" \( -name "_remote.repositories" -o -name "*.lastUpdated" \) -delete || true
             fi
-            "$MVN_CMD" -B clean test package
+            "$MVN_CMD" -B -U clean test package
           }
 
       - name: Conservation de l'artefact JAR (${{ matrix.service }})

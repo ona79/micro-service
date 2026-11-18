@@ -305,7 +305,7 @@ import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
                       </span>
                     </td>
                     <td>
-                      <span>User #{{ a.utilisateurId ?? 'N/A' }}</span>
+                      <span>User {{ a.utilisateurId ?? 'N/A' }}</span>
                       <span class="bo-cell-sub">{{ a.email || '—' }} · {{ a.ipAddress || '0.0.0.0' }}</span>
                     </td>
                     <td>{{ a.details || '—' }}</td>

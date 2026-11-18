@@ -217,7 +217,7 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
                   style="padding: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--surface-canvas); display: grid; gap: var(--space-2);"
                 >
                   <div class="bo-panel__head" style="margin: 0;">
-                    <strong style="font-size: var(--text-xs);">Étape #{{ $index + 1 }}</strong>
+                    <strong style="font-size: var(--text-xs);">Étape {{ $index + 1 }}</strong>
                     <div class="bo-actions-cell">
                       <button type="button" class="bo-btn bo-btn--sm" [disabled]="$index === 0" (click)="moveEtape($index, -1)" aria-label="Monter étape">
                         <svg lucideArrowUp [size]="12" aria-hidden="true"></svg>
@@ -341,7 +341,7 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
                   </td>
                   <td>
                     @if (c.guideResponsableId) {
-                      <span class="ui-badge ui-badge--success">Guide #{{ c.guideResponsableId }}</span>
+                      <span class="ui-badge ui-badge--success">Guide {{ c.guideResponsableId }}</span>
                     } @else {
                       <span class="ui-badge ui-badge--neutral">Non affecté</span>
                     }
@@ -433,7 +433,7 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
               <select id="drawer-assign-guide" class="bo-select" [(ngModel)]="assignGuideId" style="flex: 1;">
                 <option [ngValue]="null">-- Retirer affectation --</option>
                 @for (g of guidesValides(); track g.utilisateurId) {
-                  <option [ngValue]="g.utilisateurId">{{ g.prenom }} {{ g.nom }} (#{{ g.utilisateurId }})</option>
+                  <option [ngValue]="g.utilisateurId">{{ g.prenom }} {{ g.nom }} ({{ g.utilisateurId }})</option>
                 }
               </select>
               <button type="button" class="bo-btn bo-btn--primary" (click)="assignerGuide(d)">Affecter</button>
@@ -798,7 +798,7 @@ export class ProCircuitsPageComponent implements OnInit {
     this.tp2Result.set('Test en cours...');
     try {
       const res = await firstValueFrom(this.api.testerCommunication(mode, patId));
-      this.tp2Result.set(`Succès ${String(res['clientUtilise'])} sur patrimoine #${patId}`);
+      this.tp2Result.set(`Succès ${String(res['clientUtilise'])} sur patrimoine ${patId}`);
     } catch (err) {
       this.tp2Result.set(`Échec ${mode}: ${extractErrorMessage(err)}`);
     }

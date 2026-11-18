@@ -418,7 +418,7 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
                         {{ p.referenceTransaction }} · {{ p.montant | fcfaPrice }}
                       </p>
                       <p class="notif-item__body">
-                        {{ p.modePaiement }} · Réservation #{{ p.reservationId }}
+                        {{ p.modePaiement }} · Réservation {{ p.reservationId }}
                         · <a [routerLink]="['/paiements', p.reservationId]">Reçu &amp; simulation</a>
                         · <a [routerLink]="['/reservations', p.reservationId]">Fiche réservation</a>
                       </p>
@@ -1135,7 +1135,7 @@ export class AccountPageComponent implements OnInit {
   protected async submitDraft(reservationId: number): Promise<void> {
     try {
       await this.reservationStore.soumettreReservation(reservationId);
-      toast.success(`Réservation #${reservationId} prête pour paiement.`);
+      toast.success(`Réservation ${reservationId} prête pour paiement.`);
     } catch (err) {
       toast.error(extractErrorMessage(err));
     }
