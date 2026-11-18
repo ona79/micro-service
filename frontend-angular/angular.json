@@ -20,7 +20,9 @@
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
             "allowedCommonJsDependencies": [
-              "leaflet"
+              "leaflet",
+              "qrcode",
+              "html5-qrcode"
             ],
             "assets": [
               {

@@ -17,6 +17,7 @@ public interface ReservationMapper {
 
     @Mapping(target = "participants", ignore = true)
     @Mapping(target = "historique", ignore = true)
+    @Mapping(target = "billets", ignore = true)
     @Mapping(target = "version", ignore = true)
     Reservation toEntity(ReservationDto dto);
 
@@ -37,6 +38,7 @@ public interface ReservationMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "participants", ignore = true)
     @Mapping(target = "historique", ignore = true)
+    @Mapping(target = "billets", ignore = true)
     @Mapping(target = "version", ignore = true)
     void updateEntity(ReservationDto dto, @MappingTarget Reservation reservation);
 }

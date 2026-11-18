@@ -41,6 +41,7 @@ export type Permission =
   | 'GUIDE:GERER_PROPRE_PROFIL'
   | 'GUIDE:VALIDER'
   | 'GUIDE:SUSPENDRE'
+  | 'VISITE:VALIDER'
   | 'AVIS:LIRE'
   | 'AVIS:CREER'
   | 'AVIS:MODIFIER_PROPRE'
@@ -104,6 +105,9 @@ export const ROLE_PERMISSIONS: Readonly<Record<RoleUtilisateur, readonly Permiss
     'EVENEMENT:LIRE',
     'UTILISATEUR:LIRE_PROFIL',
     'GUIDE:LIRE',
+    'GUIDE:VALIDER',
+    'GUIDE:SUSPENDRE',
+    'VISITE:VALIDER',
     'AVIS:LIRE',
     'AVIS:SIGNALER',
     'NOTIFICATION:LIRE_PROPRE',
@@ -130,6 +134,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<RoleUtilisateur, readonly Permiss
     'GUIDE:LIRE',
     'GUIDE:VALIDER',
     'GUIDE:SUSPENDRE',
+    'VISITE:VALIDER',
     'AVIS:LIRE',
     'AVIS:SIGNALER',
     'AVIS:MODERER',
@@ -174,6 +179,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<RoleUtilisateur, readonly Permiss
     'GUIDE:LIRE',
     'GUIDE:VALIDER',
     'GUIDE:SUSPENDRE',
+    'VISITE:VALIDER',
     'AVIS:LIRE',
     'AVIS:CREER',
     'AVIS:MODIFIER_PROPRE',

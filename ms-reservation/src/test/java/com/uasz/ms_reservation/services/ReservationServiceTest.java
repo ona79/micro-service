@@ -70,6 +70,8 @@ class ReservationServiceTest {
     private PaiementClient paiementClient;
     @Mock
     private NotificationClient notificationClient;
+    @Mock
+    private com.uasz.ms_reservation.repositories.BilletRepository billetRepository;
 
     private final ReservationMapper reservationMapper = Mappers.getMapper(ReservationMapper.class);
     private ReservationService reservationService;
@@ -79,7 +81,7 @@ class ReservationServiceTest {
         reservationService = new ReservationService(
                 reservationRepository, disponibiliteRepository, evenementRecuRepository,
                 disponibiliteLockService, reservationMapper, circuitClient, evenementClient,
-                paiementClient, notificationClient);
+                paiementClient, notificationClient, billetRepository, new com.uasz.ms_reservation.mappers.BilletMapper());
         SecurityUserContextHolder.setContext(new SecurityUserContext(2L, "TOURISTE", "moussa@uasz.sn", false, null));
         lenient().when(disponibiliteLockService.acquerirVerrou(any(), any(), any(), eq(25)))
                 .thenReturn(DisponibilitePrestation.builder().capaciteTotale(25).placesReservees(0).build());
@@ -409,5 +411,129 @@ class ReservationServiceTest {
         assertThat(confirmed.getReferencePaiement()).isEqualTo("GRATUIT-RES-20261118-FREE");
         assertThat(confirmed.getDateConfirmation()).isNotNull();
         assertThat(confirmed.getExpiresAt()).isNull();
+    }
+
+    @Test
+    void validerBillet_succes_passeEnConsommeAvecHorodatageEtValidateur() {
+        LocalDate today = LocalDate.now(Reservation.CASAMANCE_ZONE);
+        Reservation res = Reservation.builder()
+                .id(10L)
+                .referenceReservation("RES-2026-000010")
+                .nomClient("Amy Sarr")
+                .datePrestation(today)
+                .statut(StatutReservation.CONFIRMEE)
+                .build();
+
+        com.uasz.ms_reservation.entities.Billet billet = com.uasz.ms_reservation.entities.Billet.builder()
+                .id(1L)
+                .reservation(res)
+                .numeroBillet("BIL-RES-2026-000010-01")
+                .tokenQr("token-secret-12345")
+                .nomBeneficiaire("Amy Sarr")
+                .statut(com.uasz.ms_reservation.entities.StatutBillet.VALIDE)
+                .build();
+
+        when(billetRepository.findByTokenQrForUpdate("token-secret-12345")).thenReturn(Optional.of(billet));
+        when(billetRepository.save(any(com.uasz.ms_reservation.entities.Billet.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Scan effectué par un conservateur
+        SecurityUserContextHolder.setContext(new SecurityUserContext(
+                4L, "CONSERVATEUR", "fatou.conservateur@patrimoine-casamance.sn", false, null));
+
+        com.uasz.ms_reservation.dto.ValidationBilletResponse response = reservationService.validerBillet("token-secret-12345");
+
+        assertThat(response.isValide()).isTrue();
+        assertThat(response.getMessage()).contains("Accès autorisé");
+        assertThat(response.getBillet().getStatut()).isEqualTo(com.uasz.ms_reservation.entities.StatutBillet.CONSOMME);
+        assertThat(response.getBillet().getDateUtilisation()).isNotNull();
+        assertThat(response.getBillet().getValidePar()).isEqualTo("fatou.conservateur@patrimoine-casamance.sn");
+    }
+
+    @Test
+    void validerBillet_doubleScan_rejeteAvec409Conflict() {
+        LocalDate today = LocalDate.now(Reservation.CASAMANCE_ZONE);
+        Reservation res = Reservation.builder()
+                .id(10L)
+                .referenceReservation("RES-2026-000010")
+                .datePrestation(today)
+                .statut(StatutReservation.CONFIRMEE)
+                .build();
+
+        com.uasz.ms_reservation.entities.Billet billet = com.uasz.ms_reservation.entities.Billet.builder()
+                .id(1L)
+                .reservation(res)
+                .numeroBillet("BIL-RES-2026-000010-01")
+                .tokenQr("token-already-used")
+                .nomBeneficiaire("Amy Sarr")
+                .statut(com.uasz.ms_reservation.entities.StatutBillet.CONSOMME)
+                .dateUtilisation(LocalDateTime.now(Reservation.CASAMANCE_ZONE).minusMinutes(15))
+                .validePar("guard@patrimoine-casamance.sn")
+                .build();
+
+        when(billetRepository.findByTokenQrForUpdate("token-already-used")).thenReturn(Optional.of(billet));
+
+        SecurityUserContextHolder.setContext(new SecurityUserContext(
+                3L, "GESTIONNAIRE_SITE", "awa.sagna@zig.univ.sn", false, null));
+
+        assertThatThrownBy(() -> reservationService.validerBillet("token-already-used"))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("DOUBLE SCAN INTERDIT")
+                .hasMessageContaining("guard@patrimoine-casamance.sn");
+    }
+
+    @Test
+    void validerBillet_touristeNonAutorise_rejeteAvec403() {
+        SecurityUserContextHolder.setContext(new SecurityUserContext(2L, "TOURISTE", "moussa@uasz.sn", false, null));
+
+        assertThatThrownBy(() -> reservationService.validerBillet("token-random"))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("VISITE:VALIDER requise");
+    }
+
+    @Test
+    void getBilletsByReservation_proprietaire_obtientBillets() {
+        Reservation res = Reservation.builder()
+                .id(50L)
+                .utilisateurId(2L)
+                .referenceReservation("RES-2026-000050")
+                .statut(StatutReservation.CONFIRMEE)
+                .nombrePlaces(1)
+                .nomClient("Moussa Touriste")
+                .build();
+        when(reservationRepository.findById(50L)).thenReturn(Optional.of(res));
+
+        com.uasz.ms_reservation.entities.Billet b = com.uasz.ms_reservation.entities.Billet.builder()
+                .id(100L)
+                .reservation(res)
+                .numeroBillet("BIL-RES-2026-000050-01")
+                .tokenQr("qr-50")
+                .statut(com.uasz.ms_reservation.entities.StatutBillet.VALIDE)
+                .build();
+        when(billetRepository.findByReservationIdOrderByNumeroBilletAsc(50L)).thenReturn(List.of(b));
+
+        SecurityUserContextHolder.setContext(new SecurityUserContext(2L, "TOURISTE", "moussa@uasz.sn", false, null));
+
+        List<com.uasz.ms_reservation.dto.BilletDto> billets = reservationService.getBilletsByReservation(50L);
+        assertThat(billets).hasSize(1);
+        assertThat(billets.get(0).getNumeroBillet()).isEqualTo("BIL-RES-2026-000050-01");
+    }
+
+    @Test
+    void getBilletsByReservation_autreTouriste_rejeteAvec403() {
+        Reservation res = Reservation.builder()
+                .id(50L)
+                .utilisateurId(99L)
+                .referenceReservation("RES-2026-000050")
+                .statut(StatutReservation.CONFIRMEE)
+                .emailClient("other@uasz.sn")
+                .build();
+        when(reservationRepository.findById(50L)).thenReturn(Optional.of(res));
+
+        // Utilisateur 2 tente de consulter les billets de l'utilisateur 99
+        SecurityUserContextHolder.setContext(new SecurityUserContext(2L, "TOURISTE", "moussa@uasz.sn", false, null));
+
+        assertThatThrownBy(() -> reservationService.getBilletsByReservation(50L))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("propres billets");
     }
 }

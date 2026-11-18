@@ -324,6 +324,18 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'controle-acces',
+        title: 'Contrôle d’Accès & Billetterie',
+        canActivate: [
+          roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE', 'CONSERVATEUR']),
+          permissionGuard(['VISITE:VALIDER']),
+        ],
+        loadComponent: () =>
+          import(
+            './features/pro/pages/pro-controle-acces-page/pro-controle-acces-page.component'
+          ).then((m) => m.ProControleAccesPageComponent),
+      },
+      {
         path: 'paiements',
         title: 'Paiements Simulés & Remboursements',
         canActivate: [roleGuard(['ADMINISTRATEUR']), permissionGuard(['PAIEMENT:LIRE_TOUT'])],

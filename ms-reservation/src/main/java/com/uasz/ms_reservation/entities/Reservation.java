@@ -133,6 +133,13 @@ public class Reservation {
     @EqualsAndHashCode.Exclude
     private List<ReservationHistorique> historique = new ArrayList<>();
 
+    @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("numeroBillet ASC, id ASC")
+    @Builder.Default
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private List<Billet> billets = new ArrayList<>();
+
     @PrePersist
     public void onPrePersist() {
         LocalDateTime now = LocalDateTime.now(CASAMANCE_ZONE);

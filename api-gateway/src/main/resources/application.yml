@@ -35,6 +35,10 @@ spring:
               uri: ${RESERVATION_URL:lb://ms-reservation}
               predicates:
                 - Path=/api/moderation/**
+            - id: ms-visites
+              uri: ${RESERVATION_URL:lb://ms-reservation}
+              predicates:
+                - Path=/api/visites/**
             - id: ms-utilisateur
               uri: ${UTILISATEUR_URL:lb://ms-utilisateur}
               predicates:

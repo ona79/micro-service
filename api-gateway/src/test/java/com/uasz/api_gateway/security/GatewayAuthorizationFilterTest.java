@@ -535,5 +535,23 @@ class GatewayAuthorizationFilterTest {
         MockHttpServletResponse resMgrEvtStats = new MockHttpServletResponse();
         filter.doFilter(mgrEvtStats, resMgrEvtStats, new MockFilterChain());
         assertThat(resMgrEvtStats.getStatus()).isEqualTo(200);
+
+        // 6. POST /api/visites/valider : 401 si anonyme, 403 si TOURISTE, 200 si CONSERVATEUR ou GESTIONNAIRE_SITE
+        MockHttpServletRequest anonVisite = new MockHttpServletRequest("POST", "/api/visites/valider");
+        MockHttpServletResponse resAnonVisite = new MockHttpServletResponse();
+        filter.doFilter(anonVisite, resAnonVisite, new MockFilterChain());
+        assertThat(resAnonVisite.getStatus()).isEqualTo(401);
+
+        MockHttpServletRequest touristeVisite = new MockHttpServletRequest("POST", "/api/visites/valider");
+        attachCookieAuthWithCsrf(touristeVisite, 2L, "moussa@uasz.sn", "TOURISTE", 300);
+        MockHttpServletResponse resTouristeVisite = new MockHttpServletResponse();
+        filter.doFilter(touristeVisite, resTouristeVisite, new MockFilterChain());
+        assertThat(resTouristeVisite.getStatus()).isEqualTo(403);
+
+        MockHttpServletRequest conservateurVisite = new MockHttpServletRequest("POST", "/api/visites/valider");
+        attachCookieAuthWithCsrf(conservateurVisite, 4L, "fatou@uasz.sn", "CONSERVATEUR", 300);
+        MockHttpServletResponse resConsVisite = new MockHttpServletResponse();
+        filter.doFilter(conservateurVisite, resConsVisite, new MockFilterChain());
+        assertThat(resConsVisite.getStatus()).isEqualTo(200);
     }
 }

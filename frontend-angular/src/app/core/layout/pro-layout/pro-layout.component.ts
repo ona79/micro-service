@@ -26,6 +26,7 @@ import {
   LucideMessageSquareWarning,
   LucidePanelLeftClose,
   LucidePanelLeftOpen,
+  LucideQrCode,
   LucideRoute,
   LucideShieldCheck,
   LucideTicket,
@@ -52,6 +53,7 @@ export type ProNavIcon =
   | 'guides'
   | 'moderation'
   | 'reservations'
+  | 'controle-acces'
   | 'paiements'
   | 'notifications'
   | 'utilisateurs';
@@ -148,6 +150,15 @@ export const PRO_NAV_ITEMS: readonly ProNavItem[] = [
     section: 'Transactions & Alertes',
   },
   {
+    id: 'controle-acces',
+    label: 'Contrôle d’accès (Scan)',
+    to: '/pro/controle-acces',
+    icon: 'controle-acces',
+    roles: ['ADMINISTRATEUR', 'GESTIONNAIRE_SITE', 'CONSERVATEUR'],
+    section: 'Catalogue & Opérations',
+    badgeText: 'Scan',
+  },
+  {
     id: 'paiements',
     label: 'Paiements simulés',
     to: '/pro/paiements',
@@ -197,6 +208,7 @@ export const PRO_NAV_ITEMS: readonly ProNavItem[] = [
     LucideShieldCheck,
     LucidePanelLeftClose,
     LucidePanelLeftOpen,
+    LucideQrCode,
     LucideMenu,
     LucideX,
     LucideExternalLink,

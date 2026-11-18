@@ -130,4 +130,24 @@ class ReservationControllerTest {
                 .andExpect(jsonPath("$.totalReservations").value(5))
                 .andExpect(jsonPath("$.devise").value("XOF"));
     }
+
+    @Test
+    void getBilletsByReservation_retourne200AvecListeBillets() throws Exception {
+        com.uasz.ms_reservation.dto.BilletDto b = com.uasz.ms_reservation.dto.BilletDto.builder()
+                .id(1L)
+                .reservationId(10L)
+                .referenceReservation("RES-2026-000010")
+                .numeroBillet("BIL-RES-2026-000010-01")
+                .tokenQr("qr-token-xyz")
+                .statut(com.uasz.ms_reservation.entities.StatutBillet.VALIDE)
+                .nomBeneficiaire("Moussa Touriste")
+                .build();
+        when(reservationService.getBilletsByReservation(10L)).thenReturn(List.of(b));
+
+        mockMvc.perform(get("/api/reservations/10/billets"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].numeroBillet").value("BIL-RES-2026-000010-01"))
+                .andExpect(jsonPath("$[0].tokenQr").value("qr-token-xyz"))
+                .andExpect(jsonPath("$[0].nomBeneficiaire").value("Moussa Touriste"));
+    }
 }

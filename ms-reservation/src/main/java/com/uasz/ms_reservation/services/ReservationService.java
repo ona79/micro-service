@@ -4,6 +4,7 @@ import com.uasz.ms_reservation.clients.CircuitClient;
 import com.uasz.ms_reservation.clients.EvenementClient;
 import com.uasz.ms_reservation.clients.NotificationClient;
 import com.uasz.ms_reservation.clients.PaiementClient;
+import com.uasz.ms_reservation.dto.BilletDto;
 import com.uasz.ms_reservation.dto.CircuitDto;
 import com.uasz.ms_reservation.dto.DisponibiliteDto;
 import com.uasz.ms_reservation.dto.EvenementDto;
@@ -16,12 +17,15 @@ import com.uasz.ms_reservation.dto.PaiementResumeDto;
 import com.uasz.ms_reservation.dto.ParticipantDto;
 import com.uasz.ms_reservation.dto.ReservationDto;
 import com.uasz.ms_reservation.dto.ReservationStatsDto;
+import com.uasz.ms_reservation.dto.ValidationBilletResponse;
+import com.uasz.ms_reservation.entities.Billet;
 import com.uasz.ms_reservation.entities.DisponibilitePrestation;
 import com.uasz.ms_reservation.entities.Reservation;
 import com.uasz.ms_reservation.entities.ReservationEvenementRecu;
 import com.uasz.ms_reservation.entities.ReservationHistorique;
 import com.uasz.ms_reservation.entities.ReservationNotificationOutbox;
 import com.uasz.ms_reservation.entities.ReservationParticipant;
+import com.uasz.ms_reservation.entities.StatutBillet;
 import com.uasz.ms_reservation.entities.StatutOutbox;
 import com.uasz.ms_reservation.entities.StatutReservation;
 import com.uasz.ms_reservation.entities.TypeReservation;
@@ -31,7 +35,9 @@ import com.uasz.ms_reservation.exceptions.ForbiddenException;
 import com.uasz.ms_reservation.exceptions.ResourceNotFoundException;
 import com.uasz.ms_reservation.exceptions.ServiceIndisponibleException;
 import com.uasz.ms_reservation.exceptions.UnauthorizedException;
+import com.uasz.ms_reservation.mappers.BilletMapper;
 import com.uasz.ms_reservation.mappers.ReservationMapper;
+import com.uasz.ms_reservation.repositories.BilletRepository;
 import com.uasz.ms_reservation.repositories.DisponibilitePrestationRepository;
 import com.uasz.ms_reservation.repositories.ReservationEvenementRecuRepository;
 import com.uasz.ms_reservation.repositories.ReservationNotificationOutboxRepository;
@@ -56,13 +62,17 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -100,6 +110,12 @@ public class ReservationService implements IReservationService {
     @Autowired(required = false)
     private ReservationNotificationOutboxRelayService notificationOutboxRelayService;
 
+    @Autowired(required = false)
+    private BilletRepository billetRepository;
+
+    @Autowired(required = false)
+    private BilletMapper billetMapper;
+
     @Value("${reservation.expiration-minutes:30}")
     private int expirationMinutes = 30;
 
@@ -113,7 +129,9 @@ public class ReservationService implements IReservationService {
             CircuitClient circuitClient,
             EvenementClient evenementClient,
             @Autowired(required = false) PaiementClient paiementClient,
-            @Autowired(required = false) NotificationClient notificationClient
+            @Autowired(required = false) NotificationClient notificationClient,
+            @Autowired(required = false) BilletRepository billetRepository,
+            @Autowired(required = false) BilletMapper billetMapper
     ) {
         this.reservationRepository = reservationRepository;
         this.disponibiliteRepository = disponibiliteRepository;
@@ -124,6 +142,24 @@ public class ReservationService implements IReservationService {
         this.evenementClient = evenementClient;
         this.paiementClient = paiementClient;
         this.notificationClient = notificationClient;
+        this.billetRepository = billetRepository;
+        this.billetMapper = billetMapper != null ? billetMapper : new BilletMapper();
+    }
+
+    public ReservationService(
+            ReservationRepository reservationRepository,
+            DisponibilitePrestationRepository disponibiliteRepository,
+            ReservationEvenementRecuRepository evenementRecuRepository,
+            DisponibiliteLockService disponibiliteLockService,
+            ReservationMapper reservationMapper,
+            CircuitClient circuitClient,
+            EvenementClient evenementClient,
+            PaiementClient paiementClient,
+            NotificationClient notificationClient
+    ) {
+        this(reservationRepository, disponibiliteRepository, evenementRecuRepository,
+                disponibiliteLockService, reservationMapper, circuitClient, evenementClient,
+                paiementClient, notificationClient, null, new BilletMapper());
     }
 
     private static Map<StatutReservation, Set<StatutReservation>> buildTransitions() {
@@ -203,6 +239,7 @@ public class ReservationService implements IReservationService {
                 contextePrestation, montantTotal, targetStatut, now);
         Reservation saved = reservationRepository.save(entity);
         if (isGratuit) {
+            genererBilletsPourReservation(saved);
             notifierAsyncNonBloquant(saved,
                     "Confirmation de réservation " + saved.getReferenceReservation(),
                     "Bonjour " + saved.getNomClient() + ", votre réservation " + saved.getReferenceReservation()
@@ -260,6 +297,7 @@ public class ReservationService implements IReservationService {
             appliquerTransition(reservation, StatutReservation.CONFIRMEE, caller.userId(), caller.role(), "USER",
                     reservation.getCorrelationId(), reservation.getReferencePaiement(), "Validation automatique réservation gratuite");
             Reservation saved = reservationRepository.save(reservation);
+            genererBilletsPourReservation(saved);
             notifierAsyncNonBloquant(saved,
                     "Confirmation de réservation " + saved.getReferenceReservation(),
                     "Bonjour " + saved.getNomClient() + ", votre réservation " + saved.getReferenceReservation()
@@ -478,6 +516,15 @@ public class ReservationService implements IReservationService {
                 reservation.getCorrelationId(), reservation.getReferencePaiement(), effectiveMotif);
 
         Reservation saved = reservationRepository.save(reservation);
+        if (billetRepository != null) {
+            List<Billet> billets = billetRepository.findByReservationIdOrderByNumeroBilletAsc(saved.getId());
+            for (Billet b : billets) {
+                if (b.getStatut() == StatutBillet.VALIDE) {
+                    b.setStatut(StatutBillet.ANNULE);
+                    billetRepository.save(b);
+                }
+            }
+        }
         libererPlacesSiApplicable(saved);
         notifierAsyncNonBloquant(saved, "Annulation de réservation " + saved.getReferenceReservation(),
                 "Bonjour " + saved.getNomClient() + ", votre réservation " + saved.getReferenceReservation() + " a été annulée. Motif : " + effectiveMotif);
@@ -727,7 +774,8 @@ public class ReservationService implements IReservationService {
             appliquerTransition(reservation, StatutReservation.CONFIRMEE, null, "SYSTEM", "SERVICE",
                     req.getCorrelationId(), req.getReferenceTransaction(),
                     req.getMotif() != null ? req.getMotif() : "Paiement simulé accepté");
-            reservationRepository.save(reservation);
+            Reservation saved = reservationRepository.save(reservation);
+            genererBilletsPourReservation(saved);
             notifierAsyncNonBloquant(reservation,
                     "Confirmation de réservation " + reservation.getReferenceReservation(),
                     "Bonjour " + reservation.getNomClient() + ", votre réservation " + reservation.getReferenceReservation()
@@ -1364,6 +1412,185 @@ public class ReservationService implements IReservationService {
                 .codeRejet(codeRejet)
                 .message(msg)
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public List<BilletDto> getBilletsByReservation(Long reservationId) {
+        Reservation reservation = findReservation(reservationId);
+        SecurityUserContext caller = requireAuthenticatedContext(false);
+
+        boolean isOwner = Objects.equals(caller.userId(), reservation.getUtilisateurId())
+                || (caller.email() != null && caller.email().equalsIgnoreCase(reservation.getEmailClient()));
+        boolean isStaff = caller.hasPermission("RESERVATION:LIRE_TOUT")
+                || caller.hasPermission("RESERVATION:GERER")
+                || "ADMINISTRATEUR".equals(caller.role())
+                || "CONSERVATEUR".equals(caller.role())
+                || "GESTIONNAIRE_SITE".equals(caller.role());
+
+        if (!isOwner && !isStaff) {
+            throw new ForbiddenException("Accès interdit : vous ne pouvez consulter que vos propres billets.");
+        }
+
+        if (billetRepository == null) {
+            return Collections.emptyList();
+        }
+
+        // Si la réservation est confirmée mais n'a pas encore de billets, les générer à la volée
+        if (reservation.getStatut() == StatutReservation.CONFIRMEE) {
+            List<Billet> existants = billetRepository.findByReservationIdOrderByNumeroBilletAsc(reservation.getId());
+            if (existants.isEmpty()) {
+                genererBilletsPourReservation(reservation);
+            }
+        }
+
+        List<Billet> billets = billetRepository.findByReservationIdOrderByNumeroBilletAsc(reservation.getId());
+        return billetMapper.toDtoList(billets);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BilletDto verifierBillet(String tokenQr) {
+        requireAuthenticatedContext(false);
+        if (tokenQr == null || tokenQr.isBlank()) {
+            throw new BadRequestException("Le token QR ou numéro de billet est obligatoire.");
+        }
+        if (billetRepository == null) {
+            throw new ServiceIndisponibleException("Le service de billetterie est temporairement indisponible.");
+        }
+        String cleaned = tokenQr.trim();
+        Billet billet = billetRepository.findByTokenQr(cleaned)
+                .or(() -> billetRepository.findByNumeroBillet(cleaned))
+                .orElseThrow(() -> new ResourceNotFoundException("Billet invalide ou introuvable pour ce QR Code."));
+
+        return billetMapper.toDto(billet);
+    }
+
+    @Override
+    @Transactional
+    public ValidationBilletResponse validerBillet(String tokenQr) {
+        SecurityUserContext caller = requireAuthenticatedContext(false);
+        boolean canScan = caller.hasPermission("VISITE:VALIDER")
+                || caller.hasPermission("PATRIMOINE:VALIDER")
+                || caller.hasPermission("RESERVATION:GERER")
+                || "CONSERVATEUR".equals(caller.role())
+                || "GESTIONNAIRE_SITE".equals(caller.role())
+                || "ADMINISTRATEUR".equals(caller.role());
+
+        if (!canScan) {
+            throw new ForbiddenException("Accès interdit : permission VISITE:VALIDER requise.");
+        }
+
+        if (tokenQr == null || tokenQr.isBlank()) {
+            throw new BadRequestException("Le token QR ou code de billet est obligatoire.");
+        }
+        if (billetRepository == null) {
+            throw new ServiceIndisponibleException("Le service de billetterie est temporairement indisponible.");
+        }
+
+        String cleaned = tokenQr.trim();
+        // Verrou pessimiste en base pour empêcher les doubles scans simultanés (race condition)
+        Billet billet = billetRepository.findByTokenQrForUpdate(cleaned)
+                .or(() -> billetRepository.findByNumeroBillet(cleaned))
+                .orElseThrow(() -> new ResourceNotFoundException("Billet invalide ou introuvable pour ce QR Code."));
+
+        Reservation res = billet.getReservation();
+
+        // 1. Contrôle du statut actuel du billet
+        if (billet.getStatut() == StatutBillet.CONSOMME) {
+            String dateFmt = billet.getDateUtilisation() != null
+                    ? billet.getDateUtilisation().format(DateTimeFormatter.ofPattern("dd/MM/yyyy à HH:mm:ss"))
+                    : "précédemment";
+            String par = billet.getValidePar() != null ? " par " + billet.getValidePar() : "";
+            throw new ConflictException(String.format("DOUBLE SCAN INTERDIT : Ce billet (%s) a déjà été validé le %s%s.",
+                    billet.getNumeroBillet(), dateFmt, par));
+        }
+
+        if (billet.getStatut() == StatutBillet.ANNULE || (res != null && res.getStatut() == StatutReservation.ANNULEE)) {
+            throw new ConflictException(String.format("ACCÈS REFUSÉ : Le billet (%s) est associé à une réservation annulée.",
+                    billet.getNumeroBillet()));
+        }
+
+        if (billet.getStatut() == StatutBillet.EXPIRE || (res != null && res.getStatut() == StatutReservation.EXPIREE)) {
+            throw new BadRequestException(String.format("ACCÈS REFUSÉ : Le billet (%s) a expiré.",
+                    billet.getNumeroBillet()));
+        }
+
+        // 2. Contrôle de date de prestation avec tolérance (+/- 1 jour)
+        LocalDate today = LocalDate.now(Reservation.CASAMANCE_ZONE);
+        if (res != null && res.getDatePrestation() != null) {
+            LocalDate dateP = res.getDatePrestation();
+            if (dateP.isBefore(today.minusDays(1))) {
+                throw new BadRequestException(String.format(
+                        "BILLET EXPIRÉ : La prestation était programmée pour le %s (date dépassée).",
+                        dateP.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))));
+            }
+            if (dateP.isAfter(today.plusDays(1))) {
+                throw new BadRequestException(String.format(
+                        "BILLET NON UTILISABLE AUJOURD'HUI : La prestation est prévue pour le %s.",
+                        dateP.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))));
+            }
+        }
+
+        // 3. Validation atomique du billet
+        LocalDateTime now = LocalDateTime.now(Reservation.CASAMANCE_ZONE);
+        billet.setStatut(StatutBillet.CONSOMME);
+        billet.setDateUtilisation(now);
+        String validator = caller.email() != null && !caller.email().isBlank()
+                ? caller.email()
+                : (caller.userId() != null ? "ID#" + caller.userId() : "SYSTEM");
+        billet.setValidePar(validator);
+
+        Billet saved = billetRepository.save(billet);
+        BilletDto dto = billetMapper.toDto(saved);
+
+        return ValidationBilletResponse.builder()
+                .valide(true)
+                .message("Accès autorisé. Billet validé avec succès pour " + (dto.getNomBeneficiaire() != null ? dto.getNomBeneficiaire() : "le visiteur") + ".")
+                .billet(dto)
+                .build();
+    }
+
+    private void genererBilletsPourReservation(Reservation reservation) {
+        if (billetRepository == null || reservation == null || reservation.getStatut() != StatutReservation.CONFIRMEE) {
+            return;
+        }
+        int places = reservation.getNombrePlaces() > 0 ? reservation.getNombrePlaces() : 1;
+        List<Billet> existing = billetRepository.findByReservationIdOrderByNumeroBilletAsc(reservation.getId());
+        if (!existing.isEmpty()) {
+            return;
+        }
+        List<ReservationParticipant> parts = reservation.getParticipants();
+        LocalDateTime now = LocalDateTime.now(Reservation.CASAMANCE_ZONE);
+        for (int i = 1; i <= places; i++) {
+            String num = String.format("BIL-%s-%02d", reservation.getReferenceReservation(), i);
+            String beneficiaire;
+            if (parts != null && i <= parts.size() && parts.get(i - 1).getNomComplet() != null && !parts.get(i - 1).getNomComplet().isBlank()) {
+                beneficiaire = parts.get(i - 1).getNomComplet();
+            } else if (places > 1) {
+                beneficiaire = reservation.getNomClient() + " (Place " + i + ")";
+            } else {
+                beneficiaire = reservation.getNomClient();
+            }
+            String raw = reservation.getId() + ":" + i + ":" + num + ":" + UUID.randomUUID();
+            String tokenQr;
+            try {
+                MessageDigest md = MessageDigest.getInstance("SHA-256");
+                byte[] digest = md.digest(raw.getBytes(StandardCharsets.UTF_8));
+                tokenQr = HexFormat.of().formatHex(digest);
+            } catch (Exception ex) {
+                tokenQr = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "");
+            }
+            Billet billet = Billet.builder()
+                    .reservation(reservation)
+                    .numeroBillet(num)
+                    .tokenQr(tokenQr)
+                    .nomBeneficiaire(beneficiaire)
+                    .statut(StatutBillet.VALIDE)
+                    .createdAt(now)
+                    .build();
+            billetRepository.save(billet);
+        }
     }
 
     private record PrestationValidation(

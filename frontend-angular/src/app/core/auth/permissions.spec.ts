@@ -35,8 +35,8 @@ describe('PermissionService & RBAC Matrix (P07)', () => {
     service = TestBed.inject(PermissionService);
   });
 
-  it('grants all 47 administrative permissions to ADMINISTRATEUR (excluding guide self-profile)', () => {
-    expect(ROLE_PERMISSIONS.ADMINISTRATEUR).toHaveLength(47);
+  it('grants all 48 administrative permissions to ADMINISTRATEUR (excluding guide self-profile)', () => {
+    expect(ROLE_PERMISSIONS.ADMINISTRATEUR).toHaveLength(48);
     expect(ROLE_PERMISSIONS.GUIDE).toContain('GUIDE:GERER_PROPRE_PROFIL');
     expect(ROLE_PERMISSIONS.ADMINISTRATEUR).not.toContain('GUIDE:GERER_PROPRE_PROFIL');
     userSig.set(fakeUser('ADMINISTRATEUR'));
@@ -45,16 +45,18 @@ describe('PermissionService & RBAC Matrix (P07)', () => {
     expect(service.has('UTILISATEUR:GERER_ROLES')).toBe(true);
     expect(service.has('AUDIT:LIRE')).toBe(true);
     expect(service.has('NOTIFICATION:RELANCER')).toBe(true);
+    expect(service.has('VISITE:VALIDER')).toBe(true);
   });
 
-  it('isolates CONSERVATEUR strictly to heritage catalog and blocks reservations/payments/moderation/users', () => {
+  it('isolates CONSERVATEUR to heritage catalog, guide validation and access control, while blocking reservations/payments/moderation/users', () => {
     userSig.set(fakeUser('CONSERVATEUR'));
     expect(service.canAccessBackOffice()).toBe(true);
     expect(service.has('PATRIMOINE:CREER')).toBe(true);
     expect(service.has('PATRIMOINE:PUBLIER')).toBe(true);
     expect(service.has('CIRCUIT:CREER')).toBe(false);
     expect(service.has('EVENEMENT:CREER')).toBe(false);
-    expect(service.has('GUIDE:VALIDER')).toBe(false);
+    expect(service.has('GUIDE:VALIDER')).toBe(true);
+    expect(service.has('VISITE:VALIDER')).toBe(true);
     expect(service.has('RESERVATION:LIRE_TOUT')).toBe(false);
     expect(service.has('PAIEMENT:LIRE_TOUT')).toBe(false);
     expect(service.has('AVIS:MODERER')).toBe(false);

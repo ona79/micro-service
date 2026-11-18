@@ -25,6 +25,7 @@ import {
 import { firstValueFrom } from 'rxjs';
 import { toast } from 'ngx-sonner';
 import { extractErrorMessage } from '../../../../core/models/api-error.model';
+import { Billet } from '../../../../core/models/billet.model';
 import {
   Paiement,
   formatModePaiementLabel,
@@ -44,9 +45,11 @@ import {
 import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confirm-dialog/ui-confirm-dialog.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
 import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skeleton-grid/ui-skeleton-grid.component';
+import { UiTicketViewComponent } from '../../../../shared/components/ui-ticket-view/ui-ticket-view.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
 import { PaiementApiService } from '../../../paiements/data-access/paiement-api.service';
+import { BilletApiService } from '../../data-access/billet-api.service';
 import { ReservationApiService } from '../../data-access/reservation-api.service';
 
 @Component({
@@ -60,6 +63,7 @@ import { ReservationApiService } from '../../data-access/reservation-api.service
     UiBreadcrumbComponent,
     UiSkeletonGridComponent,
     UiErrorBannerComponent,
+    UiTicketViewComponent,
     LucideArrowLeft,
     LucideArrowRight,
     LucideCalendar,
@@ -154,6 +158,15 @@ import { ReservationApiService } from '../../data-access/reservation-api.service
 
           @if (actionError()) {
             <app-ui-error-banner [message]="actionError()!" />
+          }
+
+          @if (res.statut === 'CONFIRMEE') {
+            <section class="tickets-wrapper">
+              <app-ui-ticket-view
+                [billets]="billets()"
+                [loading]="billetsLoading()"
+              />
+            </section>
           }
 
           <div class="detail-grid">
@@ -372,6 +385,9 @@ import { ReservationApiService } from '../../data-access/reservation-api.service
       color: var(--status-error-ink);
       border: 1px solid var(--status-error-border);
     }
+    .tickets-wrapper {
+      margin-bottom: 1.5rem;
+    }
     .detail-grid {
       display: grid;
       grid-template-columns: 1.45fr 1fr;
@@ -505,11 +521,14 @@ export class ReservationDetailPageComponent {
 
   private readonly reservationApi = inject(ReservationApiService);
   private readonly paiementApi = inject(PaiementApiService);
+  private readonly billetApi = inject(BilletApiService);
   private readonly dialog = inject(Dialog);
   private readonly seo = inject(SeoService);
 
   protected readonly reservation = signal<Reservation | null>(null);
   protected readonly paiements = signal<Paiement[]>([]);
+  protected readonly billets = signal<Billet[]>([]);
+  protected readonly billetsLoading = signal<boolean>(false);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly actionError = signal<string | null>(null);
@@ -597,6 +616,11 @@ export class ReservationDetailPageComponent {
       this.reservation.set(updated);
       const pays = await firstValueFrom(this.paiementApi.getByReservation(r.id)).catch(() => []);
       this.paiements.set(pays ?? []);
+      if (updated.statut === 'CONFIRMEE') {
+        void this.loadBillets(updated.id);
+      } else {
+        this.billets.set([]);
+      }
       toast.success('Statut synchronisé avec le service de paiement.');
     } catch (err) {
       this.actionError.set(extractErrorMessage(err));
@@ -646,6 +670,11 @@ export class ReservationDetailPageComponent {
       if (seq !== this.loadSeq) return;
       this.reservation.set(detail);
       this.paiements.set(pays ?? []);
+      if (detail.statut === 'CONFIRMEE') {
+        void this.loadBillets(detail.id);
+      } else {
+        this.billets.set([]);
+      }
       this.seo.update({
         title: `Réservation ${detail.referenceReservation || '#' + detail.id}`,
         description: `Suivi détaillé de la réservation ${detail.referenceReservation || '#' + detail.id}.`,
@@ -659,6 +688,18 @@ export class ReservationDetailPageComponent {
       if (seq === this.loadSeq) {
         this.loading.set(false);
       }
+    }
+  }
+
+  private async loadBillets(resId: number | string): Promise<void> {
+    this.billetsLoading.set(true);
+    try {
+      const list = await firstValueFrom(this.billetApi.getBillets(resId));
+      this.billets.set(list ?? []);
+    } catch {
+      this.billets.set([]);
+    } finally {
+      this.billetsLoading.set(false);
     }
   }
 }
