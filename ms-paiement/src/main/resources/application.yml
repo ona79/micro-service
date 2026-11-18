@@ -33,6 +33,9 @@ reservation:
 notification:
   url: ${NOTIFICATION_URL:http://localhost:3007}
 
+paiement:
+  expiration-minutes: ${PAIEMENT_EXPIRATION_MINUTES:15}
+
 eureka:
   client:
     service-url:

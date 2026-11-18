@@ -108,9 +108,9 @@ public class MicroserviceSecurityFilter extends OncePerRequestFilter {
 
         try {
             if (serviceSignature != null && !serviceSignature.isBlank()) {
-                // Matrice ACL : aucun microservice interne n'est autorisé à appeler ms-paiement
-                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
-                        "Appel interservice non autorisé par la matrice ACL vers " + SERVICE_NAME + ".");
+                if (validateInterserviceCall(cachedRequest, response, serviceSignature)) {
+                    filterChain.doFilter(cachedRequest, response);
+                }
                 return;
             }
 
@@ -195,6 +195,84 @@ public class MicroserviceSecurityFilter extends OncePerRequestFilter {
 
         SecurityUserContextHolder.setContext(new SecurityUserContext(parsedUserId, roleForSig, permissions, emailForSig, false, null));
         return true;
+    }
+
+    private boolean validateInterserviceCall(CachedBodyHttpServletRequest request,
+                                             HttpServletResponse response,
+                                             String serviceSignature) throws IOException {
+        String callerService = request.getHeader("X-Service-Name");
+        String audience = request.getHeader("X-Service-Audience");
+        String timestampStr = request.getHeader("X-Service-Timestamp");
+        String nonce = request.getHeader("X-Service-Nonce");
+        String headerBodySha256 = request.getHeader("X-Content-SHA256");
+
+        if (callerService == null || audience == null || timestampStr == null || nonce == null || headerBodySha256 == null) {
+            writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED, "En-têtes d'authentification interservice incomplets.");
+            return false;
+        }
+        if (!SERVICE_NAME.equals(audience.trim())) {
+            writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                    "Audience interservice invalide : attendu '" + SERVICE_NAME + "', reçu '" + audience + "'.");
+            return false;
+        }
+
+        String upperMethod = request.getMethod() != null ? request.getMethod().toUpperCase(Locale.ROOT) : "GET";
+        String normalizedPath = normalizePath(request.getRequestURI());
+
+        if (!isCallerServiceAuthorized(callerService.trim(), upperMethod, normalizedPath)) {
+            writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                    "Appel interservice non autorisé par la matrice ACL vers " + SERVICE_NAME + ".");
+            return false;
+        }
+
+        long serviceTs;
+        try {
+            serviceTs = Long.parseLong(timestampStr.trim());
+        } catch (NumberFormatException ex) {
+            writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED, "Horodatage interservice invalide.");
+            return false;
+        }
+        long now = Instant.now().getEpochSecond();
+        if (Math.abs(now - serviceTs) > FEIGN_TOLERANCE_SECONDS) {
+            writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED, "Appel interservice expiré.");
+            return false;
+        }
+
+        String actualBodySha256 = sha256Hex(request.getCachedBody());
+        if (!MessageDigest.isEqual(headerBodySha256.trim().toLowerCase(Locale.ROOT).getBytes(StandardCharsets.UTF_8),
+                actualBodySha256.getBytes(StandardCharsets.UTF_8))) {
+            writeJsonError(response, HttpServletResponse.SC_FORBIDDEN, "Intégrité du corps interservice compromise.");
+            return false;
+        }
+
+        String userIdForSig = defaultIfBlank(request.getHeader("X-User-Id"), "SYSTEM");
+        String roleForSig = defaultIfBlank(request.getHeader("X-User-Roles"), "SYSTEM");
+        String permsForSig = defaultIfNull(request.getHeader("X-User-Permissions"));
+        String emailForSig = defaultIfNull(request.getHeader("X-User-Email"));
+
+        String canonicalString = upperMethod + "|" + normalizedPath + "|" + SERVICE_NAME + "|" + callerService.trim() + "|"
+                + serviceTs + "|" + nonce.trim() + "|" + userIdForSig + "|" + roleForSig + "|"
+                + permsForSig + "|" + emailForSig + "|" + actualBodySha256;
+        String expectedSignature = signHmac(canonicalString, interserviceSecret);
+
+        if (!MessageDigest.isEqual(serviceSignature.trim().getBytes(StandardCharsets.UTF_8), expectedSignature.getBytes(StandardCharsets.UTF_8))) {
+            writeJsonError(response, HttpServletResponse.SC_FORBIDDEN, "Signature interservice invalide.");
+            return false;
+        }
+        if (seenNonces.putIfAbsent("SVC:" + callerService.trim() + ":" + nonce.trim(), now) != null) {
+            writeJsonError(response, HttpServletResponse.SC_FORBIDDEN, "Attaque par rejeu interservice détectée.");
+            return false;
+        }
+
+        SecurityUserContextHolder.setContext(new SecurityUserContext(
+                parseUserId(userIdForSig), roleForSig, parsePermissions(permsForSig, roleForSig), emailForSig, true, callerService.trim()));
+        return true;
+    }
+
+    private boolean isCallerServiceAuthorized(String callerService, String method, String normalizedPath) {
+        return "ms-reservation".equals(callerService)
+                && "GET".equalsIgnoreCase(method)
+                && normalizedPath.startsWith("/api/paiements/internal/reservation/");
     }
 
     private Long parseUserId(String userIdStr) {

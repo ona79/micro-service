@@ -1,8 +1,11 @@
 package com.uasz.ms_paiement.entities;
 
 public enum StatutPaiement {
-    REUSSI,
-    ECHEC,
+    INITIE,
+    EN_COURS,
+    ACCEPTE,
+    REFUSE,
+    EXPIRE,
+    ANNULE,
     REMBOURSE
 }
-
