@@ -28,7 +28,7 @@ La charte issue du Lot 1 a été déployée avec rigueur à travers les variable
 - **Mangrove & Forêt sacrée (`#153D30` & `#28634B`) :** piliers de navigation, en-têtes et cartes héroïques.
 - **Latérite & Ocre (`#C36B45` & `#D6A85D`) :** accents identitaires, badges de catégorie, points d'intérêt patrimoniaux et boutons d'appel à l'action.
 - **Lin & Sable (`#F5F0E5` & `#EFECE6`) :** fonds texturés et zones d'information apaisantes.
-- **Typographies :** Playfair Display pour les titres éditoriaux, Plus Jakarta Sans pour le contenu informatif et les métadonnées.
+- **Typographies :** Fraunces (Lot 1) pour les titres éditoriaux et identitaires, Plus Jakarta Sans pour le contenu informatif et les métadonnées.
 
 ---
 

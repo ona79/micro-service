@@ -23,7 +23,6 @@ import { AvisResume } from '../../../../core/models/avis.model';
 import { Evenement, TypeEvenement } from '../../../../core/models/evenement.model';
 import { Patrimoine, ZoneCasamance } from '../../../../core/models/patrimoine.model';
 import { SeoService } from '../../../../core/services/seo.service';
-import { UiCardComponent } from '../../../../shared/components/ui-card/ui-card.component';
 import { UiLoadingStateComponent } from '../../../../shared/components/ui-loading-state/ui-loading-state.component';
 import { UiPaginationComponent } from '../../../../shared/components/ui-pagination/ui-pagination.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
@@ -51,7 +50,6 @@ import { EvenementApiService } from '../../data-access/evenement-api.service';
     LucideUsers,
     LucideArrowRight,
     LucideTicket,
-    UiCardComponent,
     UiLoadingStateComponent,
     UiPaginationComponent,
     UiPatrimoineImageComponent,

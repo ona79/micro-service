@@ -92,11 +92,36 @@ Toutes les subtilités, écarts de contrat historiques ou contraintes de donnée
 
 ---
 
+### 2.6. Anomalie Feign Inter-Services & Anti-Rejeu Gateway (`PUB-005`)
+
+- **Problématique observée :**  
+  L'appel direct `GET /api/circuits/:id` déclenchait une erreur HTTP 403 : `Attaque par rejeu détectée sur l'enveloppe Gateway.`  
+  *Cause racine backend :* `ms-circuit` appelle `PatrimoineClient` configuré par défaut sur `${patrimoine.url:http://localhost:3001}`. En conteneur Docker, `localhost:3001` échoue (`Connection refused`), provoquant une exception 503. Le client Apache HttpClient de l'API Gateway réémet automatiquement la requête après 1 seconde avec le même nonce/jeton d'enveloppe interne. Le filtre de sécurité de `ms-circuit` détecte légitimement le rejeu du nonce et renvoie HTTP 403.  
+- **Compensation Frontend résiliente :**  
+  Dans `CircuitStore.loadById(id)`, le frontend tente d'abord l'appel direct `GET /api/circuits/:id`. En cas d'échec (403 ou 503), il se replie automatiquement et de manière transparente sur `ensureLoaded()` (`GET /api/circuits`), qui renvoie la liste complète des circuits et leurs étapes associées. La fiche détaillée s'affiche ainsi immédiatement avec son itinéraire et ses étapes ordonnées, sans dégrader l'expérience utilisateur et sans toucher au backend Java.
+
+---
+
+### 2.7. Limitation Typage PostgreSQL JDBC sur `sumPlacesByCircuitIdAndDateAndStatutIn`
+
+- **Problématique observée :**  
+  Lors de l'annulation d'une réservation de circuit créée sans date de prestation (`date_prestation IS NULL`), la méthode JPA `ReservationRepository.sumPlacesByCircuitIdAndDateAndStatutIn` génère la requête SQL :  
+  `WHERE (:datePrestation IS NULL OR r.date_prestation = :datePrestation)`  
+  PostgreSQL échoue avec : `org.postgresql.util.PSQLException: ERROR: could not determine data type of parameter $4`.  
+- **Prise en charge Frontend & Ticket :**  
+  - Le frontend valide systématiquement la présence d'une date de prestation pour les réservations de circuit.
+  - L'annulation des réservations d'événements et des circuits avec date valide s'exécute avec succès (HTTP 200).
+  - Un ticket correctif backend officiel est émis dans `P07_8_LOT2_1_STABILISATION.md`.
+
+---
+
 ## 3. Synthèse
 
 | Composant | Limitation / Spécificité | Compensation Frontend Lot 2 |
 |---|---|---|
 | `GuideDetailPageComponent` | Discordance ID Guide vs Utilisateur | Repli transparent `getById()` -> `getByUtilisateurId()` |
+| `CircuitStore` (`PUB-005`) | Feign `localhost:3001` + Retry Gateway rejouant le nonce (403) | Repli résilient automatique sur `ensureLoaded()` (`GET /api/circuits`) |
+| `EvenementsListPageComponent` (`PUB-006`) | Imbrication `UiCard` rompant la grille 3 colonnes CSS | Structure native 3 colonnes pleine largeur (96px, 240px, 1fr) |
 | `PaiementCheckoutPageComponent` | Pas de banque marchande réelle | Simulation monétique pédagogique Wave / Orange Money P04 |
 | `ReserverPageComponent` | Offres commémoratives à 0 FCFA | Confirmation directe & génération des e-billets |
 | `AccountPageComponent` | Billets dispersés | Onglet centralisé « Mes Billets QR » & héro Prochaine Visite |

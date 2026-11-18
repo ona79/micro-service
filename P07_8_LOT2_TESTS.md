@@ -53,7 +53,8 @@ L'ensemble des composants refondus pour le Lot 2 a fait l'objet d'une validation
   - Ordonnancement chronologique strict des étapes du circuit (étape 1 avant étape 2).
   - Résolution des patrimoines traversés et calcul des durées/distances cumulées.
   - Intégration des avis vérifiés et tarification dynamique en FCFA.
-- **Résultat :** 1/1 test passé.
+  - **Résilience Gateway/Feign (Lot 2.1) :** repli automatique sur le catalogue `ensureLoaded()` (`GET /api/circuits`) lorsque l'appel direct `GET /api/circuits/:id` est bloqué par l'anomalie backend Feign/anti-rejeu HTTP 403.
+- **Résultat :** 2/2 tests passés.
 
 ### PUB-006 & PUB-007 — Agenda Événements Culturels (`/evenements` & `/evenements/:id`)
 - **Fichier de spec :** `evenements-list-page.component.spec.ts`
@@ -62,6 +63,7 @@ L'ensemble des composants refondus pour le Lot 2 a fait l'objet d'une validation
   - Filtrage réactif par badges thématiques (Festival, Cérémonie, Exposition...).
   - Vérification de disponibilité des places en temps réel.
   - Rendu des événements associés et gestion des événements complets ou annulés.
+  - **Correction Layout 3 colonnes (Lot 2.1 - PUB-006) :** suppression de l'imbrication `<app-ui-card>` rompant la grille CSS, rétablissement de la structure native 3 colonnes (`.agenda-date-stamp` 96px, `.agenda-row__media` 240px, `.agenda-row__body` 1fr) couvrant 100% de la largeur du conteneur sans vide.
 - **Résultat :** 1/1 test passé.
 
 ### PUB-008 & PUB-009 — Guides Certifiés de Casamance (`/guides` & `/guides/:id`)
@@ -115,3 +117,38 @@ L'ensemble des composants refondus pour le Lot 2 a fait l'objet d'une validation
 | **TOUR-002** | `/reserver` | Touriste | **VALIDE** | Étapes de réservation, 0 FCFA direct |
 | **TOUR-003** | `/paiement/:id` | Touriste | **VALIDE** | Simulation Wave / OM P04 |
 | **TOUR-004** | `/reservations/:id` | Touriste | **VALIDE** | Billetterie QR participants, export PDF |
+
+---
+
+## 4. Validation des Parcours Métier E2E Playwright (Lot 2.1)
+
+Une suite de tests end-to-end automatisée (`scripts/e2e-tourist-flow.js`) a été développée et exécutée via Playwright sur Chromium sous de vraies sessions utilisateur :
+
+1. **Authentification Touriste réelle (AUTH-001) :**
+   - Remplissage automatique via quick-pill `moussa.diop@zig.univ.sn`.
+   - Clic sur `.auth-submit-btn` et réception de la réponse HTTP 200 avec cookie de session HttpOnly `PATRIMOINE_SESSION`.
+   - **Résultat : SUCCÈS**.
+
+2. **Parcours A — Visite Gratuite 0 FCFA (TOUR-002) :**
+   - Réservation de l'événement en accès libre `#4` (Visite Pédagogique et Découverte Mémorielle).
+   - Confirmation serveur immédiate (`statut: "CONFIRMEE"`, `montantTotal: 0.00 FCFA`, `referencePaiement: "GRATUIT-..."`).
+   - Émission immédiate des billets QR individuels associés au statut `VALIDE`.
+   - **Résultat : SUCCÈS**.
+
+3. **Parcours B — Visite Payante et Paiement Simulé Wave / OM (TOUR-002, TOUR-003) :**
+   - Réservation d'une prestation payante (5 000 FCFA), statut initial `EN_ATTENTE_PAIEMENT`.
+   - Tunnel `/paiements/:id`, sélection du portefeuille Wave et initiation (`PAY-SIM-WAV-...`).
+   - Simulateur P04 : déclenchement de la décision « Simuler acceptation ».
+   - Synchronisation temps réel de la réservation vers `CONFIRMEE` et génération des billets QR.
+   - **Résultat : SUCCÈS**.
+
+4. **Parcours C — Annulation de Réservation et Invalidation QR (TOUR-001, TOUR-004) :**
+   - Clic sur « Annuler » depuis la réservation confirmée, modal `UiConfirmDialogComponent`.
+   - Transition serveur `PUT /api/reservations/:id/annuler` vers `ANNULEE` (HTTP 200).
+   - Invalidation automatique des billets QR associés (transition vers `statut: "ANNULE"`).
+   - **Résultat : SUCCÈS**.
+
+5. **Contrôle d'Isolation BOLA (Broken Object Level Authorization) :**
+   - Tentative d'accès par le touriste connecté à la réservation d'un autre utilisateur (`/reservations/2`).
+   - Rejet immédiat par l'API (HTTP 403 Forbidden : *"vous ne pouvez pas consulter la réservation d'un autre utilisateur"*) et affichage de la bannière de refus `UiErrorBannerComponent`.
+   - **Résultat : SUCCÈS**.

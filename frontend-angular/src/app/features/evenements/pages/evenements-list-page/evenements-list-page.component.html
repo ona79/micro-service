@@ -129,103 +129,102 @@
         @for (ev of publishedEvents(); track ev.id) {
           @let patLie = resolvePatrimoine(ev);
           @let sobre = isMemorialEvent(ev);
-          <app-ui-card [interactive]="true" class="agenda-row" [class.agenda-row--memorial]="sobre">
-            <div slot="media">
-              <div class="agenda-row__media-wrap">
-                <div class="agenda-row__date">
-                  <span class="date-day tabular-nums">{{ ev.dateDebut | dateFr: 'dd' }}</span>
-                  <span class="date-month">{{ ev.dateDebut | dateFr: 'MMM yyyy' }}</span>
-                </div>
-                <a [routerLink]="['/evenements', ev.id]" class="agenda-row__media">
-                  <app-ui-patrimoine-image
-                    [codePatrimoine]="patLie?.codePatrimoine"
-                    [nomPatrimoine]="patLie?.nomPatrimoine ?? ev.nomEvenement"
-                    [imageUrl]="ev.imageUrl || patLie?.imageUrl"
-                    [sobriete]="sobre"
-                  />
-                </a>
-              </div>
+          <article class="agenda-row" [class.agenda-row--memorial]="sobre">
+            <div class="agenda-date-stamp">
+              <span class="agenda-date-stamp__day tabular-nums">{{ ev.dateDebut | dateFr: 'dd' }}</span>
+              <span class="agenda-date-stamp__month">{{ ev.dateDebut | dateFr: 'MMM yyyy' }}</span>
             </div>
 
-            <div slot="header" class="agenda-row__top">
-              <div class="agenda-row__badges">
-                <span
-                  class="ui-badge"
-                  [class.ui-badge--memorial]="sobre"
-                  [class.ui-badge--terracotta]="!sobre"
-                >
-                  {{ ev.typeEvenement | evenementType }}
-                </span>
-                @if (patLie) {
-                  <span class="ui-badge">{{ patLie.nomPatrimoine }}</span>
-                }
-                @if (ev.statutEvenement === 'ANNULE') {
-                  <span class="ui-badge ui-badge--danger">ANNULÉ</span>
-                } @else if (ev.statutEvenement === 'TERMINE') {
-                  <span class="ui-badge">TERMINÉ</span>
-                } @else if (!isReservable(ev)) {
-                  <span class="ui-badge ui-badge--neutral">Accès sans réservation en ligne</span>
-                }
-                @if (getResume(ev.id); as res) {
-                  @if (res.totalAvis > 0) {
-                    <span class="ui-badge ui-badge--ochre tabular-nums">
-                      <svg lucideStar [size]="12" aria-hidden="true"></svg>
-                      {{ res.noteMoyenne }}/5 ({{ res.totalAvis }})
-                    </span>
-                  }
-                }
-              </div>
-              <span class="agenda-row__price tabular-nums">{{ ev.prix | fcfaPrice }}</span>
-            </div>
+            <a [routerLink]="['/evenements', ev.id]" class="agenda-row__media">
+              <app-ui-patrimoine-image
+                [codePatrimoine]="patLie?.codePatrimoine"
+                [nomPatrimoine]="patLie?.nomPatrimoine ?? ev.nomEvenement"
+                [imageUrl]="ev.imageUrl || patLie?.imageUrl"
+                [sobriete]="sobre"
+              />
+            </a>
 
-            <h2 class="agenda-row__title">
-              <a [routerLink]="['/evenements', ev.id]">{{ ev.nomEvenement }}</a>
-            </h2>
-
-            <p class="agenda-row__desc">
-              {{
-                ev.descriptionEvenement ||
-                  'Consultez la fiche de cet événement pour connaître les modalités de participation.'
-              }}
-            </p>
-
-            <div slot="footer" class="agenda-row__footer">
-              <div class="agenda-row__meta">
-                <span>
-                  <svg lucideCalendar [size]="14" aria-hidden="true"></svg>
-                  {{ ev.dateDebut | dateFr }} (Africa/Dakar)
-                </span>
-                <span>
-                  <svg lucideMapPin [size]="14" aria-hidden="true"></svg>
-                  {{ ev.lieu || patLie?.adressePatrimoine || 'Casamance' }}
-                </span>
-                <span class="tabular-nums">
-                  <svg lucideUsers [size]="14" aria-hidden="true"></svg>
-                  {{ ev.capaciteMax }} places
-                </span>
-              </div>
-
-              <div class="agenda-row__actions">
-                <a
-                  [routerLink]="['/evenements', ev.id]"
-                  class="agenda-btn agenda-btn--secondary"
-                >
-                  <span>Détails</span>
-                  <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
-                </a>
-                @if (isReservable(ev)) {
-                  <a
-                    routerLink="/reserver"
-                    [queryParams]="{ type: 'EVENEMENT', evenementId: ev.id }"
-                    class="agenda-btn agenda-btn--primary"
+            <div class="agenda-row__body">
+              <div class="agenda-row__top">
+                <div class="agenda-row__badges">
+                  <span
+                    class="ui-badge"
+                    [class.ui-badge--memorial]="sobre"
+                    [class.ui-badge--terracotta]="!sobre"
                   >
-                    <svg lucideTicket [size]="14" aria-hidden="true"></svg>
-                    <span>Réserver</span>
+                    {{ ev.typeEvenement | evenementType }}
+                  </span>
+                  @if (patLie) {
+                    <span class="ui-badge">{{ patLie.nomPatrimoine }}</span>
+                  }
+                  @if (ev.statutEvenement === 'ANNULE') {
+                    <span class="ui-badge ui-badge--danger">ANNULÉ</span>
+                  } @else if (ev.statutEvenement === 'TERMINE') {
+                    <span class="ui-badge">TERMINÉ</span>
+                  } @else if (!isReservable(ev)) {
+                    <span class="ui-badge ui-badge--neutral">Accès sans réservation en ligne</span>
+                  }
+                  @if (getResume(ev.id); as res) {
+                    @if (res.totalAvis > 0) {
+                      <span class="ui-badge ui-badge--ochre tabular-nums">
+                        <svg lucideStar [size]="12" aria-hidden="true"></svg>
+                        {{ res.noteMoyenne }}/5 ({{ res.totalAvis }})
+                      </span>
+                    }
+                  }
+                </div>
+                <span class="agenda-row__price tabular-nums">{{ ev.prix | fcfaPrice }}</span>
+              </div>
+
+              <h2 class="agenda-row__title">
+                <a [routerLink]="['/evenements', ev.id]">{{ ev.nomEvenement }}</a>
+              </h2>
+
+              <p class="agenda-row__desc">
+                {{
+                  ev.descriptionEvenement ||
+                    'Consultez la fiche de cet événement pour connaître les modalités de participation.'
+                }}
+              </p>
+
+              <div class="agenda-row__footer">
+                <div class="agenda-row__meta">
+                  <span>
+                    <svg lucideCalendar [size]="14" aria-hidden="true"></svg>
+                    {{ ev.dateDebut | dateFr }} (Africa/Dakar)
+                  </span>
+                  <span>
+                    <svg lucideMapPin [size]="14" aria-hidden="true"></svg>
+                    {{ ev.lieu || patLie?.adressePatrimoine || 'Casamance' }}
+                  </span>
+                  <span class="tabular-nums">
+                    <svg lucideUsers [size]="14" aria-hidden="true"></svg>
+                    {{ ev.capaciteMax }} places
+                  </span>
+                </div>
+
+                <div class="agenda-row__actions">
+                  <a
+                    [routerLink]="['/evenements', ev.id]"
+                    class="agenda-btn agenda-btn--secondary"
+                  >
+                    <span>Détails</span>
+                    <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
                   </a>
-                }
+                  @if (isReservable(ev)) {
+                    <a
+                      routerLink="/reserver"
+                      [queryParams]="{ type: 'EVENEMENT', evenementId: ev.id }"
+                      class="agenda-btn agenda-btn--primary"
+                    >
+                      <svg lucideTicket [size]="14" aria-hidden="true"></svg>
+                      <span>Réserver</span>
+                    </a>
+                  }
+                </div>
               </div>
             </div>
-          </app-ui-card>
+          </article>
         }
       </div>
 

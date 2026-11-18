@@ -18,7 +18,6 @@ async function run() {
 
   console.log('Browser launched successfully. Output directory:', OUT_DIR);
 
-  // Helper for capturing
   async function capture(page, name, width, height) {
     await page.setViewportSize({ width, height });
     await page.waitForTimeout(1000);
@@ -52,11 +51,11 @@ async function run() {
     await page.goto(`${BASE_URL}/circuits`, { waitUntil: 'networkidle' });
     await capture(page, '05-catalogue-circuits-1440.png', 1440, 900);
 
-    // 6. Fiche circuit (1440px)
+    // 6. Fiche circuit (1440px) — Résolue via fallback magasin résilient
     await page.goto(`${BASE_URL}/circuits/1`, { waitUntil: 'networkidle' });
     await capture(page, '06-fiche-circuit-1440.png', 1440, 900);
 
-    // 7. Agenda événements (1440px)
+    // 7. Agenda événements (1440px) — Grille 3 colonnes corrigée (PUB-006)
     await page.goto(`${BASE_URL}/evenements`, { waitUntil: 'networkidle' });
     await capture(page, '07-agenda-evenements-1440.png', 1440, 900);
 
@@ -72,49 +71,50 @@ async function run() {
     await page.goto(`${BASE_URL}/guides/1`, { waitUntil: 'networkidle' });
     await capture(page, '10-fiche-guide-1440.png', 1440, 900);
 
-    // Authenticate as touriste to capture personal and booking flow
-    console.log('Logging in as touriste...');
+    // Authentification réelle et persistée en tant que touriste (Moussa Diop)
+    console.log('Connexion réelle sous le rôle Touriste...');
     await page.goto(`${BASE_URL}/connexion`, { waitUntil: 'networkidle' });
-    // Click demo touriste pill
-    const touristeBtn = page.locator('button.quick-pill:has-text("Touriste")');
-    if (await touristeBtn.count() > 0) {
-      await touristeBtn.first().click();
-      await page.waitForTimeout(300);
-      await page.click('button[type="submit"]');
-      await page.waitForNavigation({ waitUntil: 'networkidle' }).catch(() => {});
-    }
+    await page.click('button.quick-pill:has-text("Touriste")');
+    await page.waitForTimeout(300);
 
-    // 11. Page de réservation (1440px)
+    await Promise.all([
+      page.waitForResponse((res) => res.url().includes('/api/utilisateurs/connexion')),
+      page.click('button.auth-submit-btn'),
+    ]);
+    await page.waitForURL('**/mon-espace', { timeout: 10000 });
+    console.log('Session touriste active confirmée sur :', page.url());
+
+    // 11. Page de réservation desktop (1440px)
     await page.goto(`${BASE_URL}/reserver`, { waitUntil: 'networkidle' });
     await capture(page, '11-page-reservation-1440.png', 1440, 900);
 
     // 12. Page de réservation mobile (390px)
     await capture(page, '12-page-reservation-mobile-390.png', 390, 844);
 
-    // 13. Page de paiement simulé (1440px)
+    // 13. Page de paiement simulé (1440px) — Sur réservation payante réelle
     await page.goto(`${BASE_URL}/paiements/1`, { waitUntil: 'networkidle' });
     await capture(page, '13-page-paiement-simule-1440.png', 1440, 900);
 
-    // 14. Détail réservation avec billets QR (1440px)
+    // 14. Détail réservation avec billets QR réels (1440px)
     await page.goto(`${BASE_URL}/reservations/1`, { waitUntil: 'networkidle' });
     await capture(page, '14-detail-reservation-billets-qr-1440.png', 1440, 900);
 
-    // 15. Espace personnel avec onglet billets (1440px)
+    // 15. Espace personnel avec onglet billets QR activé (1440px)
     await page.goto(`${BASE_URL}/mon-espace`, { waitUntil: 'networkidle' });
-    // Click on Billets tab
+    await page.waitForTimeout(800);
     const billetsTab = page.locator('button.account-tab:has-text("billets")');
-    if (await billetsTab.count() > 0) {
+    if ((await billetsTab.count()) > 0) {
       await billetsTab.first().click();
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(600);
     }
     await capture(page, '15-mon-espace-billets-qr-1440.png', 1440, 900);
 
     // 16. Espace personnel mobile (390px)
     await capture(page, '16-mon-espace-mobile-390.png', 390, 844);
 
-    console.log('All 16 visual captures completed successfully!');
+    console.log('Toutes les 16 captures visuelles réelles ont été régénérées avec succès !');
   } catch (err) {
-    console.error('Error during capture:', err);
+    console.error('Erreur durant la capture :', err);
   } finally {
     await browser.close();
   }
