@@ -556,6 +556,15 @@ public class CircuitService implements ICircuitService {
         if (circuit.getDifficulte() == null) {
             circuit.setDifficulte(Difficulte.FACILE);
         }
+        if (circuit.getDevise() == null || circuit.getDevise().isBlank()) {
+            circuit.setDevise("XOF");
+        } else {
+            String normalizedDevise = circuit.getDevise().trim().toUpperCase(Locale.ROOT);
+            if (!"XOF".equals(normalizedDevise)) {
+                throw new BadRequestException("Devise non supportée pour un circuit : " + circuit.getDevise() + " (seule la devise XOF / FCFA est autorisée).");
+            }
+            circuit.setDevise("XOF");
+        }
     }
 
     private Comparator<Circuit> buildComparator(String sortBy, String sortDir) {

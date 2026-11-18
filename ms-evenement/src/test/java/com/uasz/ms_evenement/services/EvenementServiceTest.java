@@ -305,4 +305,24 @@ class EvenementServiceTest {
         assertThatThrownBy(() -> evenementService.deleteEvenement(999L))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
+
+    @Test
+    void getEvenementsReservables_neRetourneQuePubliesExplicitementOuvertsEtFuturs() {
+        LocalDateTime futur = LocalDateTime.now(Evenement.CASAMANCE_ZONE).plusDays(7);
+        Evenement ouvert = Evenement.builder()
+                .id(1L).nomEvenement("Festival Réservable").typeEvenement(TypeEvenement.FESTIVAL)
+                .dateDebut(futur).dateFin(futur.plusDays(1)).capaciteMax(100)
+                .statutEvenement(StatutEvenement.PUBLIE).ouvertReservation(true).build();
+        Evenement ferme = Evenement.builder()
+                .id(2L).nomEvenement("Commémoration Non Réservable").typeEvenement(TypeEvenement.EXPOSITION)
+                .dateDebut(futur).dateFin(futur.plusDays(1)).capaciteMax(100)
+                .statutEvenement(StatutEvenement.PUBLIE).ouvertReservation(false).build();
+
+        when(evenementRepository.findAll()).thenReturn(List.of(ouvert, ferme));
+
+        List<EvenementDto> reservables = evenementService.getEvenementsReservables();
+        assertThat(reservables).hasSize(1);
+        assertThat(reservables.getFirst().getNomEvenement()).isEqualTo("Festival Réservable");
+        assertThat(reservables.getFirst().isOuvertReservation()).isTrue();
+    }
 }

@@ -16,6 +16,8 @@ public interface IEvenementService {
 
     List<EvenementDto> getEvenementsAVenir();
 
+    List<EvenementDto> getEvenementsReservables();
+
     PageResponseDto<EvenementDto> rechercherEvenements(
             String q,
             TypeEvenement type,

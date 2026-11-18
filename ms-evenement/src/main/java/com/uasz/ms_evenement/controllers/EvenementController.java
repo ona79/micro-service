@@ -46,6 +46,11 @@ public class EvenementController {
         return ResponseEntity.ok(evenementService.getEvenementsAVenir());
     }
 
+    @GetMapping("/reservables")
+    public ResponseEntity<List<EvenementDto>> getEvenementsReservables() {
+        return ResponseEntity.ok(evenementService.getEvenementsReservables());
+    }
+
     @GetMapping("/recherche")
     public ResponseEntity<PageResponseDto<EvenementDto>> rechercherEvenements(
             @RequestParam(required = false) String q,

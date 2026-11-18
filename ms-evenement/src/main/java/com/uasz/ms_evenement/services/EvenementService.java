@@ -136,6 +136,27 @@ public class EvenementService implements IEvenementService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<EvenementDto> getEvenementsReservables() {
+        LocalDateTime now = LocalDateTime.now(Evenement.CASAMANCE_ZONE);
+        List<Evenement> dbResults = evenementRepository
+                .findByStatutEvenementAndOuvertReservationTrueAndDateFinGreaterThanEqualOrderByDateDebutAsc(
+                        StatutEvenement.PUBLIE, now);
+        if (dbResults != null && !dbResults.isEmpty()) {
+            return dbResults.stream().map(evenementMapper::toDto).toList();
+        }
+        return evenementRepository.findAll().stream()
+                .filter(e -> e.getStatutEvenement() == StatutEvenement.PUBLIE
+                        && e.isOuvertReservation()
+                        && e.getDateFin() != null
+                        && !e.getDateFin().isBefore(now))
+                .sorted(Comparator.comparing(
+                        e -> e.getDateDebut() != null ? e.getDateDebut() : LocalDateTime.MAX))
+                .map(evenementMapper::toDto)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public PageResponseDto<EvenementDto> rechercherEvenements(
             String q,
             TypeEvenement type,
@@ -550,6 +571,15 @@ public class EvenementService implements IEvenementService {
         }
         if (evenement.getFuseauHoraire() == null || evenement.getFuseauHoraire().isBlank()) {
             evenement.setFuseauHoraire("Africa/Dakar");
+        }
+        if (evenement.getDevise() == null || evenement.getDevise().isBlank()) {
+            evenement.setDevise("XOF");
+        } else {
+            String normalizedDevise = evenement.getDevise().trim().toUpperCase(Locale.ROOT);
+            if (!"XOF".equals(normalizedDevise)) {
+                throw new BadRequestException("Devise non supportée pour un événement : " + evenement.getDevise() + " (seule la devise XOF / FCFA est autorisée).");
+            }
+            evenement.setDevise("XOF");
         }
     }
 

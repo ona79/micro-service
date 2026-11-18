@@ -20,4 +20,7 @@ public interface EvenementRepository extends JpaRepository<Evenement, Long>, Jpa
 
     List<Evenement> findByStatutEvenementAndDateFinGreaterThanEqualOrderByDateDebutAsc(
             StatutEvenement statutEvenement, LocalDateTime dateReference);
+
+    List<Evenement> findByStatutEvenementAndOuvertReservationTrueAndDateFinGreaterThanEqualOrderByDateDebutAsc(
+            StatutEvenement statutEvenement, LocalDateTime dateReference);
 }
