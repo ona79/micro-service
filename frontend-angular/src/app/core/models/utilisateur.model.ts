@@ -32,14 +32,4 @@ export interface InscriptionPayload {
 }
 
 export type { ModePaiement, Paiement, StatutPaiement } from './paiement.model';
-
-export interface NotificationItem {
-  id: number;
-  destinataire: string;
-  sujet: string;
-  contenu: string;
-  canal: 'EMAIL' | 'SMS' | 'PUSH';
-  statut: 'ENVOYEE' | 'ECHEC';
-  dateEnvoi: string;
-  reservationId: number | null;
-}
+export type { NotificationItem } from './notification.model';

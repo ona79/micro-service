@@ -1,7 +1,9 @@
-import { ChangeDetectionStrategy, Component, HostListener, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, HostListener, inject, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import {
+  LucideAward,
+  LucideBell,
   LucideCompass,
   LucideLogOut,
   LucideMenu,
@@ -14,6 +16,7 @@ import {
 import { toast } from 'ngx-sonner';
 import { AuthStore } from '../../auth/auth.store';
 import { APP_SITE_CONFIG } from '../../config/site.config';
+import { NotificationStore } from '../../../features/notifications/data-access/notification.store';
 
 interface NavItem {
   readonly to: string;
@@ -38,6 +41,8 @@ interface NavItem {
     LucideShieldCheck,
     LucideLogOut,
     LucideX,
+    LucideBell,
+    LucideAward,
   ],
   templateUrl: './main-layout.component.html',
   styleUrl: './main-layout.component.css',
@@ -45,6 +50,7 @@ interface NavItem {
 export class MainLayoutComponent {
   protected readonly config = inject(APP_SITE_CONFIG);
   protected readonly authStore = inject(AuthStore);
+  protected readonly notificationStore = inject(NotificationStore);
   private readonly router = inject(Router);
 
   protected readonly menuOpen = signal(false);
@@ -55,7 +61,21 @@ export class MainLayoutComponent {
     { to: '/patrimoines', label: 'Patrimoines', exact: false },
     { to: '/circuits', label: 'Circuits', exact: false },
     { to: '/evenements', label: 'Événements', exact: false },
+    { to: '/guides', label: 'Guides', exact: false },
   ];
+
+  constructor() {
+    effect(() => {
+      const user = this.authStore.user();
+      untracked(() => {
+        if (user) {
+          void this.notificationStore.refreshUnreadCount();
+        } else {
+          this.notificationStore.clear();
+        }
+      });
+    });
+  }
 
   @HostListener('document:keydown.escape')
   protected onEscapeKey(): void {

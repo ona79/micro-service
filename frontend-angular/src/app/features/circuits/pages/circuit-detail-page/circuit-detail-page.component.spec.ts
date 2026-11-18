@@ -83,6 +83,16 @@ describe('CircuitDetailPageComponent', () => {
     await new Promise((r) => setTimeout(r, 0));
     fixture.detectChanges();
 
+    httpMock
+      .expectOne('/api/avis/resume?cibleType=CIRCUIT&cibleId=1')
+      .flush({ cibleType: 'CIRCUIT', cibleId: 1, noteMoyenne: 4.5, totalAvis: 1, repartition: { 5: 1 } });
+    httpMock
+      .expectOne('/api/avis?cibleType=CIRCUIT&cibleId=1&page=0&size=6')
+      .flush({ content: [], page: 0, size: 6, totalElements: 0, totalPages: 0, last: true });
+
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+
     const titles = Array.from(
       fixture.nativeElement.querySelectorAll('.timeline-item__title') as NodeListOf<HTMLElement>
     ).map((el) => el.textContent?.trim());

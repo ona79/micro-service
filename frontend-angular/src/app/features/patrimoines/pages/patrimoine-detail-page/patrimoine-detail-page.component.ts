@@ -32,6 +32,7 @@ import {
 } from '../../../../shared/components/ui-heritage-map/ui-heritage-map.component';
 import { UiPatrimoineImageComponent } from '../../../../shared/components/ui-patrimoine-image/ui-patrimoine-image.component';
 import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skeleton-grid/ui-skeleton-grid.component';
+import { UiAvisSectionComponent } from '../../../../shared/components/ui-avis-section/ui-avis-section.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { DurationMinutesPipe } from '../../../../shared/pipes/duration-minutes.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
@@ -61,6 +62,7 @@ import { PatrimoineStore } from '../../data-access/patrimoine.store';
     UiHeritageMapComponent,
     UiSkeletonGridComponent,
     UiErrorBannerComponent,
+    UiAvisSectionComponent,
     DateFrPipe,
     DurationMinutesPipe,
     FcfaPricePipe,

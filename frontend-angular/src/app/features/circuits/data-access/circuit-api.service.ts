@@ -62,6 +62,14 @@ export class CircuitApiService {
     return this.http.get<Circuit>(`/circuits/${id}`);
   }
 
+  getMesCircuitsGuide(): Observable<Circuit[]> {
+    return this.http.get<Circuit[]>('/circuits/guide/mes-circuits');
+  }
+
+  affecterGuideResponsable(circuitId: number | string, guideResponsableId: number | null): Observable<Circuit> {
+    return this.http.patch<Circuit>(`/circuits/${circuitId}/guide`, { guideResponsableId });
+  }
+
   create(payload: Partial<Circuit>): Observable<Circuit> {
     return this.http.post<Circuit>('/circuits', payload);
   }
