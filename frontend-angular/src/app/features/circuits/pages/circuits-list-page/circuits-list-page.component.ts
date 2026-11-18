@@ -9,7 +9,7 @@ import {
   LucideTicket,
   LucideUsers,
 } from '@lucide/angular';
-import { Circuit, Difficulte } from '../../../../core/models/circuit.model';
+import { Circuit, Difficulte, MoyenTransport } from '../../../../core/models/circuit.model';
 import { Patrimoine } from '../../../../core/models/patrimoine.model';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
@@ -52,21 +52,29 @@ export class CircuitsListPageComponent implements OnInit {
 
   protected readonly search = signal('');
   protected readonly difficulte = signal<'' | Difficulte>('');
+  protected readonly moyenTransport = signal<'' | MoyenTransport>('');
   protected readonly dureeMax = signal('');
   protected readonly distanceMax = signal('');
 
   protected readonly filteredCircuits = computed(() => {
     const q = this.search().trim().toLowerCase();
     const diff = this.difficulte();
-    const maxDuree = this.dureeMax().trim() !== '' ? Number(this.dureeMax()) : null;
-    const maxDist = this.distanceMax().trim() !== '' ? Number(this.distanceMax()) : null;
+    const transport = this.moyenTransport();
+    const maxDureeRaw = String(this.dureeMax() ?? '').trim();
+    const maxDistRaw = String(this.distanceMax() ?? '').trim();
+    const maxDuree = maxDureeRaw !== '' ? Number(maxDureeRaw) : null;
+    const maxDist = maxDistRaw !== '' ? Number(maxDistRaw) : null;
 
     return this.store.items().filter((c) => {
+      if (c.statutCircuit && c.statutCircuit !== 'PUBLIE') return false;
       if (q) {
-        const text = `${c.nomCircuit ?? ''} ${c.descriptionCircuit ?? ''}`.toLowerCase();
+        const text = `${c.nomCircuit ?? ''} ${c.descriptionCircuit ?? ''} ${
+          c.presentationTouristique ?? ''
+        } ${c.pointDepart ?? ''} ${c.pointArrivee ?? ''}`.toLowerCase();
         if (!text.includes(q)) return false;
       }
       if (diff && c.difficulte !== diff) return false;
+      if (transport && c.moyenTransport !== transport) return false;
       if (maxDuree !== null && !Number.isNaN(maxDuree) && (c.dureeEstimee ?? 0) > maxDuree) {
         return false;
       }
@@ -85,6 +93,7 @@ export class CircuitsListPageComponent implements OnInit {
   protected resetFilters(): void {
     this.search.set('');
     this.difficulte.set('');
+    this.moyenTransport.set('');
     this.dureeMax.set('');
     this.distanceMax.set('');
   }

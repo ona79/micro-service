@@ -9,9 +9,14 @@ import org.mapstruct.Builder;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
+import org.mapstruct.NullValuePropertyMappingStrategy;
 
 // disableBuilder : MapStruct utilise les setters, ce qui permet d'exécuter @AfterMapping sur l'entité
-@Mapper(componentModel = "spring", builder = @Builder(disableBuilder = true))
+@Mapper(
+        componentModel = "spring",
+        builder = @Builder(disableBuilder = true),
+        nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE
+)
 public interface CircuitMapper {
 
     CircuitDto toDto(Circuit circuit);
@@ -27,6 +32,11 @@ public interface CircuitMapper {
     /** Met à jour les champs simples du circuit (les étapes sont gérées par le service) */
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "etapes", ignore = true)
+    @Mapping(target = "creeParId", ignore = true)
+    @Mapping(target = "valideParId", ignore = true)
+    @Mapping(target = "dateCreation", ignore = true)
+    @Mapping(target = "datePublication", ignore = true)
+    @Mapping(target = "dateArchivage", ignore = true)
     void updateEntity(CircuitDto dto, @MappingTarget Circuit circuit);
 
     /** Renseigne la relation inverse Etape -> Circuit après le mapping */
@@ -37,4 +47,3 @@ public interface CircuitMapper {
         }
     }
 }
-

@@ -12,7 +12,11 @@ import {
   LucideUsers,
 } from '@lucide/angular';
 import { map } from 'rxjs';
-import { Patrimoine } from '../../../../core/models/patrimoine.model';
+import {
+  CategoriePatrimoine,
+  Patrimoine,
+  ZoneCasamance,
+} from '../../../../core/models/patrimoine.model';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
 import {
@@ -24,8 +28,22 @@ import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skelet
 import { hasValidCoordinates, isLieuDeMemoire } from '../../../../shared/utils/patrimoine.utils';
 import { PatrimoineStore } from '../../data-access/patrimoine.store';
 
-type TriPatrimoine = 'nom_asc' | 'capacite_desc' | 'capacite_asc';
+type TriPatrimoine = 'nom_asc' | 'capacite_desc' | 'capacite_asc' | 'tarif_asc';
 type ViewMode = 'grid' | 'map';
+
+const CATEGORIE_LABELS: Record<CategoriePatrimoine, string> = {
+  NATUREL: 'Patrimoine naturel',
+  CULTUREL: 'Patrimoine culturel',
+  HISTORIQUE: 'Patrimoine historique',
+  ARCHITECTURAL: 'Patrimoine architectural',
+  IMMATERIEL: 'Patrimoine immatériel',
+};
+
+const ZONE_LABELS: Record<ZoneCasamance, string> = {
+  BASSE_CASAMANCE: 'Basse-Casamance (Ziguinchor / Oussouye / Bignona)',
+  MOYENNE_CASAMANCE: 'Moyenne-Casamance (Sédhiou)',
+  HAUTE_CASAMANCE: 'Haute-Casamance (Kolda / Vélingara)',
+};
 
 @Component({
   selector: 'app-patrimoines-list-page',
@@ -56,27 +74,43 @@ export class PatrimoinesListPageComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
 
-  // Synchronisation réactive unidirectionnelle avec ?q= (corrige le défaut React)
   protected readonly urlQuery = toSignal(
     this.route.queryParamMap.pipe(map((params) => params.get('q') ?? '')),
     { initialValue: '' }
   );
 
+  protected readonly categorie = signal<'' | CategoriePatrimoine>('');
+  protected readonly zone = signal<'' | ZoneCasamance>('');
   protected readonly capaciteMin = signal<string>('');
   protected readonly tri = signal<TriPatrimoine>('nom_asc');
   protected readonly viewMode = signal<ViewMode>('grid');
   protected readonly selectedMapPatrimoineId = signal<number | null>(null);
+  protected readonly currentPage = signal<number>(1);
+  protected readonly pageSize = 6;
 
   protected readonly filteredPatrimoines = computed(() => {
     const query = this.urlQuery().trim().toLowerCase();
-    const minCapRaw = this.capaciteMin().trim();
+    const cat = this.categorie();
+    const zn = this.zone();
+    const minCapRaw = String(this.capaciteMin() ?? '').trim();
     const minCap = minCapRaw !== '' ? Number(minCapRaw) : null;
 
     const filtered = this.store.items().filter((p) => {
+      if (p.statutPublication && p.statutPublication !== 'PUBLIE') {
+        return false;
+      }
+      if (cat && p.categoriePatrimoine !== cat) {
+        return false;
+      }
+      if (zn && p.zoneGeographique !== zn) {
+        return false;
+      }
       if (query) {
         const haystack = `${p.nomPatrimoine ?? ''} ${p.codePatrimoine ?? ''} ${
           p.adressePatrimoine ?? ''
-        } ${p.descriptionPatrimoine ?? ''}`.toLowerCase();
+        } ${p.localite ?? ''} ${p.descriptionPatrimoine ?? ''} ${
+          p.typePatrimoine ?? ''
+        }`.toLowerCase();
         if (!haystack.includes(query)) return false;
       }
       if (minCap !== null && !Number.isNaN(minCap)) {
@@ -93,8 +127,22 @@ export class PatrimoinesListPageComponent implements OnInit {
       if (sortMode === 'capacite_asc') {
         return (a.capacitePatrimoine ?? 0) - (b.capacitePatrimoine ?? 0);
       }
+      if (sortMode === 'tarif_asc') {
+        return (a.tarifEntree ?? 0) - (b.tarifEntree ?? 0);
+      }
       return (a.nomPatrimoine ?? '').localeCompare(b.nomPatrimoine ?? '', 'fr');
     });
+  });
+
+  protected readonly totalPages = computed(() =>
+    Math.max(1, Math.ceil(this.filteredPatrimoines().length / this.pageSize))
+  );
+
+  protected readonly pagedPatrimoines = computed(() => {
+    const all = this.filteredPatrimoines();
+    const safePage = Math.min(Math.max(1, this.currentPage()), this.totalPages());
+    const start = (safePage - 1) * this.pageSize;
+    return all.slice(start, start + this.pageSize);
   });
 
   protected readonly mapPoints = computed<HeritageMapPoint[]>(() =>
@@ -128,7 +176,18 @@ export class PatrimoinesListPageComponent implements OnInit {
     return isLieuDeMemoire(pat);
   }
 
+  protected formatCategorie(cat?: CategoriePatrimoine): string {
+    if (!cat) return 'Patrimoine culturel';
+    return CATEGORIE_LABELS[cat] ?? cat;
+  }
+
+  protected formatZone(zn?: ZoneCasamance): string {
+    if (!zn) return 'Casamance';
+    return ZONE_LABELS[zn] ?? zn;
+  }
+
   protected onSearchChange(value: string): void {
+    this.currentPage.set(1);
     const trimmed = value.trim();
     void this.router.navigate([], {
       relativeTo: this.route,
@@ -139,8 +198,11 @@ export class PatrimoinesListPageComponent implements OnInit {
   }
 
   protected resetFilters(): void {
+    this.categorie.set('');
+    this.zone.set('');
     this.capaciteMin.set('');
     this.tri.set('nom_asc');
+    this.currentPage.set(1);
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { q: null },
@@ -151,6 +213,10 @@ export class PatrimoinesListPageComponent implements OnInit {
 
   protected setViewMode(mode: ViewMode): void {
     this.viewMode.set(mode);
+  }
+
+  protected goToPage(page: number): void {
+    this.currentPage.set(Math.min(Math.max(1, page), this.totalPages()));
   }
 
   protected onMapPointSelected(point: HeritageMapPoint): void {

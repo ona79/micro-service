@@ -1,6 +1,8 @@
 package com.uasz.ms_patrimoine.controllers;
 
+import com.uasz.ms_patrimoine.dto.PageResponseDto;
 import com.uasz.ms_patrimoine.dto.PatrimoineDto;
+import com.uasz.ms_patrimoine.entities.StatutPublication;
 import com.uasz.ms_patrimoine.exceptions.ResourceNotFoundException;
 import com.uasz.ms_patrimoine.services.IPatrimoineService;
 import org.junit.jupiter.api.Test;
@@ -14,6 +16,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -91,6 +95,50 @@ class PatrimoineControllerTest {
     }
 
     @Test
+    void rechercher_retournePage200() throws Exception {
+        PageResponseDto<PatrimoineDto> page = PageResponseDto.<PatrimoineDto>builder()
+                .content(List.of(dto(1L, 250)))
+                .page(0)
+                .size(12)
+                .totalElements(1)
+                .totalPages(1)
+                .last(true)
+                .build();
+        when(patrimoineService.rechercherPatrimoines(
+                any(), any(), any(), any(), any(), any(), any(), anyBoolean(), anyInt(), anyInt(), any(), any()))
+                .thenReturn(page);
+
+        mockMvc.perform(get(URL + "/recherche")
+                        .param("q", "Joola")
+                        .param("categorie", "HISTORIQUE")
+                        .param("zone", "BASSE_CASAMANCE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].codePatrimoine").value("PAT-ZIG-001"));
+    }
+
+    @Test
+    void publierEtArchiver_retournent200() throws Exception {
+        PatrimoineDto publie = dto(1L, 250);
+        publie.setStatutPublication(StatutPublication.PUBLIE);
+        when(patrimoineService.publierPatrimoine(1L)).thenReturn(publie);
+
+        mockMvc.perform(put(URL + "/1/publier"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statutPublication").value("PUBLIE"));
+
+        PatrimoineDto archive = dto(1L, 250);
+        archive.setStatutPublication(StatutPublication.ARCHIVE);
+        when(patrimoineService.archiverPatrimoine(eq(1L), any())).thenReturn(archive);
+
+        mockMvc.perform(put(URL + "/1/archiver")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"motif\":\"Travaux\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statutPublication").value("ARCHIVE"));
+    }
+
+    @Test
     void getById_retourne200() throws Exception {
         when(patrimoineService.getByIdPatrimoine(1L)).thenReturn(dto(1L, 150));
 
@@ -150,4 +198,3 @@ class PatrimoineControllerTest {
                 .andExpect(jsonPath("$.erreur").exists());
     }
 }
-

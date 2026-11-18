@@ -1,6 +1,10 @@
 package com.uasz.ms_circuit.controllers;
 
 import com.uasz.ms_circuit.dto.CircuitDto;
+import com.uasz.ms_circuit.dto.PageResponseDto;
+import com.uasz.ms_circuit.entities.Difficulte;
+import com.uasz.ms_circuit.entities.MoyenTransport;
+import com.uasz.ms_circuit.entities.StatutCircuit;
 import com.uasz.ms_circuit.services.ICircuitService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +17,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -35,6 +40,27 @@ public class CircuitController {
         return ResponseEntity.ok(circuitService.getAllCircuits());
     }
 
+    @GetMapping("/recherche")
+    public ResponseEntity<PageResponseDto<CircuitDto>> rechercherCircuits(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Difficulte difficulte,
+            @RequestParam(required = false) MoyenTransport moyenTransport,
+            @RequestParam(required = false) String zone,
+            @RequestParam(required = false) StatutCircuit statut,
+            @RequestParam(required = false) Integer dureeMax,
+            @RequestParam(required = false) Double distanceMax,
+            @RequestParam(required = false) Double prixMax,
+            @RequestParam(defaultValue = "false") boolean inclureNonPublies,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size,
+            @RequestParam(defaultValue = "nom") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir
+    ) {
+        return ResponseEntity.ok(circuitService.rechercherCircuits(
+                q, difficulte, moyenTransport, zone, statut, dureeMax, distanceMax, prixMax,
+                inclureNonPublies, page, size, sortBy, sortDir));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<CircuitDto> getByIdCircuit(@PathVariable Long id) {
         return ResponseEntity.ok(circuitService.getByIdCircuit(id));
@@ -44,6 +70,25 @@ public class CircuitController {
     public ResponseEntity<CircuitDto> updateCircuit(@PathVariable Long id,
                                                     @Valid @RequestBody CircuitDto circuitDto) {
         return ResponseEntity.ok(circuitService.updateCircuit(id, circuitDto));
+    }
+
+    @PutMapping("/{id}/soumettre")
+    public ResponseEntity<CircuitDto> soumettreCircuit(@PathVariable Long id) {
+        return ResponseEntity.ok(circuitService.soumettreCircuit(id));
+    }
+
+    @PutMapping("/{id}/publier")
+    public ResponseEntity<CircuitDto> publierCircuit(@PathVariable Long id) {
+        return ResponseEntity.ok(circuitService.publierCircuit(id));
+    }
+
+    @PutMapping("/{id}/archiver")
+    public ResponseEntity<CircuitDto> archiverCircuit(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> body
+    ) {
+        String motif = body != null ? body.get("motif") : null;
+        return ResponseEntity.ok(circuitService.archiverCircuit(id, motif));
     }
 
     @DeleteMapping("/{id}")

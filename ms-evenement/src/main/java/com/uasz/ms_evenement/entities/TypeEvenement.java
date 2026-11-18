@@ -5,6 +5,7 @@ public enum TypeEvenement {
     ATELIER,
     VISITE_GUIDEE,
     CONFERENCE,
-    FESTIVAL
+    FESTIVAL,
+    CEREMONIE_TRADITIONNELLE,
+    FOIRE_ARTISANALE
 }
-

@@ -22,14 +22,24 @@
               Lieu de mémoire et de recueillement
             </span>
           } @else {
-            <span class="ui-badge ui-badge--ochre">Patrimoine culturel</span>
+            <span class="ui-badge ui-badge--ochre">
+              {{ pat.categoriePatrimoine || 'Patrimoine culturel' }}
+            </span>
+          }
+          @if (pat.zoneGeographique) {
+            <span class="ui-badge">{{ pat.zoneGeographique }}</span>
+          }
+          @if (pat.donneeDemonstration !== false) {
+            <span class="ui-badge ui-badge--terracotta" title="Fiche de démonstration universitaire UASZ">
+              Donnée de démonstration
+            </span>
           }
         </div>
         <h1 class="monograph-header__title">{{ pat.nomPatrimoine }}</h1>
-        @if (pat.adressePatrimoine) {
+        @if (pat.adressePatrimoine || pat.localite) {
           <p class="monograph-header__location">
             <svg lucideMapPin [size]="16" aria-hidden="true"></svg>
-            <span>{{ pat.adressePatrimoine }}</span>
+            <span>{{ pat.adressePatrimoine || pat.localite }}</span>
           </p>
         }
       </header>
@@ -45,7 +55,7 @@
               />
             </div>
             <figcaption class="monograph-media__caption">
-              {{ pat.nomPatrimoine }} — {{ pat.adressePatrimoine || 'Sénégal' }} (Code :
+              {{ pat.nomPatrimoine }} — {{ pat.adressePatrimoine || 'Casamance, Sénégal' }} (Code :
               {{ pat.codePatrimoine }})
             </figcaption>
           </figure>
@@ -70,6 +80,16 @@
             @if (pat.historiquePatrimoine) {
               <h2>Repères historiques</h2>
               <p>{{ pat.historiquePatrimoine }}</p>
+            }
+
+            @if (pat.informationsCulturelles) {
+              <h2>Dimensions culturelles &amp; patrimoniales</h2>
+              <p>{{ pat.informationsCulturelles }}</p>
+            }
+
+            @if (pat.informationsPratiques) {
+              <h2>Conseils &amp; modalités de visite</h2>
+              <p>{{ pat.informationsPratiques }}</p>
             }
 
             @if (relatedCircuits().length > 0 || relatedEvenements().length > 0) {
@@ -134,10 +154,28 @@
               <dt>Code officiel</dt>
               <dd>{{ pat.codePatrimoine }}</dd>
             </div>
+            @if (pat.typePatrimoine) {
+              <div class="practical-list__row">
+                <dt>Typologie</dt>
+                <dd>{{ pat.typePatrimoine }}</dd>
+              </div>
+            }
             <div class="practical-list__row">
               <dt>Localisation</dt>
-              <dd>{{ pat.adressePatrimoine || 'Non renseignée' }}</dd>
+              <dd>{{ pat.adressePatrimoine || pat.localite || 'Non renseignée' }}</dd>
             </div>
+            @if (pat.horairesOuverture) {
+              <div class="practical-list__row">
+                <dt>Horaires</dt>
+                <dd>{{ pat.horairesOuverture }}</dd>
+              </div>
+            }
+            @if (pat.tarifEntree !== undefined && pat.tarifEntree !== null) {
+              <div class="practical-list__row">
+                <dt>Tarif indicatif</dt>
+                <dd class="tabular-nums">{{ pat.tarifEntree | fcfaPrice }}</dd>
+              </div>
+            }
             <div class="practical-list__row">
               <dt>Capacité maximale</dt>
               <dd class="tabular-nums">{{ pat.capacitePatrimoine }} personnes</dd>
@@ -204,7 +242,7 @@
                       {{ autre.nomPatrimoine }}
                     </a>
                   </h3>
-                  <p class="related-card__loc">{{ autre.adressePatrimoine || 'Sénégal' }}</p>
+                  <p class="related-card__loc">{{ autre.adressePatrimoine || 'Casamance' }}</p>
                   <a [routerLink]="['/patrimoines', autre.id]" class="related-card__link">
                     <span>Lire la fiche</span>
                     <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>

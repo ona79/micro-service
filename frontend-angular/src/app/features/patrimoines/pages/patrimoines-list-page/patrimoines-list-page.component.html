@@ -1,11 +1,11 @@
 <div class="page-section">
   <div class="container">
     <header class="editorial-header">
-      <p class="editorial-header__eyebrow">Archive culturelle</p>
+      <p class="editorial-header__eyebrow">Archive culturelle &amp; écologique de Casamance</p>
       <h1 class="editorial-header__title">Sites &amp; Monuments Patrimoniaux</h1>
       <p class="editorial-header__subtitle">
-        Explorez les trésors historiques, spirituels et mémoriels du Sénégal, de l'île
-        de Gorée aux rives de la Casamance.
+        Explorez la diversité du patrimoine naturel, culturel, historique, architectural et
+        immatériel de la Casamance (Basse, Moyenne et Haute-Casamance).
       </p>
     </header>
 
@@ -13,7 +13,7 @@
       <div class="controls-bar__fields">
         <div class="control-field control-field--search">
           <label for="pat-search" class="control-field__label">
-            Recherche (nom, ville, code)
+            Recherche (nom, localité, code)
           </label>
           <div class="search-input-wrap">
             <svg lucideSearch [size]="16" class="search-input-wrap__icon" aria-hidden="true"></svg>
@@ -21,11 +21,43 @@
               id="pat-search"
               type="search"
               class="control-input control-input--with-icon"
-              placeholder="Ex: Gorée, Ziguinchor, PAT-DKR..."
+              placeholder="Ex: Ziguinchor, Carabane, Oussouye, Sédhiou, Kolda..."
               [ngModel]="urlQuery()"
               (ngModelChange)="onSearchChange($event)"
             />
           </div>
+        </div>
+
+        <div class="control-field">
+          <label for="pat-cat" class="control-field__label">Catégorie</label>
+          <select
+            id="pat-cat"
+            class="control-input"
+            [ngModel]="categorie()"
+            (ngModelChange)="categorie.set($event); currentPage.set(1)"
+          >
+            <option value="">Toutes les catégories</option>
+            <option value="NATUREL">Patrimoine naturel</option>
+            <option value="CULTUREL">Patrimoine culturel</option>
+            <option value="HISTORIQUE">Patrimoine historique</option>
+            <option value="ARCHITECTURAL">Patrimoine architectural</option>
+            <option value="IMMATERIEL">Patrimoine immatériel</option>
+          </select>
+        </div>
+
+        <div class="control-field">
+          <label for="pat-zone" class="control-field__label">Région de Casamance</label>
+          <select
+            id="pat-zone"
+            class="control-input"
+            [ngModel]="zone()"
+            (ngModelChange)="zone.set($event); currentPage.set(1)"
+          >
+            <option value="">Toute la Casamance</option>
+            <option value="BASSE_CASAMANCE">Basse-Casamance (Ziguinchor)</option>
+            <option value="MOYENNE_CASAMANCE">Moyenne-Casamance (Sédhiou)</option>
+            <option value="HAUTE_CASAMANCE">Haute-Casamance (Kolda)</option>
+          </select>
         </div>
 
         <div class="control-field">
@@ -38,7 +70,7 @@
             class="control-input"
             placeholder="Ex: 100"
             [ngModel]="capaciteMin()"
-            (ngModelChange)="capaciteMin.set($event)"
+            (ngModelChange)="capaciteMin.set($event); currentPage.set(1)"
           />
         </div>
 
@@ -53,6 +85,7 @@
             <option value="nom_asc">Nom (A → Z)</option>
             <option value="capacite_desc">Capacité (plus grande d’abord)</option>
             <option value="capacite_asc">Capacité (plus petite d’abord)</option>
+            <option value="tarif_asc">Tarif indicatif (croissant)</option>
           </select>
         </div>
       </div>
@@ -67,7 +100,7 @@
         </p>
 
         <div class="controls-bar__actions">
-          @if (urlQuery() || capaciteMin() || tri() !== 'nom_asc') {
+          @if (urlQuery() || categorie() || zone() || capaciteMin() || tri() !== 'nom_asc') {
             <button type="button" class="btn-reset" (click)="resetFilters()">
               Réinitialiser les filtres
             </button>
@@ -147,6 +180,7 @@
             <div class="map-preview-card__body">
               <div class="heritage-card__badges">
                 <span class="ui-badge">{{ pat.codePatrimoine }}</span>
+                <span class="ui-badge ui-badge--ochre">{{ formatCategorie(pat.categoriePatrimoine) }}</span>
                 @if (isMemorial(pat)) {
                   <span class="ui-badge ui-badge--memorial">Lieu de mémoire</span>
                 }
@@ -156,7 +190,7 @@
               <ul class="map-preview-card__meta">
                 <li>
                   <svg lucideMapPin [size]="14" aria-hidden="true"></svg>
-                  <span>{{ pat.adressePatrimoine || 'Non renseignée' }}</span>
+                  <span>{{ pat.adressePatrimoine || pat.localite || 'Casamance' }}</span>
                 </li>
                 <li class="tabular-nums">
                   <svg lucideUsers [size]="14" aria-hidden="true"></svg>
@@ -173,7 +207,7 @@
       </div>
     } @else {
       <div class="patrimoines-grid">
-        @for (pat of filteredPatrimoines(); track pat.id) {
+        @for (pat of pagedPatrimoines(); track pat.id) {
           <article
             class="pat-card"
             [class.pat-card--memorial]="isMemorial(pat)"
@@ -192,6 +226,11 @@
             <div class="pat-card__body">
               <div class="pat-card__badges">
                 <span class="ui-badge">{{ pat.codePatrimoine }}</span>
+                @if (pat.categoriePatrimoine) {
+                  <span class="ui-badge ui-badge--ochre">
+                    {{ formatCategorie(pat.categoriePatrimoine) }}
+                  </span>
+                }
                 @if (isMemorial(pat)) {
                   <span class="ui-badge ui-badge--memorial">Lieu de mémoire</span>
                 }
@@ -202,8 +241,8 @@
               <p class="pat-card__desc">{{ pat.descriptionPatrimoine }}</p>
               <dl class="pat-card__meta">
                 <div>
-                  <dt>Adresse</dt>
-                  <dd>{{ pat.adressePatrimoine || 'Non renseignée' }}</dd>
+                  <dt>Localisation</dt>
+                  <dd>{{ pat.localite || pat.adressePatrimoine || 'Casamance' }}</dd>
                 </div>
                 <div>
                   <dt>Capacité</dt>
@@ -220,6 +259,30 @@
           </article>
         }
       </div>
+
+      @if (totalPages() > 1) {
+        <nav class="pagination-bar" aria-label="Pagination des sites patrimoniaux" style="display:flex;justify-content:center;align-items:center;gap:0.75rem;margin-top:2rem;">
+          <button
+            type="button"
+            class="btn-reset"
+            [disabled]="currentPage() <= 1"
+            (click)="goToPage(currentPage() - 1)"
+          >
+            Précédent
+          </button>
+          <span class="tabular-nums" style="font-size:0.875rem;">
+            Page <strong>{{ currentPage() }}</strong> sur <strong>{{ totalPages() }}</strong>
+          </span>
+          <button
+            type="button"
+            class="btn-reset"
+            [disabled]="currentPage() >= totalPages()"
+            (click)="goToPage(currentPage() + 1)"
+          >
+            Suivant
+          </button>
+        </nav>
+      }
     }
   </div>
 </div>

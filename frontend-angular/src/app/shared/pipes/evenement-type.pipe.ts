@@ -7,6 +7,8 @@ const TYPE_EVENEMENT_LABELS: Record<TypeEvenement, string> = {
   VISITE_GUIDEE: 'Visite guidée',
   CONFERENCE: 'Conférence',
   FESTIVAL: 'Festival',
+  CEREMONIE_TRADITIONNELLE: 'Cérémonie traditionnelle',
+  FOIRE_ARTISANALE: 'Foire artisanale',
 };
 
 @Pipe({
