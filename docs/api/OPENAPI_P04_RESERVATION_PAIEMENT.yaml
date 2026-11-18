@@ -1,0 +1,313 @@
+openapi: 3.1.0
+info:
+  title: API Réservation & Paiement Simulé P04 — Casamance (UASZ)
+  version: 4.0.0
+  description: >
+    Spécification OpenAPI du système transactionnel de réservation et de paiement simulé
+    Wave / Orange Money (Phase P04) de la Plateforme de Gestion et de Valorisation du
+    Patrimoine Touristique de la Casamance :
+    - ms-reservation (:3004)
+    - ms-paiement (:3006)
+    - Route de découvrabilité événementielle P04 sur ms-evenement (:3003)
+    Toutes les requêtes client transitent par l'API Gateway (:8090) avec session JWT
+    HttpOnly, CSRF et enveloppe signée X-Internal-Gateway-Token. Les routes `/internal/**`
+    sont bloquées en HTTP 403 à la Gateway et réservées à l'ACL inter-services HMAC.
+    AVERTISSEMENT SIMULATION : aucune transaction financière réelle n'est exécutée.
+servers:
+  - url: http://localhost:8090
+    description: API Gateway Zero-Trust (Point d'entrée recommandé)
+  - url: http://localhost:3004
+    description: ms-reservation (interne signé)
+  - url: http://localhost:3006
+    description: ms-paiement (interne signé)
+
+paths:
+  /api/evenements/reservables:
+    get:
+      tags: [Evenement P04]
+      summary: Liste des événements publiés, ouverts à la réservation (ouvertReservation=true) et à venir
+      responses:
+        '200':
+          description: Liste des événements éligibles à une réservation P04
+
+  /api/reservations/disponibilite:
+    get:
+      tags: [Reservation P04]
+      summary: Vérification publique en temps réel de la disponibilité et du prix serveur
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [CIRCUIT, EVENEMENT]
+        - name: prestationId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Détail de disponibilité (placesDisponibles, prixUnitaire, devise XOF, reservable)
+
+  /api/reservations:
+    get:
+      tags: [Reservation P04]
+      summary: Lister les réservations (filtrées au propriétaire pour RESERVATION:LIRE_PROPRE, globales pour RESERVATION:LIRE_TOUT)
+      responses:
+        '200':
+          description: Liste des réservations autorisées
+        '401':
+          description: Non authentifié
+    post:
+      tags: [Reservation P04]
+      summary: Créer une réservation (calcul montant serveur XOF, verrou pessimiste PG16, Idempotency-Key)
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            maxLength: 128
+      responses:
+        '201':
+          description: Réservation créée (statut BROUILLON ou EN_ATTENTE_PAIEMENT)
+        '200':
+          description: Rejeu idempotent détecté (en-tête X-Idempotency-Replayed=true)
+        '400':
+          description: Validation invalide ou manipulation de tarif/statut rejetée
+        '409':
+          description: Places insuffisantes, duplication active ou conflit d'idempotence
+
+  /api/reservations/recherche:
+    get:
+      tags: [Reservation P04]
+      summary: Recherche multicritères paginée de réservations
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: statut
+          in: query
+          schema:
+            type: string
+            enum: [BROUILLON, EN_ATTENTE_PAIEMENT, CONFIRMEE, EXPIREE, ANNULEE, ECHEC, REMBOURSEE]
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [CIRCUIT, EVENEMENT]
+        - name: prestationId
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 12 }
+      responses:
+        '200':
+          description: Page paginée de réservations
+
+  /api/reservations/{id}:
+    get:
+      tags: [Reservation P04]
+      summary: Consulter une réservation avec participants et historique des transitions (BOLA protégé)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: Réservation détaillée
+        '403':
+          description: Accès interdit à la réservation d'un autre utilisateur
+        '404':
+          description: Réservation introuvable
+    delete:
+      tags: [Reservation P04]
+      summary: Suppression logique/annulation ou rejet sur historique payé
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '204':
+          description: Réservation annulée/archivable traitée
+        '409':
+          description: Suppression interdite sur réservation confirmée/payée
+
+  /api/reservations/{id}/soumettre:
+    put:
+      tags: [Reservation P04]
+      summary: Faire transiter un BROUILLON vers EN_ATTENTE_PAIEMENT avec verrouillage des places
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: Réservation prête pour paiement simulé
+
+  /api/reservations/{id}/annuler:
+    put:
+      tags: [Reservation P04]
+      summary: Annuler une réservation et libérer atomiquement les places réservées
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: Réservation passée au statut ANNULEE
+
+  /api/reservations/{id}/synchroniser:
+    post:
+      tags: [Reservation P04]
+      summary: Réconciliation pull explicite auprès de ms-paiement
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: État de réservation resynchronisé
+
+  /api/reservations/statistiques:
+    get:
+      tags: [Reservation P04]
+      summary: Indicateurs agrégés des réservations (RESERVATION:LIRE_TOUT ou RESERVATION:GERER)
+      responses:
+        '200':
+          description: Statistiques réservations et montants en XOF
+
+  /api/reservations/guide/circuits/{circuitId}:
+    get:
+      tags: [Reservation P04]
+      summary: Manifeste logistique des participants pour le guide responsable du circuit (sans montant financier)
+      parameters:
+        - name: circuitId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: Liste des participants confirmés/attendus
+        '403':
+          description: Le guide authentifié n'est pas guideResponsableId de ce circuit
+
+  /api/reservations/internal/{id}/evenement-paiement:
+    post:
+      tags: [Inter-Services ACL]
+      summary: Endpoint interne appelé exclusivement par ms-paiement (bloqué à la Gateway)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: Acquittement d'événement outbox (accepte true/false)
+
+  /api/paiements:
+    get:
+      tags: [Paiement Simulé P04]
+      summary: Lister ses paiements simulés (ou tous les paiements avec PAIEMENT:LIRE_TOUT)
+      responses:
+        '200':
+          description: Liste des paiements simulés
+    post:
+      tags: [Paiement Simulé P04]
+      summary: Initier un paiement simulé WAVE ou ORANGE_MONEY (statut EN_COURS, estSimule=true)
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema: { type: string, maxLength: 128 }
+      responses:
+        '201':
+          description: Tentative simulée créée (statut EN_COURS)
+        '200':
+          description: Rejeu idempotent retournant la transaction simulée existante
+        '400':
+          description: Montant incohérent/manipulé ou mode hors simulation rejeté
+        '409':
+          description: Réservation expirée, annulée, ou déjà réglée
+
+  /api/paiements/{id}/simuler:
+    post:
+      tags: [Paiement Simulé P04]
+      summary: Simuler la réponse portefeuille (ACCEPTER, REFUSER, EXPIRER, ANNULER) et publier l'outbox vers ms-reservation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: Transition simulée enregistrée et relay outbox exécuté
+
+  /api/paiements/{id}/rembourser:
+    post:
+      tags: [Paiement Simulé P04]
+      summary: Remboursement intégral simulé d'un paiement ACCEPTE (Permission PAIEMENT:REMBOURSER — ADMINISTRATEUR uniquement)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: Paiement marqué REMBOURSE et synchronisation outbox déclenchée
+        '403':
+          description: Refusé pour tout rôle ne disposant pas de PAIEMENT:REMBOURSER
+
+  /api/paiements/recherche:
+    get:
+      tags: [Paiement Simulé P04]
+      summary: Recherche multicritères paginée de transactions simulées
+      responses:
+        '200':
+          description: Page de paiements simulés
+
+  /api/paiements/reservation/{reservationId}:
+    get:
+      tags: [Paiement Simulé P04]
+      summary: Lister les tentatives de paiement simulées liées à une réservation
+      parameters:
+        - name: reservationId
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        '200':
+          description: Historique des tentatives pour la réservation
+
+  /api/paiements/statistiques:
+    get:
+      tags: [Paiement Simulé P04]
+      summary: Totaux agrégés des paiements simulés Wave & Orange Money et état de l'outbox (PAIEMENT:LIRE_TOUT)
+      responses:
+        '200':
+          description: Indicateurs agrégés simulés (estSimule=true, devise=XOF)
+
+  /api/paiements/outbox/rejouer:
+    post:
+      tags: [Paiement Simulé P04]
+      summary: Relance manuelle des événements outbox en attente de synchronisation (PAIEMENT:LIRE_TOUT)
+      responses:
+        '200':
+          description: Nombre d'événements synchronisés ({ evenementsSynchronises })

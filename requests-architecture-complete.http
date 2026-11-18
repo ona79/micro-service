@@ -1,9 +1,9 @@
 ### =========================================================================
-### SCÉNARIO COMPLET VIA L'API GATEWAY (port 8090)
+### SCÉNARIO COMPLET P04 VIA L'API GATEWAY (port 8090 ou Nginx :80/api)
 ### =========================================================================
 @gateway = http://localhost:8090
 
-### 1. Inscription d'un touriste via ms-utilisateur (:3005 via Gateway :8080)
+### 1. Inscription d'un touriste via ms-utilisateur (:3005 via Gateway)
 POST {{gateway}}/api/utilisateurs
 Content-Type: application/json
 
@@ -16,7 +16,7 @@ Content-Type: application/json
   "role": "TOURISTE"
 }
 
-### 2. Connexion de l'utilisateur
+### 2. Connexion de l'utilisateur (cookie HttpOnly PATRIMOINE_SESSION + XSRF-TOKEN)
 POST {{gateway}}/api/utilisateurs/connexion
 Content-Type: application/json
 
@@ -25,58 +25,65 @@ Content-Type: application/json
   "motDePasse": "Passer123!"
 }
 
-### 3. Création d'un patrimoine via ms-patrimoine (:3001 via Gateway :8080)
-POST {{gateway}}/api/patrimoines
-Content-Type: application/json
+### 3. Vérification de disponibilité temps réel (public, sans manipulation client)
+GET {{gateway}}/api/reservations/disponibilite?type=CIRCUIT&prestationId=1&date=2026-12-20
 
-{
-  "nomPatrimoine": "Cathédrale Saint-Antoine de Padoue",
-  "codePatrimoine": "PAT-ZIG-01",
-  "descriptionPatrimoine": "Édifice historique emblématique de Ziguinchor.",
-  "historiquePatrimoine": "Construite à l'époque coloniale au coeur de Ziguinchor.",
-  "adressePatrimoine": "Centre-ville, Ziguinchor",
-  "capacitePatrimoine": 300,
-  "latitudePatrimoine": 12.5833,
-  "longitudePatrimoine": -16.2719
-}
+### 4. Liste des événements ouverts à la réservation P04
+GET {{gateway}}/api/evenements/reservables
 
-### 4. Consultation des circuits via ms-circuit (:3002 via Gateway :8080)
-GET {{gateway}}/api/circuits
-
-### 5. Consultation des événements via ms-evenement (:3003 via Gateway :8080)
-GET {{gateway}}/api/evenements
-
-### 6. Création d'une réservation via ms-reservation (:3004 via Gateway :8080)
+### 5. Création d'une réservation P04 avec clé d'idempotence (statut initial EN_ATTENTE_PAIEMENT)
 POST {{gateway}}/api/reservations
 Content-Type: application/json
+Idempotency-Key: demo-p04-res-001
 
 {
   "nomClient": "Moussa Diop",
   "emailClient": "moussa.diop@zig.univ.sn",
   "telephoneClient": "+221771234567",
   "nombrePlaces": 2,
-  "typeReservation": "EVENEMENT",
-  "evenementId": 1
+  "datePrestation": "2026-12-20",
+  "creneauPrestation": "Matin (09h00)",
+  "typeReservation": "CIRCUIT",
+  "circuitId": 1,
+  "soumettrePourPaiement": true,
+  "participants": [
+    { "nomComplet": "Moussa Diop", "categorie": "ADULTE" },
+    { "nomComplet": "Awa Diop", "categorie": "ADULTE" }
+  ]
 }
 
-### 7. Paiement de la réservation 2 via ms-paiement (:3006 -> appelle ms-reservation:3004 + ms-notification:3007)
+### 6. Initiation du paiement simulé Wave Sénégal (:3006 -> :3004)
 POST {{gateway}}/api/paiements
+Content-Type: application/json
+Idempotency-Key: demo-p04-pay-001
+
+{
+  "reservationId": 1,
+  "modePaiement": "WAVE",
+  "numeroTelephoneSimule": "+221771234567"
+}
+
+### 7. Simulation de décision Mobile Money (ACCEPTER | REFUSER | EXPIRER | ANNULER)
+POST {{gateway}}/api/paiements/1/simuler
 Content-Type: application/json
 
 {
-  "reservationId": 2,
-  "modePaiement": "WAVE"
+  "decision": "ACCEPTER",
+  "motif": "Validation OTP Wave simulée"
 }
 
-### 8. Vérification des notifications envoyées automatiquement (:3007 via Gateway :8080)
+### 8. Remboursement intégral simulé (ADMINISTRATEUR / PAIEMENT:REMBOURSER uniquement)
+POST {{gateway}}/api/paiements/1/rembourser
+Content-Type: application/json
+
+{
+  "motif": "Remboursement intégral simulé validé par l'administration"
+}
+
+### 9. Vérification des notifications envoyées automatiquement (:3007 via Gateway)
 GET {{gateway}}/api/notifications
 
-
-### 9. Démonstration TP2 — Communication inter-microservices via OpenFeign
-GET {{gateway}}/api/circuits/communication/feign/patrimoines/1
-
-### 10. Démonstration TP2 — Communication inter-microservices via RestTemplate
-GET {{gateway}}/api/circuits/communication/resttemplate/patrimoines/2
-
-### 11. Démonstration TP2 — Communication inter-microservices via WebClient
-GET {{gateway}}/api/circuits/communication/webclient/patrimoines/3
+### 10. Statistiques réservations & paiements simulés (GESTIONNAIRE_SITE / ADMINISTRATEUR)
+GET {{gateway}}/api/reservations/statistiques
+###
+GET {{gateway}}/api/paiements/statistiques
