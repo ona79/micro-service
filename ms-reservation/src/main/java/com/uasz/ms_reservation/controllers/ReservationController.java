@@ -97,6 +97,25 @@ public class ReservationController {
         return ResponseEntity.ok(reservationService.getManifesteGuidePourCircuit(circuitId));
     }
 
+    @GetMapping("/guide/agenda")
+    public ResponseEntity<List<com.uasz.ms_reservation.dto.GuideAgendaItemDto>> getGuideAgenda(
+            @RequestParam(required = false) Long guideId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin
+    ) {
+        return ResponseEntity.ok(reservationService.getGuideAgenda(guideId, dateDebut, dateFin));
+    }
+
+    @GetMapping("/guide/{guideId}/disponibilite")
+    public ResponseEntity<com.uasz.ms_reservation.dto.GuideDisponibiliteDto> verifierDisponibiliteGuide(
+            @PathVariable Long guideId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) String creneau,
+            @RequestParam(required = false) Long circuitIdExclu
+    ) {
+        return ResponseEntity.ok(reservationService.verifierDisponibiliteGuide(guideId, date, creneau, circuitIdExclu));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ReservationDto> getByIdReservation(@PathVariable Long id) {
         return ResponseEntity.ok(reservationService.getByIdReservation(id));

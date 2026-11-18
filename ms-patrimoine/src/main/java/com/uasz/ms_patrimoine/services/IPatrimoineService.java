@@ -42,5 +42,7 @@ public interface IPatrimoineService {
 
     PatrimoineStatsDto getStatistiques();
 
+    List<PatrimoineDto> getPatrimoinesProximite(double latitude, double longitude, Double rayonKm, Integer limit);
+
     void deletePatrimoine(Long id);
 }

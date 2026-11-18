@@ -93,6 +93,10 @@ export class PatrimoinesListPageComponent implements OnInit {
   protected readonly avisResumes = signal<Map<number, AvisResume>>(new Map());
   protected readonly selectedMapPatrimoine = signal<Patrimoine | null>(null);
 
+  protected readonly gpsLocation = signal<{ lat: number; lon: number } | null>(null);
+  protected readonly gpsLoading = signal<boolean>(false);
+  protected readonly gpsError = signal<string | null>(null);
+
   private loadSeq = 0;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -235,7 +239,72 @@ export class PatrimoinesListPageComponent implements OnInit {
     this.selectedZone.set('');
     this.sortBy.set('nom_asc');
     this.currentPage.set(1);
+    this.gpsLocation.set(null);
+    this.gpsError.set(null);
     void this.syncUrlAndLoad();
+  }
+
+  protected activerGeolocalisation(): void {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      this.gpsError.set("La géolocalisation n'est pas supportée par votre navigateur.");
+      return;
+    }
+    this.gpsLoading.set(true);
+    this.gpsError.set(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        this.gpsLoading.set(false);
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        this.gpsLocation.set({ lat, lon });
+        void this.loadProximite(lat, lon);
+      },
+      (err) => {
+        this.gpsLoading.set(false);
+        this.gpsError.set("Impossible d'obtenir votre position GPS (" + err.message + ").");
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  }
+
+  protected async loadProximite(lat: number, lon: number): Promise<void> {
+    const seq = ++this.loadSeq;
+    this.loading.set(true);
+    this.error.set(null);
+    try {
+      const items = await firstValueFrom(this.api.getProximite(lat, lon, 60, 24));
+      if (seq !== this.loadSeq) return;
+      this.items.set(items);
+      this.totalElements.set(items.length);
+      this.totalPages.set(1);
+      this.currentPage.set(1);
+      if (items.length > 0) {
+        const resumes = await firstValueFrom(
+          this.avisApi.getResumesBatch(
+            'PATRIMOINE',
+            items.map((p) => p.id)
+          )
+        ).catch(() => []);
+        if (seq === this.loadSeq) {
+          this.avisResumes.set(new Map(resumes.map((r) => [r.cibleId, r])));
+        }
+      } else {
+        this.avisResumes.set(new Map());
+      }
+    } catch (err) {
+      if (seq !== this.loadSeq) return;
+      this.error.set(extractErrorMessage(err));
+    } finally {
+      if (seq === this.loadSeq) {
+        this.loading.set(false);
+      }
+    }
+  }
+
+  protected desactiverGeolocalisation(): void {
+    this.gpsLocation.set(null);
+    this.gpsError.set(null);
+    void this.loadPage();
   }
 
   protected reload(): void {

@@ -41,6 +41,26 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long>,
 
     List<Reservation> findByCircuitIdAndStatutInOrderByDatePrestationAsc(Long circuitId, Collection<StatutReservation> statuts);
 
+    List<Reservation> findByGuideIdAndStatutInOrderByDatePrestationAscCreneauPrestationAsc(
+            Long guideId, Collection<StatutReservation> statuts);
+
+    List<Reservation> findByGuideIdAndDatePrestationAndStatutIn(
+            Long guideId, LocalDate datePrestation, Collection<StatutReservation> statuts);
+
+    @Query("""
+            SELECT r FROM Reservation r
+            WHERE r.guideId = :guideId
+              AND r.statut IN :statuts
+              AND (:dateDebut IS NULL OR r.datePrestation >= :dateDebut)
+              AND (:dateFin IS NULL OR r.datePrestation <= :dateFin)
+            ORDER BY r.datePrestation ASC, r.creneauPrestation ASC
+            """)
+    List<Reservation> findGuideReservationsBetweenDates(
+            @Param("guideId") Long guideId,
+            @Param("statuts") Collection<StatutReservation> statuts,
+            @Param("dateDebut") LocalDate dateDebut,
+            @Param("dateFin") LocalDate dateFin);
+
     Optional<Reservation> findByUtilisateurIdAndIdempotencyKey(Long utilisateurId, String idempotencyKey);
 
     Optional<Reservation> findByReferenceReservation(String referenceReservation);

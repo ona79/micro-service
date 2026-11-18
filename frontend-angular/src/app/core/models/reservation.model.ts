@@ -129,6 +129,26 @@ export interface Reservation {
   evenement: Evenement | null;
 }
 
+export interface GuideAgendaItem {
+  date: string;
+  creneau: string;
+  circuitId: number;
+  nomCircuit: string;
+  placesOccupees: number;
+  placesMax: number;
+  nombreReservations: number;
+  conflit: boolean;
+  reservations: Reservation[];
+}
+
+export interface GuideDisponibilite {
+  guideId: number;
+  date: string;
+  creneau?: string;
+  disponible: boolean;
+  motif?: string;
+}
+
 export function formatReservationStatusLabel(statut: StatutReservation): string {
   switch (statut) {
     case 'BROUILLON':

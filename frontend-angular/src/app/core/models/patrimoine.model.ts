@@ -48,4 +48,5 @@ export interface Patrimoine {
   dateModification?: string | null;
   datePublication?: string | null;
   dateArchivage?: string | null;
+  distanceKm?: number;
 }

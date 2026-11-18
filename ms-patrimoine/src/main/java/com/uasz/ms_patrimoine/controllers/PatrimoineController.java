@@ -60,6 +60,16 @@ public class PatrimoineController {
                 q, categorie, zone, localite, statut, capaciteMin, tarifMax, inclureNonPublies, page, size, sortBy, sortDir));
     }
 
+    @GetMapping("/proximite")
+    public ResponseEntity<List<PatrimoineDto>> getPatrimoinesProximite(
+            @RequestParam double lat,
+            @RequestParam double lon,
+            @RequestParam(required = false, defaultValue = "50.0") Double rayonKm,
+            @RequestParam(required = false, defaultValue = "10") Integer limit
+    ) {
+        return ResponseEntity.ok(patrimoineService.getPatrimoinesProximite(lat, lon, rayonKm, limit));
+    }
+
     @GetMapping("/statistiques")
     public ResponseEntity<com.uasz.ms_patrimoine.dto.PatrimoineStatsDto> getStatistiques() {
         return ResponseEntity.ok(patrimoineService.getStatistiques());

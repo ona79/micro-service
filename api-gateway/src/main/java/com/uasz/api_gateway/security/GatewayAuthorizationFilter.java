@@ -290,7 +290,7 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
                 return;
             }
         }
-        if (isCircuitPath && path.equals("/api/circuits/guide/mes-circuits") && token == null) {
+        if (isCircuitPath && path.startsWith("/api/circuits/guide/") && token == null) {
             writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
                     tokenError != null ? tokenError : "Authentification requise.");
             return;
@@ -414,6 +414,13 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
                     if (!token.hasPermission("AVIS:SIGNALER")) {
                         writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
                                 "Accès interdit : permission AVIS:SIGNALER requise.");
+                        return;
+                    }
+                } else if (path.endsWith("/reponse") && "POST".equalsIgnoreCase(method)) {
+                    boolean canReply = "GUIDE".equals(token.role()) || token.hasPermission("AVIS:MODERER") || token.hasPermission("CIRCUIT:MODIFIER");
+                    if (!canReply) {
+                        writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                                "Accès interdit : droit de réponse réservé au guide responsable ou au modérateur.");
                         return;
                     }
                 } else if ("POST".equalsIgnoreCase(method)) {

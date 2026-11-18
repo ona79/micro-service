@@ -371,6 +371,7 @@ describe('P07 Modular Back-Office Components (/pro/**)', () => {
       statutValidation: 'VALIDE',
     };
     httpMock.expectOne('/api/guides/mon-profil').flush(monProfil);
+    httpMock.expectOne('/api/reservations/guide/agenda').flush([]);
     await flushMicrotasks();
     httpMock.expectOne('/api/guides/7/historique').flush([]);
     await flushMicrotasks();

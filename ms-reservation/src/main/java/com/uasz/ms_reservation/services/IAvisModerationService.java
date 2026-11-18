@@ -34,6 +34,8 @@ public interface IAvisModerationService {
 
     AvisDto modifierAvis(Long id, AvisUpdateRequest request);
 
+    AvisDto repondreAvis(Long id, com.uasz.ms_reservation.dto.AvisReponseGuideRequest request);
+
     void supprimerAvis(Long id);
 
     SignalementDto signalerAvis(Long avisId, SignalementCreateRequest request);

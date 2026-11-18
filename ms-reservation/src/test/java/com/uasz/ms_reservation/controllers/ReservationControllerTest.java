@@ -150,4 +150,48 @@ class ReservationControllerTest {
                 .andExpect(jsonPath("$[0].tokenQr").value("qr-token-xyz"))
                 .andExpect(jsonPath("$[0].nomBeneficiaire").value("Moussa Touriste"));
     }
+
+    @Test
+    void getGuideAgenda_retourne200AvecAgenda() throws Exception {
+        com.uasz.ms_reservation.dto.GuideAgendaItemDto item = com.uasz.ms_reservation.dto.GuideAgendaItemDto.builder()
+                .date(LocalDate.of(2026, 12, 10))
+                .creneau("Matin (09h00)")
+                .circuitId(5L)
+                .nomCircuit("Carabane Express")
+                .placesOccupees(4)
+                .placesMax(12)
+                .nombreReservations(2)
+                .conflit(false)
+                .build();
+        when(reservationService.getGuideAgenda(eq(5L), any(), any())).thenReturn(List.of(item));
+
+        mockMvc.perform(get("/api/reservations/guide/agenda")
+                        .param("guideId", "5")
+                        .param("dateDebut", "2026-12-01")
+                        .param("dateFin", "2026-12-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].nomCircuit").value("Carabane Express"))
+                .andExpect(jsonPath("$[0].placesOccupees").value(4));
+    }
+
+    @Test
+    void verifierDisponibiliteGuide_retourne200AvecStatut() throws Exception {
+        com.uasz.ms_reservation.dto.GuideDisponibiliteDto dispo = com.uasz.ms_reservation.dto.GuideDisponibiliteDto.builder()
+                .guideId(5L)
+                .date(LocalDate.of(2026, 12, 10))
+                .creneau("Matin (09h00)")
+                .disponible(true)
+                .motif("Disponible")
+                .build();
+        when(reservationService.verifierDisponibiliteGuide(eq(5L), eq(LocalDate.of(2026, 12, 10)), eq("Matin (09h00)"), any()))
+                .thenReturn(dispo);
+
+        mockMvc.perform(get("/api/reservations/guide/5/disponibilite")
+                        .param("date", "2026-12-10")
+                        .param("creneau", "Matin (09h00)"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.disponible").value(true))
+                .andExpect(jsonPath("$.motif").value("Disponible"));
+    }
 }

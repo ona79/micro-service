@@ -77,6 +77,11 @@ public class CircuitController {
         return ResponseEntity.ok(circuitService.getMesCircuitsGuide());
     }
 
+    @GetMapping("/guide/{guideId}")
+    public ResponseEntity<List<CircuitDto>> getCircuitsByGuide(@PathVariable Long guideId) {
+        return ResponseEntity.ok(circuitService.getCircuitsByGuide(guideId));
+    }
+
     @PatchMapping("/{id}/guide")
     public ResponseEntity<CircuitDto> affecterGuideResponsable(
             @PathVariable Long id,
