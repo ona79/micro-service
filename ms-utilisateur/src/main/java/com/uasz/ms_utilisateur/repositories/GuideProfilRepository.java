@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 public interface GuideProfilRepository extends JpaRepository<GuideProfil, Long> {
@@ -21,21 +22,33 @@ public interface GuideProfilRepository extends JpaRepository<GuideProfil, Long> 
             WHERE g.statutValidation = 'VALIDE'
               AND g.visibilitePublique = true
               AND u.actif = true
-              AND (:zone IS NULL OR LOWER(g.zonesIntervention) LIKE LOWER(CONCAT('%', :zone, '%')))
-              AND (:langue IS NULL OR LOWER(g.languesParlees) LIKE LOWER(CONCAT('%', :langue, '%')))
-              AND (:q IS NULL
-                   OR LOWER(u.nom) LIKE LOWER(CONCAT('%', :q, '%'))
-                   OR LOWER(u.prenom) LIKE LOWER(CONCAT('%', :q, '%'))
-                   OR LOWER(g.specialites) LIKE LOWER(CONCAT('%', :q, '%'))
-                   OR LOWER(g.presentationCourte) LIKE LOWER(CONCAT('%', :q, '%'))
-                   OR LOWER(g.zonesIntervention) LIKE LOWER(CONCAT('%', :q, '%')))
             ORDER BY g.anneesExperience DESC, g.id ASC
             """)
-    List<GuideProfil> searchPublicGuides(
-            @Param("zone") String zone,
-            @Param("langue") String langue,
-            @Param("q") String q
-    );
+    List<GuideProfil> findAllPublicActive();
+
+    default List<GuideProfil> searchPublicGuides(String zone, String langue, String q) {
+        String z = zone != null ? zone.trim().toLowerCase(Locale.ROOT) : "";
+        String l = langue != null ? langue.trim().toLowerCase(Locale.ROOT) : "";
+        String query = q != null ? q.trim().toLowerCase(Locale.ROOT) : "";
+        if (z.isEmpty() && l.isEmpty() && query.isEmpty()) {
+            return findAllPublicActive();
+        }
+        return findAllPublicActive().stream()
+                .filter(g -> z.isEmpty() || containsIgnoreCase(g.getZonesIntervention(), z))
+                .filter(g -> l.isEmpty() || containsIgnoreCase(g.getLanguesParlees(), l))
+                .filter(g -> query.isEmpty()
+                        || (g.getUtilisateur() != null && (
+                        containsIgnoreCase(g.getUtilisateur().getNom(), query)
+                                || containsIgnoreCase(g.getUtilisateur().getPrenom(), query)))
+                        || containsIgnoreCase(g.getSpecialites(), query)
+                        || containsIgnoreCase(g.getPresentationCourte(), query)
+                        || containsIgnoreCase(g.getZonesIntervention(), query))
+                .toList();
+    }
+
+    private static boolean containsIgnoreCase(String value, String needleLower) {
+        return value != null && value.toLowerCase(Locale.ROOT).contains(needleLower);
+    }
 
     @Query("""
             SELECT g FROM GuideProfil g
