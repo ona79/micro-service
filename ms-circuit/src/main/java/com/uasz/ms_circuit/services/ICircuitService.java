@@ -1,6 +1,7 @@
 package com.uasz.ms_circuit.services;
 
 import com.uasz.ms_circuit.dto.CircuitDto;
+import com.uasz.ms_circuit.dto.CircuitStatsDto;
 import com.uasz.ms_circuit.dto.PageResponseDto;
 import com.uasz.ms_circuit.dto.PatrimoineDto;
 import com.uasz.ms_circuit.entities.Difficulte;
@@ -44,6 +45,8 @@ public interface ICircuitService {
     CircuitDto publierCircuit(Long id);
 
     CircuitDto archiverCircuit(Long id, String motif);
+
+    CircuitStatsDto getStatistiques();
 
     void deleteCircuit(Long id);
 

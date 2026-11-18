@@ -269,4 +269,38 @@ class GuideServiceTest {
         assertThat(publicDto.getMotifDecision()).isNull();
         assertThat(publicDto.getValideParId()).isNull();
     }
+
+    @Test
+    void getStatistiques_autoriseGestionnaireEtBloqueGuideEtCalculeRepartitions() {
+        SecurityUserContextHolder.setContext(new SecurityUserContext(
+                5L, "GUIDE", "alassane.badji@zig.univ.sn", false, null));
+        assertThatThrownBy(() -> guideService.getStatistiques())
+                .isInstanceOf(ForbiddenException.class);
+
+        SecurityUserContextHolder.setContext(new SecurityUserContext(
+                3L, "GESTIONNAIRE_SITE", "awa.sagna@zig.univ.sn", false, null));
+        when(guideProfilRepository.countByStatutValidation(StatutValidationGuide.BROUILLON)).thenReturn(0L);
+        when(guideProfilRepository.countByStatutValidation(StatutValidationGuide.EN_ATTENTE_VALIDATION)).thenReturn(1L);
+        when(guideProfilRepository.countByStatutValidation(StatutValidationGuide.VALIDE)).thenReturn(2L);
+        when(guideProfilRepository.countByStatutValidation(StatutValidationGuide.REJETE)).thenReturn(0L);
+        when(guideProfilRepository.countByStatutValidation(StatutValidationGuide.SUSPENDU)).thenReturn(0L);
+        when(guideProfilRepository.countByStatutValidation(StatutValidationGuide.DESACTIVE)).thenReturn(0L);
+        when(guideProfilRepository.countByStatutValidationAndDisponibleTrue(StatutValidationGuide.VALIDE)).thenReturn(2L);
+        when(guideProfilRepository.countByStatutValidationAndVisibilitePubliqueTrue(StatutValidationGuide.VALIDE)).thenReturn(2L);
+        when(guideProfilRepository.findAllAdminOrderByUpdatedDesc()).thenReturn(java.util.List.of(
+                GuideProfil.builder()
+                        .id(1L).utilisateur(guideUser)
+                        .zonesIntervention("Ziguinchor, Cap Skirring")
+                        .languesParlees("Français, Diola")
+                        .statutValidation(StatutValidationGuide.VALIDE)
+                        .build()
+        ));
+
+        var stats = guideService.getStatistiques();
+
+        assertThat(stats.getValides()).isEqualTo(2L);
+        assertThat(stats.getEnAttenteValidation()).isEqualTo(1L);
+        assertThat(stats.getParZone()).containsEntry("Ziguinchor", 1L).containsEntry("Cap Skirring", 1L);
+        assertThat(stats.getParLangue()).containsEntry("Français", 1L).containsEntry("Diola", 1L);
+    }
 }

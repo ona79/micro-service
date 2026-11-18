@@ -7,6 +7,7 @@ import com.uasz.ms_reservation.dto.AvisModerationHistoriqueDto;
 import com.uasz.ms_reservation.dto.AvisResumeDto;
 import com.uasz.ms_reservation.dto.AvisUpdateRequest;
 import com.uasz.ms_reservation.dto.ModerationDecisionRequest;
+import com.uasz.ms_reservation.dto.ModerationStatsDto;
 import com.uasz.ms_reservation.dto.PageResponseDto;
 import com.uasz.ms_reservation.dto.SignalementCreateRequest;
 import com.uasz.ms_reservation.dto.SignalementDecisionRequest;
@@ -40,6 +41,8 @@ public interface IAvisModerationService {
     List<AvisDto> getAvisModeration(CibleAvis cibleType, StatutModerationAvis statut);
 
     List<SignalementDto> getSignalementsModeration(StatutSignalement statut);
+
+    ModerationStatsDto getStatistiques();
 
     List<AvisModerationHistoriqueDto> getHistoriqueModeration(Long avisId);
 

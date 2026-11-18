@@ -315,6 +315,52 @@ public class UtilisateurController {
         return ResponseEntity.ok(utilisateurService.getAllUtilisateurs());
     }
 
+    @GetMapping("/recherche")
+    public ResponseEntity<com.uasz.ms_utilisateur.dto.PageResponseDto<UtilisateurDto>> rechercher(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) RoleUtilisateur role,
+            @RequestParam(required = false) Boolean actif,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest request
+    ) {
+        SessionTokenService.SessionClaims claims = requireAuthenticated(request, false);
+        if (claims.role() != RoleUtilisateur.ADMINISTRATEUR) {
+            throw new ForbiddenException("Accès interdit : seul un administrateur peut rechercher des utilisateurs.");
+        }
+        return ResponseEntity.ok(utilisateurService.rechercherUtilisateurs(q, role, actif, page, size));
+    }
+
+    @GetMapping("/statistiques")
+    public ResponseEntity<com.uasz.ms_utilisateur.dto.UtilisateurStatsDto> statistiques(HttpServletRequest request) {
+        SessionTokenService.SessionClaims claims = requireAuthenticated(request, false);
+        if (claims.role() != RoleUtilisateur.ADMINISTRATEUR) {
+            throw new ForbiddenException("Accès interdit : seul un administrateur peut consulter les statistiques utilisateurs.");
+        }
+        com.uasz.ms_utilisateur.dto.UtilisateurStatsDto stats = utilisateurService.getUtilisateursStats();
+        AuditSecuriteService.AuditSummary audit = auditSecuriteService.getAuditSummary();
+        stats.setAuditLogsTotal(audit.totalLogs());
+        stats.setAlertesSecurite24h(audit.alertes24h());
+        stats.setEchecsConnexion24h(audit.echecsConnexion24h());
+        return ResponseEntity.ok(stats);
+    }
+
+    @GetMapping("/audit")
+    public ResponseEntity<com.uasz.ms_utilisateur.dto.PageResponseDto<com.uasz.ms_utilisateur.dto.AuditSecuriteDto>> auditLogs(
+            @RequestParam(required = false) String eventType,
+            @RequestParam(required = false) Long utilisateurId,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size,
+            HttpServletRequest request
+    ) {
+        SessionTokenService.SessionClaims claims = requireAuthenticated(request, false);
+        if (claims.role() != RoleUtilisateur.ADMINISTRATEUR) {
+            throw new ForbiddenException("Accès interdit : seul un administrateur peut consulter le journal d'audit sécurité.");
+        }
+        return ResponseEntity.ok(auditSecuriteService.rechercherAuditLogs(eventType, utilisateurId, q, page, size));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<UtilisateurDto> getById(@PathVariable Long id, HttpServletRequest request) {
         SessionTokenService.SessionClaims claims = requireAuthenticated(request, false);

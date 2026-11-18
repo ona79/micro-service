@@ -30,6 +30,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -204,5 +205,28 @@ class UtilisateurSecurityControllerTest {
         assertThat(setCookies).anyMatch(c -> c.startsWith("PATRIMOINE_SESSION=;") && c.contains("Max-Age=0") && c.contains("Path=/"));
         assertThat(setCookies).anyMatch(c -> c.startsWith("PATRIMOINE_REFRESH=;") && c.contains("Max-Age=0") && c.contains("Path=/api/utilisateurs"));
         assertThat(setCookies).anyMatch(c -> c.startsWith("XSRF-TOKEN=;") && c.contains("Max-Age=0") && c.contains("Path=/"));
+    }
+
+    @Test
+    void auditEtStatsUtilisateurs_interditsAuxNonAdministrateurs() throws Exception {
+        SessionTokenService.SessionClaims managerClaims = new SessionTokenService.SessionClaims(
+                3L, "awa@uasz.sn", RoleUtilisateur.GESTIONNAIRE_SITE,
+                List.of("GUIDE:VALIDER"), "sess-mgr", 9999999999L, "jti-mgr"
+        );
+        UtilisateurDto managerDto = UtilisateurDto.builder()
+                .id(3L).email("awa@uasz.sn").role(RoleUtilisateur.GESTIONNAIRE_SITE).actif(true).build();
+
+        when(sessionTokenService.extractToken(any())).thenReturn("mgr.jwt.token");
+        when(sessionTokenService.verifyToken("mgr.jwt.token")).thenReturn(managerClaims);
+        when(authSessionManager.isSessionActive("sess-mgr")).thenReturn(true);
+        when(utilisateurService.getByIdUtilisateur(3L)).thenReturn(managerDto);
+
+        mockMvc.perform(get("/api/utilisateurs/statistiques")
+                        .header("Authorization", "Bearer mgr.jwt.token"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(get("/api/utilisateurs/audit")
+                        .header("Authorization", "Bearer mgr.jwt.token"))
+                .andExpect(status().isForbidden());
     }
 }

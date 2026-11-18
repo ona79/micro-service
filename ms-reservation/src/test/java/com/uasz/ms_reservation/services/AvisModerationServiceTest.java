@@ -277,4 +277,26 @@ class AvisModerationServiceTest {
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("BOLA");
     }
+
+    @Test
+    void getStatistiques_agregeAvisEtSignalementsPourModerateur() {
+        SecurityUserContextHolder.setContext(new SecurityUserContext(3L, "GESTIONNAIRE_SITE", "awa@uasz.sn", false, null));
+        when(avisRepository.findAll()).thenReturn(List.of(
+                Avis.builder().id(1L).note(5).cibleType(CibleAvis.CIRCUIT).statutModeration(StatutModerationAvis.APPROUVE).build(),
+                Avis.builder().id(2L).note(1).cibleType(CibleAvis.GUIDE).statutModeration(StatutModerationAvis.MASQUE).build()
+        ));
+        when(signalementRepository.findAll()).thenReturn(List.of(
+                AvisSignalement.builder().id(10L).statut(StatutSignalement.OUVERT).build(),
+                AvisSignalement.builder().id(11L).statut(StatutSignalement.VALIDE_CONTENU_RETIRE).build()
+        ));
+
+        var stats = service.getStatistiques();
+
+        assertThat(stats.getTotalAvis()).isEqualTo(2L);
+        assertThat(stats.getApprouves()).isEqualTo(1L);
+        assertThat(stats.getMasques()).isEqualTo(1L);
+        assertThat(stats.getNoteMoyenneApprouves()).isEqualTo(5.0);
+        assertThat(stats.getSignalementsOuverts()).isEqualTo(1L);
+        assertThat(stats.getSignalementsFondes()).isEqualTo(1L);
+    }
 }

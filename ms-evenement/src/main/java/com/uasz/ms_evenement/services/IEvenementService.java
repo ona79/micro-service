@@ -1,6 +1,7 @@
 package com.uasz.ms_evenement.services;
 
 import com.uasz.ms_evenement.dto.EvenementDto;
+import com.uasz.ms_evenement.dto.EvenementStatsDto;
 import com.uasz.ms_evenement.dto.PageResponseDto;
 import com.uasz.ms_evenement.entities.StatutEvenement;
 import com.uasz.ms_evenement.entities.TypeEvenement;
@@ -48,6 +49,8 @@ public interface IEvenementService {
     EvenementDto terminerEvenement(Long id);
 
     EvenementDto archiverEvenement(Long id, String motif);
+
+    EvenementStatsDto getStatistiques();
 
     void deleteEvenement(Long id);
 }

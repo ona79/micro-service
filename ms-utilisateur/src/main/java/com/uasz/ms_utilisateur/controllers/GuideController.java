@@ -3,6 +3,7 @@ package com.uasz.ms_utilisateur.controllers;
 import com.uasz.ms_utilisateur.dto.GuideHistoriqueDto;
 import com.uasz.ms_utilisateur.dto.GuideProfilDto;
 import com.uasz.ms_utilisateur.dto.GuideSelfUpdateRequest;
+import com.uasz.ms_utilisateur.dto.GuideStatsDto;
 import com.uasz.ms_utilisateur.dto.GuideValidationDecisionRequest;
 import com.uasz.ms_utilisateur.dto.GuideVerificationDto;
 import com.uasz.ms_utilisateur.entities.StatutValidationGuide;
@@ -73,6 +74,11 @@ public class GuideController {
             @RequestParam(required = false) StatutValidationGuide statut
     ) {
         return ResponseEntity.ok(guideService.getAllAdmin(statut));
+    }
+
+    @GetMapping("/statistiques")
+    public ResponseEntity<GuideStatsDto> getStatistiques() {
+        return ResponseEntity.ok(guideService.getStatistiques());
     }
 
     @GetMapping("/utilisateur/{utilisateurId}")

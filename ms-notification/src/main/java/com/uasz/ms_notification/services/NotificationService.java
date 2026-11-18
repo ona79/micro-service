@@ -148,6 +148,54 @@ public class NotificationService implements INotificationService {
 
     @Override
     @Transactional(readOnly = true)
+    public com.uasz.ms_notification.dto.NotificationStatsDto getStatistiques() {
+        SecurityUserContext caller = requireAuthenticatedContext();
+        requireReadAllPermission(caller);
+        List<Notification> all = notificationRepository.findAll();
+
+        long enAttente = 0L;
+        long envoyees = 0L;
+        long echecsTemp = 0L;
+        long echecsDef = 0L;
+        long nonLues = 0L;
+        java.util.Map<String, Long> parStatut = new java.util.LinkedHashMap<>();
+        java.util.Map<String, Long> parCanal = new java.util.LinkedHashMap<>();
+        java.util.Map<String, Long> parType = new java.util.LinkedHashMap<>();
+
+        for (Notification n : all) {
+            StatutNotification st = n.getStatut() != null ? n.getStatut() : StatutNotification.EN_ATTENTE;
+            switch (st) {
+                case EN_ATTENTE -> enAttente++;
+                case ENVOYEE -> envoyees++;
+                case ECHEC_TEMPORAIRE -> echecsTemp++;
+                case ECHEC -> echecsDef++;
+            }
+            if (!n.isLue()) {
+                nonLues++;
+            }
+            parStatut.merge(st.name(), 1L, Long::sum);
+            parCanal.merge(n.getCanal() != null ? n.getCanal().name() : "INCONNU", 1L, Long::sum);
+            String type = (n.getTypeEvenement() != null && !n.getTypeEvenement().isBlank())
+                    ? n.getTypeEvenement()
+                    : "GENERAL";
+            parType.merge(type, 1L, Long::sum);
+        }
+
+        return com.uasz.ms_notification.dto.NotificationStatsDto.builder()
+                .total(all.size())
+                .enAttente(enAttente)
+                .envoyees(envoyees)
+                .echecsTemporaires(echecsTemp)
+                .echecsDefinitifs(echecsDef)
+                .nonLuesTotal(nonLues)
+                .parStatut(parStatut)
+                .parCanal(parCanal)
+                .parTypeEvenement(parType)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public NotificationPageResponseDto getMesNotifications(int page, int size, boolean nonLuesOnly, String typeEvenement) {
         SecurityUserContext caller = requireAuthenticatedContext();
         if (!caller.hasPermission("NOTIFICATION:LIRE_PROPRE") && !caller.isAdmin()) {
@@ -158,9 +206,10 @@ public class NotificationService implements INotificationService {
         }
         Pageable pageable = buildPageable(page, size);
         String normalizedType = normalizeUpperOrNull(typeEvenement);
+        String safeEmail = safeEmail(caller.email());
         Page<Notification> result = notificationRepository.findOwnedNotifications(
-                caller.userId(), caller.email(), nonLuesOnly, normalizedType, pageable);
-        long unreadCount = notificationRepository.countUnreadOwned(caller.userId(), caller.email());
+                caller.userId(), safeEmail, nonLuesOnly, normalizedType, pageable);
+        long unreadCount = notificationRepository.countUnreadOwned(caller.userId(), safeEmail);
         return toPageResponse(result, unreadCount);
     }
 
@@ -171,7 +220,7 @@ public class NotificationService implements INotificationService {
         if (caller.userId() == null) {
             throw new UnauthorizedException("Identifiant utilisateur requis.");
         }
-        long count = notificationRepository.countUnreadOwned(caller.userId(), caller.email());
+        long count = notificationRepository.countUnreadOwned(caller.userId(), safeEmail(caller.email()));
         return NotificationCompteurDto.builder().unreadCount(count).build();
     }
 
@@ -201,7 +250,7 @@ public class NotificationService implements INotificationService {
         if (caller.userId() == null) {
             throw new UnauthorizedException("Identifiant utilisateur requis.");
         }
-        List<Notification> unread = notificationRepository.findAllUnreadOwned(caller.userId(), caller.email());
+        List<Notification> unread = notificationRepository.findAllUnreadOwned(caller.userId(), safeEmail(caller.email()));
         LocalDateTime now = LocalDateTime.now(CASAMANCE_ZONE);
         for (Notification n : unread) {
             n.setLue(true);
@@ -382,5 +431,9 @@ public class NotificationService implements INotificationService {
             return null;
         }
         return val.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private static String safeEmail(String email) {
+        return email != null ? email.trim() : "";
     }
 }

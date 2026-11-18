@@ -457,4 +457,75 @@ class GatewayAuthorizationFilterTest {
         filter.doFilter(touristeAllNotifs, resTouristeAllNotifs, new MockFilterChain());
         assertThat(resTouristeAllNotifs.getStatus()).isEqualTo(403);
     }
+
+    @Test
+    @DisplayName("P07 : Hardening Analytics, Utilisateurs /recherche /statistiques /audit, /internal et /soumettre guide")
+    void shouldEnforceP07AnalyticsAuditInternalAndGuideCircuitSubmitRbac() throws Exception {
+        // 1. /api/utilisateurs/internal/** toujours bloqué 403 même pour ADMINISTRATEUR
+        MockHttpServletRequest internalUsersReq = new MockHttpServletRequest("GET", "/api/utilisateurs/internal/sessions/sess-1");
+        internalUsersReq.addHeader("Authorization", "Bearer " + generateToken(1L, "admin@uasz.sn", "ADMINISTRATEUR", 300));
+        MockHttpServletResponse resInternalUsers = new MockHttpServletResponse();
+        filter.doFilter(internalUsersReq, resInternalUsers, new MockFilterChain());
+        assertThat(resInternalUsers.getStatus()).isEqualTo(403);
+
+        // 2. /api/utilisateurs/audit et /statistiques et /recherche réservés à ADMINISTRATEUR (403 pour GESTIONNAIRE_SITE)
+        MockHttpServletRequest managerAudit = new MockHttpServletRequest("GET", "/api/utilisateurs/audit");
+        managerAudit.addHeader("Authorization", "Bearer " + generateToken(3L, "awa@uasz.sn", "GESTIONNAIRE_SITE", 300));
+        MockHttpServletResponse resManagerAudit = new MockHttpServletResponse();
+        filter.doFilter(managerAudit, resManagerAudit, new MockFilterChain());
+        assertThat(resManagerAudit.getStatus()).isEqualTo(403);
+
+        MockHttpServletRequest adminAudit = new MockHttpServletRequest("GET", "/api/utilisateurs/audit");
+        adminAudit.addHeader("Authorization", "Bearer " + generateToken(1L, "admin@uasz.sn", "ADMINISTRATEUR", 300));
+        MockHttpServletResponse resAdminAudit = new MockHttpServletResponse();
+        MockFilterChain chainAudit = new MockFilterChain();
+        filter.doFilter(adminAudit, resAdminAudit, chainAudit);
+        assertThat(resAdminAudit.getStatus()).isEqualTo(200);
+        assertThat(chainAudit.getRequest()).isNotNull();
+
+        MockHttpServletRequest managerUserStats = new MockHttpServletRequest("GET", "/api/utilisateurs/statistiques");
+        managerUserStats.addHeader("Authorization", "Bearer " + generateToken(3L, "awa@uasz.sn", "GESTIONNAIRE_SITE", 300));
+        MockHttpServletResponse resManagerStats = new MockHttpServletResponse();
+        filter.doFilter(managerUserStats, resManagerStats, new MockFilterChain());
+        assertThat(resManagerStats.getStatus()).isEqualTo(403);
+
+        // 3. /api/guides/statistiques autorisé pour GESTIONNAIRE_SITE, refusé pour GUIDE et TOURISTE
+        MockHttpServletRequest guideStatsForbidden = new MockHttpServletRequest("GET", "/api/guides/statistiques");
+        guideStatsForbidden.addHeader("Authorization", "Bearer " + generateToken(5L, "guide@uasz.sn", "GUIDE", 300));
+        MockHttpServletResponse resGuideStats = new MockHttpServletResponse();
+        filter.doFilter(guideStatsForbidden, resGuideStats, new MockFilterChain());
+        assertThat(resGuideStats.getStatus()).isEqualTo(403);
+
+        MockHttpServletRequest managerGuideStats = new MockHttpServletRequest("GET", "/api/guides/statistiques");
+        managerGuideStats.addHeader("Authorization", "Bearer " + generateToken(3L, "awa@uasz.sn", "GESTIONNAIRE_SITE", 300));
+        MockHttpServletResponse resManagerGuideStats = new MockHttpServletResponse();
+        filter.doFilter(managerGuideStats, resManagerGuideStats, new MockFilterChain());
+        assertThat(resManagerGuideStats.getStatus()).isEqualTo(200);
+
+        // 4. POST /api/circuits/{id}/soumettre autorisé pour GUIDE (CIRCUIT:MODIFIER), interdit pour CONSERVATEUR et TOURISTE
+        MockHttpServletRequest guideSubmitCircuit = new MockHttpServletRequest("POST", "/api/circuits/42/soumettre");
+        attachCookieAuthWithCsrf(guideSubmitCircuit, 5L, "guide@uasz.sn", "GUIDE", 300);
+        MockHttpServletResponse resGuideSubmit = new MockHttpServletResponse();
+        filter.doFilter(guideSubmitCircuit, resGuideSubmit, new MockFilterChain());
+        assertThat(resGuideSubmit.getStatus()).isEqualTo(200);
+
+        MockHttpServletRequest conservateurSubmitCircuit = new MockHttpServletRequest("POST", "/api/circuits/42/soumettre");
+        attachCookieAuthWithCsrf(conservateurSubmitCircuit, 4L, "fatou@uasz.sn", "CONSERVATEUR", 300);
+        MockHttpServletResponse resConsSubmit = new MockHttpServletResponse();
+        filter.doFilter(conservateurSubmitCircuit, resConsSubmit, new MockFilterChain());
+        assertThat(resConsSubmit.getStatus()).isEqualTo(403);
+
+        // 5. /api/evenements/statistiques refusé à CONSERVATEUR et TOURISTE, autorisé à GESTIONNAIRE_SITE
+        MockHttpServletRequest consEvtStats = new MockHttpServletRequest("GET", "/api/evenements/statistiques");
+        consEvtStats.addHeader("Authorization", "Bearer " + generateToken(4L, "fatou@uasz.sn", "CONSERVATEUR", 300));
+        MockHttpServletResponse resConsEvtStats = new MockHttpServletResponse();
+        filter.doFilter(consEvtStats, resConsEvtStats, new MockFilterChain());
+        assertThat(resConsEvtStats.getStatus()).isEqualTo(403);
+
+        MockHttpServletRequest mgrEvtStats = new MockHttpServletRequest("GET", "/api/evenements/statistiques");
+        mgrEvtStats.addHeader("Authorization", "Bearer " + generateToken(3L, "awa@uasz.sn", "GESTIONNAIRE_SITE", 300));
+        MockHttpServletResponse resMgrEvtStats = new MockHttpServletResponse();
+        filter.doFilter(mgrEvtStats, resMgrEvtStats, new MockFilterChain());
+        assertThat(resMgrEvtStats.getStatus()).isEqualTo(200);
+    }
 }

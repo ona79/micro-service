@@ -1,7 +1,9 @@
 package com.uasz.ms_utilisateur.services;
 
 import com.uasz.ms_utilisateur.dto.ConnexionRequest;
+import com.uasz.ms_utilisateur.dto.PageResponseDto;
 import com.uasz.ms_utilisateur.dto.UtilisateurDto;
+import com.uasz.ms_utilisateur.dto.UtilisateurStatsDto;
 import com.uasz.ms_utilisateur.entities.RoleUtilisateur;
 import com.uasz.ms_utilisateur.entities.Utilisateur;
 import com.uasz.ms_utilisateur.exceptions.BadRequestException;
@@ -10,13 +12,22 @@ import com.uasz.ms_utilisateur.exceptions.ResourceNotFoundException;
 import com.uasz.ms_utilisateur.exceptions.UnauthorizedException;
 import com.uasz.ms_utilisateur.mappers.UtilisateurMapper;
 import com.uasz.ms_utilisateur.repositories.UtilisateurRepository;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -85,6 +96,70 @@ public class UtilisateurService implements IUtilisateurService {
         return utilisateurRepository.findAll().stream()
                 .map(utilisateurMapper::toDto)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponseDto<UtilisateurDto> rechercherUtilisateurs(
+            String q,
+            RoleUtilisateur role,
+            Boolean actif,
+            int page,
+            int size
+    ) {
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), 100);
+        String qLower = (q != null && !q.isBlank()) ? q.trim().toLowerCase(Locale.ROOT) : null;
+
+        Specification<Utilisateur> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (role != null) {
+                predicates.add(cb.equal(root.get("role"), role));
+            }
+            if (actif != null) {
+                predicates.add(cb.equal(root.get("actif"), actif));
+            }
+            if (qLower != null) {
+                String pattern = "%" + qLower + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(cb.coalesce(root.get("nom"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("prenom"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("email"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("telephone"), "")), pattern)
+                ));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
+        Page<Utilisateur> result = utilisateurRepository.findAll(
+                spec,
+                PageRequest.of(safePage, safeSize, Sort.by(Sort.Direction.DESC, "id"))
+        );
+        return PageResponseDto.<UtilisateurDto>builder()
+                .content(result.getContent().stream().map(utilisateurMapper::toDto).toList())
+                .page(result.getNumber())
+                .size(result.getSize())
+                .totalElements(result.getTotalElements())
+                .totalPages(result.getTotalPages())
+                .last(result.isLast())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UtilisateurStatsDto getUtilisateursStats() {
+        long total = utilisateurRepository.count();
+        long actifs = utilisateurRepository.countByActifTrue();
+        Map<String, Long> parRole = new LinkedHashMap<>();
+        for (RoleUtilisateur r : RoleUtilisateur.values()) {
+            parRole.put(r.name(), utilisateurRepository.countByRole(r));
+        }
+        return UtilisateurStatsDto.builder()
+                .total(total)
+                .actifs(actifs)
+                .inactifs(Math.max(0L, total - actifs))
+                .parRole(parRole)
+                .build();
     }
 
     @Override

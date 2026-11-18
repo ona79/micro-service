@@ -325,4 +325,33 @@ class EvenementServiceTest {
         assertThat(reservables.getFirst().getNomEvenement()).isEqualTo("Festival Réservable");
         assertThat(reservables.getFirst().isOuvertReservation()).isTrue();
     }
+
+    @Test
+    void getStatistiques_retourneCompteursEtBloqueTouriste() {
+        LocalDateTime futur = LocalDateTime.now(Evenement.CASAMANCE_ZONE).plusDays(7);
+        Evenement pub = Evenement.builder()
+                .id(1L).nomEvenement("Festival").typeEvenement(TypeEvenement.FESTIVAL)
+                .dateDebut(futur).dateFin(futur.plusDays(1)).capaciteMax(100)
+                .statutEvenement(StatutEvenement.PUBLIE).ouvertReservation(true).build();
+        Evenement annule = Evenement.builder()
+                .id(2L).nomEvenement("Atelier Annulé").typeEvenement(TypeEvenement.ATELIER)
+                .dateDebut(futur).dateFin(futur.plusHours(2)).capaciteMax(20)
+                .statutEvenement(StatutEvenement.ANNULE).ouvertReservation(false).build();
+
+        com.uasz.ms_evenement.security.SecurityUserContextHolder.setContext(
+                new com.uasz.ms_evenement.security.SecurityUserContext(4L, "CONSERVATEUR", "c@uasz.sn", false, null));
+        assertThatThrownBy(() -> evenementService.getStatistiques())
+                .isInstanceOf(com.uasz.ms_evenement.exceptions.ForbiddenException.class);
+
+        when(evenementRepository.findAll()).thenReturn(List.of(pub, annule));
+        com.uasz.ms_evenement.security.SecurityUserContextHolder.setContext(
+                new com.uasz.ms_evenement.security.SecurityUserContext(3L, "GESTIONNAIRE_SITE", "awa@uasz.sn", false, null));
+        var stats = evenementService.getStatistiques();
+
+        assertThat(stats.getTotal()).isEqualTo(2L);
+        assertThat(stats.getPublies()).isEqualTo(1L);
+        assertThat(stats.getAnnules()).isEqualTo(1L);
+        assertThat(stats.getAVenirPublies()).isEqualTo(1L);
+        assertThat(stats.getOuvertsReservation()).isEqualTo(1L);
+    }
 }

@@ -62,6 +62,11 @@ public class CircuitController {
                 inclureNonPublies, page, size, sortBy, sortDir));
     }
 
+    @GetMapping("/statistiques")
+    public ResponseEntity<com.uasz.ms_circuit.dto.CircuitStatsDto> getStatistiques() {
+        return ResponseEntity.ok(circuitService.getStatistiques());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<CircuitDto> getByIdCircuit(@PathVariable Long id) {
         return ResponseEntity.ok(circuitService.getByIdCircuit(id));

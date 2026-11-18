@@ -18,30 +18,59 @@ public interface GuideProfilRepository extends JpaRepository<GuideProfil, Long> 
     @Query("""
             SELECT g FROM GuideProfil g
             JOIN FETCH g.utilisateur u
-            WHERE g.statutValidation = 'VALIDE'
+            WHERE g.statutValidation = com.uasz.ms_utilisateur.entities.StatutValidationGuide.VALIDE
               AND g.visibilitePublique = true
               AND u.actif = true
-              AND (:zone IS NULL OR LOWER(g.zonesIntervention) LIKE LOWER(CONCAT('%', :zone, '%')))
-              AND (:langue IS NULL OR LOWER(g.languesParlees) LIKE LOWER(CONCAT('%', :langue, '%')))
-              AND (:q IS NULL
-                   OR LOWER(u.nom) LIKE LOWER(CONCAT('%', :q, '%'))
-                   OR LOWER(u.prenom) LIKE LOWER(CONCAT('%', :q, '%'))
-                   OR LOWER(g.specialites) LIKE LOWER(CONCAT('%', :q, '%'))
-                   OR LOWER(g.presentationCourte) LIKE LOWER(CONCAT('%', :q, '%'))
-                   OR LOWER(g.zonesIntervention) LIKE LOWER(CONCAT('%', :q, '%')))
             ORDER BY g.anneesExperience DESC, g.id ASC
             """)
-    List<GuideProfil> searchPublicGuides(
-            @Param("zone") String zone,
-            @Param("langue") String langue,
-            @Param("q") String q
-    );
+    List<GuideProfil> findAllPublicActive();
 
     @Query("""
             SELECT g FROM GuideProfil g
             JOIN FETCH g.utilisateur u
-            WHERE (:statut IS NULL OR g.statutValidation = :statut)
             ORDER BY g.updatedAt DESC, g.id DESC
             """)
-    List<GuideProfil> findAllAdminFiltered(@Param("statut") StatutValidationGuide statut);
+    List<GuideProfil> findAllAdminOrderByUpdatedDesc();
+
+    @Query("""
+            SELECT g FROM GuideProfil g
+            JOIN FETCH g.utilisateur u
+            WHERE g.statutValidation = :statut
+            ORDER BY g.updatedAt DESC, g.id DESC
+            """)
+    List<GuideProfil> findByStatutAdminOrderByUpdatedDesc(@Param("statut") StatutValidationGuide statut);
+
+    long countByStatutValidation(StatutValidationGuide statutValidation);
+
+    long countByStatutValidationAndDisponibleTrue(StatutValidationGuide statutValidation);
+
+    long countByStatutValidationAndVisibilitePubliqueTrue(StatutValidationGuide statutValidation);
+
+    /**
+     * Recherche publique tolérante aux paramètres absents sans passer de paramètres null
+     * à LOWER() côté PostgreSQL 16 (prévention de l'erreur function lower(bytea) does not exist).
+     */
+    default List<GuideProfil> searchPublicGuides(String zone, String langue, String q) {
+        String zoneNorm = zone != null && !zone.isBlank() ? zone.trim().toLowerCase() : null;
+        String langueNorm = langue != null && !langue.isBlank() ? langue.trim().toLowerCase() : null;
+        String qNorm = q != null && !q.isBlank() ? q.trim().toLowerCase() : null;
+        return findAllPublicActive().stream()
+                .filter(g -> zoneNorm == null || containsIgnoreCase(g.getZonesIntervention(), zoneNorm))
+                .filter(g -> langueNorm == null || containsIgnoreCase(g.getLanguesParlees(), langueNorm))
+                .filter(g -> qNorm == null
+                        || containsIgnoreCase(g.getUtilisateur() != null ? g.getUtilisateur().getNom() : null, qNorm)
+                        || containsIgnoreCase(g.getUtilisateur() != null ? g.getUtilisateur().getPrenom() : null, qNorm)
+                        || containsIgnoreCase(g.getSpecialites(), qNorm)
+                        || containsIgnoreCase(g.getPresentationCourte(), qNorm)
+                        || containsIgnoreCase(g.getZonesIntervention(), qNorm))
+                .toList();
+    }
+
+    default List<GuideProfil> findAllAdminFiltered(StatutValidationGuide statut) {
+        return statut == null ? findAllAdminOrderByUpdatedDesc() : findByStatutAdminOrderByUpdatedDesc(statut);
+    }
+
+    private static boolean containsIgnoreCase(String value, String needleLower) {
+        return value != null && value.toLowerCase().contains(needleLower);
+    }
 }

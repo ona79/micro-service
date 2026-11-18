@@ -275,6 +275,69 @@ public class PatrimoineService implements IPatrimoineService {
         patrimoineRepository.deleteById(id);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public com.uasz.ms_patrimoine.dto.PatrimoineStatsDto getStatistiques() {
+        SecurityUserContext caller = SecurityUserContextHolder.getContext();
+        if (caller == null || caller.userId() == null) {
+            throw new UnauthorizedException("Authentification requise.");
+        }
+        if ("TOURISTE".equals(caller.role()) || "PUBLIC".equals(caller.role())) {
+            throw new ForbiddenException("Accès interdit : statistiques réservées à l'espace professionnel.");
+        }
+        boolean fullCatalogAccess = caller.hasPermission("PATRIMOINE:CREER")
+                || caller.hasPermission("PATRIMOINE:MODIFIER")
+                || caller.hasPermission("PATRIMOINE:PUBLIER")
+                || caller.hasPermission("PATRIMOINE:ARCHIVER");
+
+        List<Patrimoine> all = patrimoineRepository.findAll();
+        long brouillons = 0L;
+        long soumis = 0L;
+        long publies = 0L;
+        long archives = 0L;
+        long capacitePubliee = 0L;
+        double tarifSumPublie = 0.0;
+        java.util.Map<String, Long> parCategorie = new java.util.LinkedHashMap<>();
+        java.util.Map<String, Long> parZone = new java.util.LinkedHashMap<>();
+
+        for (Patrimoine p : all) {
+            StatutPublication st = p.getStatutPublication() != null ? p.getStatutPublication() : StatutPublication.PUBLIE;
+            if (!fullCatalogAccess && st != StatutPublication.PUBLIE) {
+                continue;
+            }
+            switch (st) {
+                case BROUILLON -> brouillons++;
+                case SOUMIS -> soumis++;
+                case PUBLIE -> {
+                    publies++;
+                    capacitePubliee += Math.max(0, p.getCapacitePatrimoine());
+                    tarifSumPublie += Math.max(0.0, p.getTarifEntree());
+                }
+                case ARCHIVE -> archives++;
+            }
+            String cat = p.getCategoriePatrimoine() != null ? p.getCategoriePatrimoine().name() : "AUTRE";
+            String zone = p.getZoneGeographique() != null ? p.getZoneGeographique().name() : "NON_DEFINIE";
+            parCategorie.merge(cat, 1L, Long::sum);
+            parZone.merge(zone, 1L, Long::sum);
+        }
+
+        long total = fullCatalogAccess ? (brouillons + soumis + publies + archives) : publies;
+        double tarifMoyen = publies > 0 ? Math.round((tarifSumPublie / publies) * 100.0) / 100.0 : 0.0;
+
+        return com.uasz.ms_patrimoine.dto.PatrimoineStatsDto.builder()
+                .total(total)
+                .brouillons(brouillons)
+                .soumis(soumis)
+                .publies(publies)
+                .archives(archives)
+                .scope(fullCatalogAccess ? "GLOBAL" : "PUBLIE_UNIQUEMENT")
+                .parCategorie(parCategorie)
+                .parZone(parZone)
+                .capaciteTotalePubliee(capacitePubliee)
+                .tarifMoyenPublie(tarifMoyen)
+                .build();
+    }
+
     private Specification<Patrimoine> buildSpecification(
             String q,
             CategoriePatrimoine categorie,

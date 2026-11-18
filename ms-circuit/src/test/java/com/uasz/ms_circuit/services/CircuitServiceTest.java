@@ -369,4 +369,41 @@ class CircuitServiceTest {
         assertThatThrownBy(() -> circuitService.deleteCircuit(999L))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
+
+    @Test
+    void getByIdCircuitEtStatistiques_guideBolaStrict() {
+        Circuit autreBrouillon = Circuit.builder()
+                .id(10L).nomCircuit("Brouillon Confrère")
+                .statutCircuit(com.uasz.ms_circuit.entities.StatutCircuit.BROUILLON)
+                .guideResponsableId(99L)
+                .dureeEstimee(90)
+                .build();
+        Circuit monCircuit = Circuit.builder()
+                .id(11L).nomCircuit("Mon Circuit")
+                .statutCircuit(com.uasz.ms_circuit.entities.StatutCircuit.SOUMIS)
+                .guideResponsableId(5L)
+                .dureeEstimee(120)
+                .build();
+
+        when(circuitRepository.findById(10L)).thenReturn(Optional.of(autreBrouillon));
+        com.uasz.ms_circuit.security.SecurityUserContextHolder.setContext(
+                new com.uasz.ms_circuit.security.SecurityUserContext(5L, "GUIDE", "guide@uasz.sn", false, null));
+
+        assertThatThrownBy(() -> circuitService.getByIdCircuit(10L))
+                .isInstanceOf(com.uasz.ms_circuit.exceptions.ForbiddenException.class)
+                .hasMessageContaining("BOLA");
+
+        when(circuitRepository.findByGuideResponsableIdOrderByIdDesc(5L)).thenReturn(List.of(monCircuit));
+        var guideStats = circuitService.getStatistiques();
+        assertThat(guideStats.getScope()).isEqualTo("GUIDE_PROPRE");
+        assertThat(guideStats.getTotal()).isEqualTo(1L);
+        assertThat(guideStats.getSoumis()).isEqualTo(1L);
+
+        when(circuitRepository.findAll()).thenReturn(List.of(autreBrouillon, monCircuit));
+        com.uasz.ms_circuit.security.SecurityUserContextHolder.setContext(
+                new com.uasz.ms_circuit.security.SecurityUserContext(3L, "GESTIONNAIRE_SITE", "awa@uasz.sn", false, null));
+        var managerStats = circuitService.getStatistiques();
+        assertThat(managerStats.getScope()).isEqualTo("GLOBAL");
+        assertThat(managerStats.getTotal()).isEqualTo(2L);
+    }
 }

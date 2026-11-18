@@ -850,6 +850,63 @@ public class AvisModerationService implements IAvisModerationService {
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public com.uasz.ms_reservation.dto.ModerationStatsDto getStatistiques() {
+        requireModeratorPermission();
+        List<Avis> avisList = avisRepository.findAll();
+        List<AvisSignalement> signalements = signalementRepository.findAll();
+
+        long approuves = 0L;
+        long enAttente = 0L;
+        long masques = 0L;
+        long rejetes = 0L;
+        long sumNotes = 0L;
+        Map<String, Long> avisParCible = new LinkedHashMap<>();
+
+        for (Avis a : avisList) {
+            StatutModerationAvis st = a.getStatutModeration() != null ? a.getStatutModeration() : StatutModerationAvis.APPROUVE;
+            switch (st) {
+                case APPROUVE -> {
+                    approuves++;
+                    sumNotes += a.getNote();
+                }
+                case EN_ATTENTE -> enAttente++;
+                case MASQUE -> masques++;
+                case REJETE -> rejetes++;
+            }
+            String cible = a.getCibleType() != null ? a.getCibleType().name() : "AUTRE";
+            avisParCible.merge(cible, 1L, Long::sum);
+        }
+
+        long sigOuverts = 0L;
+        long sigFondes = 0L;
+        long sigRejetes = 0L;
+        for (AvisSignalement s : signalements) {
+            StatutSignalement st = s.getStatut() != null ? s.getStatut() : StatutSignalement.OUVERT;
+            switch (st) {
+                case OUVERT -> sigOuverts++;
+                case VALIDE_CONTENU_RETIRE -> sigFondes++;
+                case REJETE_ABUSIF -> sigRejetes++;
+            }
+        }
+
+        double noteMoy = approuves > 0 ? Math.round(((double) sumNotes / approuves) * 100.0) / 100.0 : 0.0;
+        return com.uasz.ms_reservation.dto.ModerationStatsDto.builder()
+                .totalAvis(avisList.size())
+                .approuves(approuves)
+                .enAttente(enAttente)
+                .masques(masques)
+                .rejetes(rejetes)
+                .noteMoyenneApprouves(noteMoy)
+                .totalSignalements(signalements.size())
+                .signalementsOuverts(sigOuverts)
+                .signalementsFondes(sigFondes)
+                .signalementsRejetes(sigRejetes)
+                .avisParCible(avisParCible)
+                .build();
+    }
+
     private AvisDto toPublicDto(Avis a) {
         return AvisDto.builder()
                 .id(a.getId())
