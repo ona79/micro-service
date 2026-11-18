@@ -432,6 +432,8 @@ type AdminTab = 'patrimoines' | 'circuits' | 'evenements' | 'utilisateurs';
                       <label for="usr-role">Rôle attribué *</label>
                       <select id="usr-role" formControlName="role" class="form-input">
                         <option value="TOURISTE">Visiteur / Touriste</option>
+                        <option value="GUIDE">Guide touristique local</option>
+                        <option value="CONSERVATEUR">Conservateur du patrimoine</option>
                         <option value="GESTIONNAIRE_SITE">Gestionnaire de site</option>
                         <option value="ADMINISTRATEUR">Administrateur</option>
                       </select>

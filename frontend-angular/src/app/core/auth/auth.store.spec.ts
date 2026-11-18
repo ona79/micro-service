@@ -49,6 +49,59 @@ describe('AuthStore — Gestion de session HttpOnly et Rôles', () => {
     expect(store.roleLabel()).toBe('Administrateur');
   });
 
+  it('gère correctement le rôle CONSERVATEUR (membre du staff)', async () => {
+    const mockConservateur: Utilisateur = {
+      id: 5,
+      nom: 'Fall',
+      prenom: 'Khady',
+      email: 'khady.fall@patrimoine.uasz.sn',
+      telephone: '+221770000005',
+      role: 'CONSERVATEUR',
+      actif: true,
+      dateInscription: '2026-11-17T08:00:00',
+    };
+
+    const loginPromise = store.login({
+      email: 'khady.fall@patrimoine.uasz.sn',
+      motDePasse: 'Conservateur2026!',
+    });
+
+    const req = httpMock.expectOne('/api/utilisateurs/connexion');
+    req.flush(mockConservateur);
+
+    await loginPromise;
+    expect(store.isConservateur()).toBe(true);
+    expect(store.isStaff()).toBe(true);
+    expect(store.isAdmin()).toBe(false);
+    expect(store.roleLabel()).toBe('Conservateur du patrimoine');
+  });
+
+  it('gère correctement le rôle GUIDE', async () => {
+    const mockGuide: Utilisateur = {
+      id: 6,
+      nom: 'Sagna',
+      prenom: 'Alioune',
+      email: 'alioune.sagna@guide.uasz.sn',
+      telephone: '+221770000006',
+      role: 'GUIDE',
+      actif: true,
+      dateInscription: '2026-11-17T08:00:00',
+    };
+
+    const loginPromise = store.login({
+      email: 'alioune.sagna@guide.uasz.sn',
+      motDePasse: 'Guide2026!',
+    });
+
+    const req = httpMock.expectOne('/api/utilisateurs/connexion');
+    req.flush(mockGuide);
+
+    await loginPromise;
+    expect(store.isGuide()).toBe(true);
+    expect(store.isStaff()).toBe(false);
+    expect(store.roleLabel()).toBe('Guide touristique local');
+  });
+
   it('déconnecte l’utilisateur et réinitialise l’état de session', async () => {
     const logoutPromise = store.logout();
     const req = httpMock.expectOne('/api/utilisateurs/deconnexion');
@@ -60,9 +113,11 @@ describe('AuthStore — Gestion de session HttpOnly et Rôles', () => {
     expect(store.user()).toBeNull();
   });
 
-  it('formate correctement les libellés de rôle', () => {
+  it('formate correctement les 5 libellés de rôles RBAC', () => {
     expect(formatRoleLabel('ADMINISTRATEUR')).toBe('Administrateur');
     expect(formatRoleLabel('GESTIONNAIRE_SITE')).toBe('Gestionnaire de site');
+    expect(formatRoleLabel('CONSERVATEUR')).toBe('Conservateur du patrimoine');
+    expect(formatRoleLabel('GUIDE')).toBe('Guide touristique local');
     expect(formatRoleLabel('TOURISTE')).toBe('Visiteur / Touriste');
   });
 });

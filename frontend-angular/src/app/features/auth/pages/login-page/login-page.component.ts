@@ -480,7 +480,7 @@ export class LoginPageComponent {
       const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
       if (returnUrl && returnUrl.startsWith('/')) {
         await this.router.navigateByUrl(returnUrl);
-      } else if (user.role === 'ADMINISTRATEUR' || user.role === 'GESTIONNAIRE_SITE') {
+      } else if (user.role === 'ADMINISTRATEUR' || user.role === 'GESTIONNAIRE_SITE' || user.role === 'CONSERVATEUR') {
         await this.router.navigate(['/administration']);
       } else {
         await this.router.navigate(['/mon-espace']);
