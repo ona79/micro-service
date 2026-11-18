@@ -51,7 +51,6 @@ jobs:
       fail-fast: false
       matrix:
         service:
-          - config-server
           - discovery-server
           - ms-patrimoine
           - ms-circuit
@@ -111,38 +110,278 @@ jobs:
         with:
           path: artifacts
 
-      - name: Démarrage de ms-patrimoine (:3001), ms-circuit (:3002), ms-evenement (:3003), ms-reservation (:3004) et test E2E
+      - name: Démarrage et tests E2E durcis (ms-patrimoine, ms-circuit, ms-evenement, ms-reservation)
         run: |
-          java -jar artifacts/jar-ms-patrimoine/ms-patrimoine-0.0.1-SNAPSHOT.jar --spring.cloud.discovery.enabled=false > patrimoine.log 2>&1 &
-          java -jar artifacts/jar-ms-circuit/ms-circuit-0.0.1-SNAPSHOT.jar --spring.cloud.discovery.enabled=false > circuit.log 2>&1 &
-          java -jar artifacts/jar-ms-evenement/ms-evenement-0.0.1-SNAPSHOT.jar --spring.cloud.discovery.enabled=false > evenement.log 2>&1 &
-          java -jar artifacts/jar-ms-reservation/ms-reservation-0.0.1-SNAPSHOT.jar --spring.cloud.discovery.enabled=false > reservation.log 2>&1 &
+          set -e
+          set -u
+          set -o pipefail
 
-          echo "Attente du démarrage des 4 microservices..."
-          for port in 3001 3002 3003 3004; do
-            for i in {1..30}; do
-              curl -sf http://localhost:$port/actuator/health && break
-              sleep 2
+          PIDS=()
+          CLEANED_UP=0
+
+          cleanup() {
+            local EXIT_CODE=$?
+            if [ "$CLEANED_UP" -eq 1 ]; then
+              return
+            fi
+            CLEANED_UP=1
+            echo -e "\n>>> [CLEANUP] Nettoyage et arrêt des microservices..."
+            for pid in "${PIDS[@]}"; do
+              if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                echo "Arrêt du processus PID $pid..."
+                kill "$pid" 2>/dev/null || true
+              fi
             done
-          done
+            sleep 1
+            for pid in "${PIDS[@]}"; do
+              if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                kill -9 "$pid" 2>/dev/null || true
+              fi
+            done
+            exit "$EXIT_CODE"
+          }
+
+          trap cleanup EXIT INT TERM
+
+          dump_diagnostics() {
+            local FAILED_STEP="$1"
+            echo "=================================================================="
+            echo " [DIAGNOSTIC AUTOMATIQUE] Échec lors de : $FAILED_STEP"
+            echo "=================================================================="
+            echo ">>> État des processus :"
+            for s in "ms-patrimoine:${PID_PATRIMOINE:-}:3001" "ms-circuit:${PID_CIRCUIT:-}:3002" "ms-evenement:${PID_EVENEMENT:-}:3003" "ms-reservation:${PID_RESERVATION:-}:3004"; do
+              NAME="${s%%:*}"
+              REST="${s#*:}"
+              PID="${REST%%:*}"
+              PORT="${REST#*:}"
+              if [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null; then
+                echo "  - $NAME (PID $PID, Port $PORT) : EN COURS D'EXÉCUTION"
+              else
+                echo "  - $NAME (PID ${PID:-N/A}, Port $PORT) : ARRÊTÉ / CRASHÉ"
+              fi
+            done
+
+            echo -e "\n>>> Réponses Actuator /health :"
+            for port in 3001 3002 3003 3004; do
+              echo "  Port $port :"
+              curl -s "http://localhost:$port/actuator/health" || echo "  [Inaccessible]"
+            done
+
+            echo -e "\n>>> Dernières lignes des journaux applicatifs :"
+            for logf in patrimoine.log circuit.log evenement.log reservation.log; do
+              echo "--- Journal : $logf ---"
+              if [ -f "$logf" ]; then
+                tail -n 35 "$logf"
+              else
+                echo "[Fichier introuvable]"
+              fi
+            done
+            echo "=================================================================="
+          }
+
+          wait_for_service() {
+            local NAME="$1"
+            local PORT="$2"
+            local PID="$3"
+            local MAX_ATTEMPTS=30
+            local SLEEP_SEC=2
+
+            echo "Attente de disponibilité de $NAME (: $PORT, PID: $PID)..."
+            for ((i=1; i<=MAX_ATTEMPTS; i++)); do
+              if ! kill -0 "$PID" 2>/dev/null; then
+                echo "[ERREUR CRITIQUE] Le processus $NAME (PID $PID) s'est arrêté inopinément !" >&2
+                dump_diagnostics "Démarrage de $NAME"
+                return 1
+              fi
+
+              local HEALTH_STATUS
+              HEALTH_STATUS=$(curl -sf "http://localhost:$PORT/actuator/health" 2>/dev/null | jq -r '.status // empty' 2>/dev/null || true)
+              if [ "$HEALTH_STATUS" = "UP" ]; then
+                echo ">>> $NAME est opérationnel (status: UP) après ${i} tentative(s)."
+                return 0
+              fi
+
+              sleep "$SLEEP_SEC"
+            done
+
+            echo "[TIMEOUT] $NAME (: $PORT) n'a pas atteint le statut UP après $((MAX_ATTEMPTS * SLEEP_SEC))s." >&2
+            dump_diagnostics "Timeout démarrage de $NAME"
+            return 1
+          }
+
+          find_jar() {
+            local SVC="$1"
+            if [ -f "artifacts/jar-$SVC/$SVC-0.0.1-SNAPSHOT.jar" ]; then
+              echo "artifacts/jar-$SVC/$SVC-0.0.1-SNAPSHOT.jar"
+            elif [ -f "$SVC/target/$SVC-0.0.1-SNAPSHOT.jar" ]; then
+              echo "$SVC/target/$SVC-0.0.1-SNAPSHOT.jar"
+            else
+              echo ""
+            fi
+          }
+
+          JAR_PATRIMOINE=$(find_jar ms-patrimoine)
+          JAR_CIRCUIT=$(find_jar ms-circuit)
+          JAR_EVENEMENT=$(find_jar ms-evenement)
+          JAR_RESERVATION=$(find_jar ms-reservation)
+
+          if [ -z "$JAR_PATRIMOINE" ] || [ -z "$JAR_CIRCUIT" ] || [ -z "$JAR_EVENEMENT" ] || [ -z "$JAR_RESERVATION" ]; then
+            echo "[ERREUR] Artefact JAR introuvable pour l'un des 4 microservices !" >&2
+            exit 1
+          fi
+
+          echo "=== Démarrage des 4 microservices ==="
+          java -jar "$JAR_PATRIMOINE" --spring.cloud.discovery.enabled=false > patrimoine.log 2>&1 &
+          PID_PATRIMOINE=$!
+          PIDS+=("$PID_PATRIMOINE")
+
+          java -jar "$JAR_CIRCUIT" --spring.cloud.discovery.enabled=false > circuit.log 2>&1 &
+          PID_CIRCUIT=$!
+          PIDS+=("$PID_CIRCUIT")
+
+          java -jar "$JAR_EVENEMENT" --spring.cloud.discovery.enabled=false > evenement.log 2>&1 &
+          PID_EVENEMENT=$!
+          PIDS+=("$PID_EVENEMENT")
+
+          java -jar "$JAR_RESERVATION" --spring.cloud.discovery.enabled=false > reservation.log 2>&1 &
+          PID_RESERVATION=$!
+          PIDS+=("$PID_RESERVATION")
+
+          wait_for_service "ms-patrimoine" 3001 "$PID_PATRIMOINE"
+          wait_for_service "ms-circuit" 3002 "$PID_CIRCUIT"
+          wait_for_service "ms-evenement" 3003 "$PID_EVENEMENT"
+          wait_for_service "ms-reservation" 3004 "$PID_RESERVATION"
+
+          echo -e "\n=================================================================="
+          echo " EXÉCUTION DES TESTS FONCTIONNELS ET ASSERTIONS ROBUSTES"
+          echo "=================================================================="
 
           echo "1. Vérification des patrimoines initiaux (:3001)"
-          curl -sf http://localhost:3001/api/patrimoines | grep -q "PAT-DKR-001"
+          HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/resp_patrimoines.json "http://localhost:3001/api/patrimoines")
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "[ÉCHEC] GET /api/patrimoines a retourné HTTP $HTTP_CODE (attendu: 200)" >&2
+            cat /tmp/resp_patrimoines.json >&2
+            dump_diagnostics "Vérification des patrimoines initiaux"
+            exit 1
+          fi
+          PAT_COUNT=$(jq '. | length' /tmp/resp_patrimoines.json 2>/dev/null || echo 0)
+          PAT_FOUND=$(jq -r '.[] | select(.codePatrimoine == "PAT-ZIG-001") | .nomPatrimoine' /tmp/resp_patrimoines.json 2>/dev/null || true)
+          if [ "$PAT_COUNT" -lt 6 ] || [ -z "$PAT_FOUND" ]; then
+            echo "[ÉCHEC] Données patrimoniales incomplètes : count=$PAT_COUNT, PAT-ZIG-001=$PAT_FOUND" >&2
+            cat /tmp/resp_patrimoines.json >&2
+            dump_diagnostics "Vérification des patrimoines initiaux"
+            exit 1
+          fi
+          echo ">>> Succès : $PAT_COUNT patrimoines détectés, premier site : '$PAT_FOUND' (PAT-ZIG-001)."
 
-          echo "2. Vérification des 3 modes de communication TP2 (:3002 -> :3001)"
-          curl -sf http://localhost:3002/api/circuits/communication/feign/patrimoines/1 | grep -q "FEIGN"
-          curl -sf http://localhost:3002/api/circuits/communication/resttemplate/patrimoines/2 | grep -q "RESTTEMPLATE"
-          curl -sf http://localhost:3002/api/circuits/communication/webclient/patrimoines/3 | grep -q "WEBCLIENT"
+          echo -e "\n2. Vérification des 3 modes de communication TP2 (:3002 -> :3001)"
+          # 2a. OpenFeign
+          HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/resp_feign.json "http://localhost:3002/api/circuits/communication/feign/patrimoines/1")
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "[ÉCHEC] Communication Feign : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_feign.json >&2
+            dump_diagnostics "Communication Feign (:3002 -> :3001)"
+            exit 1
+          fi
+          CLIENT_FEIGN=$(jq -r '.clientUtilise // empty' /tmp/resp_feign.json 2>/dev/null)
+          if [ "$CLIENT_FEIGN" != "FEIGN" ]; then
+            echo "[ÉCHEC] Communication Feign : clientUtilise='$CLIENT_FEIGN' (attendu: FEIGN)" >&2
+            cat /tmp/resp_feign.json >&2
+            dump_diagnostics "Communication Feign"
+            exit 1
+          fi
+          echo "  [2a. OpenFeign] Succès : clientUtilise=FEIGN, patrimoineId=1"
 
-          echo "3. Création d'un circuit via OpenFeign (:3002 -> :3001)"
-          curl -sf -X POST http://localhost:3002/api/circuits -H "Content-Type: application/json" \
-            -d '{"nomCircuit":"Circuit CI","descriptionCircuit":"Test E2E","difficulte":"FACILE","placesMax":20,"prix":5000.0,"etapes":[{"ordre":1,"dureeVisite":60,"patrimoineId":1},{"ordre":2,"dureeVisite":45,"patrimoineId":2}]}' | grep -q '"dureeEstimee":105'
+          # 2b. RestTemplate
+          HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/resp_rest.json "http://localhost:3002/api/circuits/communication/resttemplate/patrimoines/2")
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "[ÉCHEC] Communication RestTemplate : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_rest.json >&2
+            dump_diagnostics "Communication RestTemplate (:3002 -> :3001)"
+            exit 1
+          fi
+          CLIENT_REST=$(jq -r '.clientUtilise // empty' /tmp/resp_rest.json 2>/dev/null)
+          if [ "$CLIENT_REST" != "RESTTEMPLATE" ]; then
+            echo "[ÉCHEC] Communication RestTemplate : clientUtilise='$CLIENT_REST' (attendu: RESTTEMPLATE)" >&2
+            cat /tmp/resp_rest.json >&2
+            dump_diagnostics "Communication RestTemplate"
+            exit 1
+          fi
+          echo "  [2b. RestTemplate] Succès : clientUtilise=RESTTEMPLATE, patrimoineId=2"
 
-          echo "4. Création d'une réservation vérifiant la disponibilité du circuit (:3004 -> :3002)"
-          curl -sf -X POST http://localhost:3004/api/reservations -H "Content-Type: application/json" \
-            -d '{"nomClient":"Test CI","emailClient":"ci@zig.univ.sn","nombrePlaces":4,"typeReservation":"CIRCUIT","circuitId":1}' | grep -q '"montantTotal":20000.0'
+          # 2c. WebClient
+          HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/resp_webclient.json "http://localhost:3002/api/circuits/communication/webclient/patrimoines/3")
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "[ÉCHEC] Communication WebClient : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_webclient.json >&2
+            dump_diagnostics "Communication WebClient (:3002 -> :3001)"
+            exit 1
+          fi
+          CLIENT_WEB=$(jq -r '.clientUtilise // empty' /tmp/resp_webclient.json 2>/dev/null)
+          if [ "$CLIENT_WEB" != "WEBCLIENT" ]; then
+            echo "[ÉCHEC] Communication WebClient : clientUtilise='$CLIENT_WEB' (attendu: WEBCLIENT)" >&2
+            cat /tmp/resp_webclient.json >&2
+            dump_diagnostics "Communication WebClient"
+            exit 1
+          fi
+          echo "  [2c. WebClient] Succès : clientUtilise=WEBCLIENT, patrimoineId=3"
 
-          echo "Tous les tests d'intégration inter-microservices ont réussi !"
+          echo -e "\n3. Création d'un circuit via OpenFeign (:3002 -> :3001)"
+          HTTP_CODE=$(curl -s -w "%{http_code}" -X POST "http://localhost:3002/api/circuits" \
+            -H "Content-Type: application/json" \
+            -d '{"nomCircuit":"Circuit CI","descriptionCircuit":"Test E2E","difficulte":"FACILE","placesMax":20,"prix":5000.0,"etapes":[{"ordre":1,"dureeVisite":60,"patrimoineId":1},{"ordre":2,"dureeVisite":45,"patrimoineId":2}]}' \
+            -o /tmp/resp_circuit.json)
+          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
+            echo "[ÉCHEC] POST /api/circuits a retourné HTTP $HTTP_CODE (attendu: 200 ou 201)" >&2
+            cat /tmp/resp_circuit.json >&2
+            dump_diagnostics "Création de circuit via OpenFeign"
+            exit 1
+          fi
+          DUREE=$(jq -r '.dureeEstimee // empty' /tmp/resp_circuit.json 2>/dev/null)
+          CIRCUIT_ID=$(jq -r '.id // empty' /tmp/resp_circuit.json 2>/dev/null)
+          if [ "$DUREE" != "105" ]; then
+            echo "[ÉCHEC] Durée estimée incorrecte : '$DUREE' (attendu: 105)" >&2
+            cat /tmp/resp_circuit.json >&2
+            dump_diagnostics "Création de circuit - vérification durée"
+            exit 1
+          fi
+          echo ">>> Succès : Circuit créé avec id=$CIRCUIT_ID, dureeEstimee=105 min (60min + 45min)."
+
+          echo -e "\n4. Création d'une réservation vérifiant la disponibilité du circuit (:3004 -> :3002)"
+          TARGET_CIRCUIT_ID="${CIRCUIT_ID:-1}"
+          HTTP_CODE=$(curl -s -w "%{http_code}" -X POST "http://localhost:3004/api/reservations" \
+            -H "Content-Type: application/json" \
+            -d "{\"nomClient\":\"Test CI\",\"emailClient\":\"ci@zig.univ.sn\",\"nombrePlaces\":4,\"typeReservation\":\"CIRCUIT\",\"circuitId\":$TARGET_CIRCUIT_ID}" \
+            -o /tmp/resp_reservation.json)
+          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
+            echo "[ÉCHEC] POST /api/reservations a retourné HTTP $HTTP_CODE (attendu: 200 ou 201)" >&2
+            cat /tmp/resp_reservation.json >&2
+            dump_diagnostics "Création de réservation"
+            exit 1
+          fi
+          MONTANT=$(jq -r '.montantTotal // empty' /tmp/resp_reservation.json 2>/dev/null)
+          RESA_ID=$(jq -r '.id // empty' /tmp/resp_reservation.json 2>/dev/null)
+          if [ "$MONTANT" != "20000.0" ] && [ "$MONTANT" != "20000" ]; then
+            echo "[ÉCHEC] Montant total incorrect : '$MONTANT' (attendu: 20000.0)" >&2
+            cat /tmp/resp_reservation.json >&2
+            dump_diagnostics "Création de réservation - vérification montant"
+            exit 1
+          fi
+          echo ">>> Succès : Réservation créée avec id=$RESA_ID, montantTotal=$MONTANT (4 places x 5000.0 FCFA)."
+
+          echo -e "\n=================================================================="
+          echo " SUCCÈS COMPLET : Tous les tests d'intégration E2E ont réussi !"
+          echo "=================================================================="
+
+      - name: Conservation des journaux et captures E2E
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs-integration-e2e
+          path: |
+            *.log
+            /tmp/resp_*.json
+          if-no-files-found: ignore
 
   # =========================================================================
   # 3. DÉPLOIEMENT CONTINU : Validation et Build des Images Docker (TP3)
@@ -168,11 +407,12 @@ jobs:
 
       - name: Placement des JARs dans les dossiers target/ et construction des images Docker
         run: |
-          for s in config-server discovery-server ms-patrimoine ms-circuit ms-evenement ms-reservation ms-utilisateur ms-notification ms-paiement api-gateway; do
+          for s in discovery-server ms-patrimoine ms-circuit ms-evenement ms-reservation ms-utilisateur ms-notification ms-paiement api-gateway; do
             mkdir -p "$s/target"
             cp artifacts/jar-$s/*.jar "$s/target/"
           done
-          docker compose config -q
+          cp .env.example .env
+          docker compose --env-file .env config -q
           docker build -t fatylamine/patrimoines:v1 ./ms-patrimoine
           docker build -t fatylamine/circuits:v1 ./ms-circuit
           docker build -t fatylamine/evenements:v1 ./ms-evenement

@@ -5,7 +5,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-@FeignClient(name = "ms-evenement", url = "${evenement.url:http://localhost:3003}")
+@FeignClient(name = "ms-evenement", url = "${evenement.url:}")
 public interface EvenementClient {
 
     @GetMapping("/api/evenements/{id}")

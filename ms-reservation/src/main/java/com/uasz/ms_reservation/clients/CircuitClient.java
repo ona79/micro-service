@@ -5,7 +5,7 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
-@FeignClient(name = "ms-circuit", url = "${circuit.url:http://localhost:3002}")
+@FeignClient(name = "ms-circuit", url = "${circuit.url:}")
 public interface CircuitClient {
 
     @GetMapping("/api/circuits/{id}")

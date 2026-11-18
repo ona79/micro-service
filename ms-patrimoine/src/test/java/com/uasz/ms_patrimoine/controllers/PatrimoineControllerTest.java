@@ -31,14 +31,14 @@ class PatrimoineControllerTest {
 
     private static final String JSON_VALIDE = """
             {
-              "nomPatrimoine": "Maison de l'Esclave",
-              "codePatrimoine": "PAT-001",
-              "descriptionPatrimoine": "Monument historique",
-              "historiquePatrimoine": "Construite vers 1776",
-              "adressePatrimoine": "Île de Gorée, Dakar",
-              "capacitePatrimoine": 150,
-              "latitudePatrimoine": 14.6672,
-              "longitudePatrimoine": -17.399
+              "nomPatrimoine": "Mémorial du Joola",
+              "codePatrimoine": "PAT-ZIG-001",
+              "descriptionPatrimoine": "Monument historique et mémorial",
+              "historiquePatrimoine": "Inauguré en 2024",
+              "adressePatrimoine": "Boucotte, Ziguinchor, Casamance",
+              "capacitePatrimoine": 250,
+              "latitudePatrimoine": 12.5833,
+              "longitudePatrimoine": -16.2719
             }
             """;
 
@@ -49,8 +49,8 @@ class PatrimoineControllerTest {
     private IPatrimoineService patrimoineService;
 
     private PatrimoineDto dto(Long id, int capacite) {
-        return new PatrimoineDto(id, "Maison de l'Esclave", "PAT-001", "Monument historique",
-                "Construite vers 1776", "Île de Gorée, Dakar", capacite, 14.6672f, -17.399f);
+        return new PatrimoineDto(id, "Mémorial du Joola", "PAT-ZIG-001", "Monument historique et mémorial",
+                "Inauguré en 2024", "Boucotte, Ziguinchor, Casamance", capacite, 12.5833f, -16.2719f);
     }
 
     @Test
@@ -60,7 +60,7 @@ class PatrimoineControllerTest {
         mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content(JSON_VALIDE))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.codePatrimoine").value("PAT-001"));
+                .andExpect(jsonPath("$.codePatrimoine").value("PAT-ZIG-001"));
     }
 
     @Test
@@ -94,7 +94,7 @@ class PatrimoineControllerTest {
 
         mockMvc.perform(get(URL + "/1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.nomPatrimoine").value("Maison de l'Esclave"));
+                .andExpect(jsonPath("$.nomPatrimoine").value("Mémorial du Joola"));
     }
 
     @Test

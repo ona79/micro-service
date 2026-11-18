@@ -1,7 +1,7 @@
 ### =========================================================================
-### SCÉNARIO COMPLET VIA L'API GATEWAY (port 8080) OU EN DIRECT (3001..3007)
+### SCÉNARIO COMPLET VIA L'API GATEWAY (port 8090)
 ### =========================================================================
-@gateway = http://localhost:8080
+@gateway = http://localhost:8090
 
 ### 1. Inscription d'un touriste via ms-utilisateur (:3005 via Gateway :8080)
 POST {{gateway}}/api/utilisateurs

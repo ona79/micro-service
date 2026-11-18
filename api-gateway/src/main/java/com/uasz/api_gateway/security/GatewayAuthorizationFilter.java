@@ -27,13 +27,20 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
 
     private static final String COOKIE_NAME = "PATRIMOINE_SESSION";
     private static final String HMAC_ALGO = "HmacSHA256";
-    private static final Set<String> STAFF_ROLES = Set.of("ADMINISTRATEUR", "GESTIONNAIRE_SITE");
+    private static final Set<String> STAFF_ROLES = Set.of("ADMINISTRATEUR", "GESTIONNAIRE_SITE", "CONSERVATEUR");
+    private static final int MIN_SECRET_BYTES = 32;
 
     private final byte[] secretKey;
 
     public GatewayAuthorizationFilter(
-            @Value("${security.session.secret:PatrimoineSenegalUaszSecretKey2026HmacSha256!}") String secret
+            @Value("${security.session.secret}") String secret
     ) {
+        if (secret == null || secret.trim().isEmpty() || secret.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_BYTES) {
+            throw new IllegalStateException("Le secret HMAC de session doit être configuré et comporter au moins 32 octets (256 bits d'entropie).");
+        }
+        if (secret.toUpperCase().contains("CHANGE_ME") || secret.toUpperCase().contains("REPLACE_ME")) {
+            throw new IllegalStateException("Le secret HMAC de session ne peut pas être un marqueur d'exemple (CHANGE_ME). Définissez une clé cryptographique aléatoire.");
+        }
         this.secretKey = secret.getBytes(StandardCharsets.UTF_8);
     }
 
@@ -43,13 +50,15 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        String path = request.getRequestURI();
+        String rawPath = request.getRequestURI();
         String method = request.getMethod();
 
-        if ("OPTIONS".equalsIgnoreCase(method) || !path.startsWith("/api/")) {
+        if ("OPTIONS".equalsIgnoreCase(method) || rawPath == null || !rawPath.startsWith("/api/")) {
             filterChain.doFilter(request, response);
             return;
         }
+
+        String path = normalizePath(rawPath);
 
         String rawToken = extractToken(request);
         VerifiedToken token = null;
@@ -105,36 +114,40 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
             }
         }
 
-        // 2. Protection des écritures sur le catalogue (Patrimoines, Circuits, Événements)
-        boolean isCatalogPath = path.startsWith("/api/patrimoines")
-                || path.startsWith("/api/circuits")
-                || path.startsWith("/api/evenements");
-        boolean isWriteMethod = "POST".equalsIgnoreCase(method)
+        // 2. Protection des mutations sur le catalogue (Patrimoines, Circuits, Événements)
+        // FAIL-CLOSED : toute méthode de mutation (POST, PUT, PATCH, DELETE) requiert l'authentification et un rôle staff.
+        // Les méthodes de consultation (GET, HEAD) restent publiques.
+        boolean isCatalogPath = path.equals("/api/patrimoines") || path.startsWith("/api/patrimoines/")
+                || path.equals("/api/circuits") || path.startsWith("/api/circuits/")
+                || path.equals("/api/evenements") || path.startsWith("/api/evenements/");
+        boolean isMutationMethod = "POST".equalsIgnoreCase(method)
                 || "PUT".equalsIgnoreCase(method)
+                || "PATCH".equalsIgnoreCase(method)
                 || "DELETE".equalsIgnoreCase(method);
 
-        if (isCatalogPath && isWriteMethod) {
-            // PUT et DELETE exigent systématiquement un compte GESTIONNAIRE_SITE ou ADMINISTRATEUR
-            if ("PUT".equalsIgnoreCase(method) || "DELETE".equalsIgnoreCase(method)) {
-                if (token == null) {
-                    writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
-                            "Authentification requise pour modifier ou supprimer un élément du catalogue.");
-                    return;
-                }
-                if (!STAFF_ROLES.contains(token.role())) {
-                    writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
-                            "Accès interdit : rôle GESTIONNAIRE_SITE ou ADMINISTRATEUR requis.");
-                    return;
-                }
-            } else if ("POST".equalsIgnoreCase(method) && token != null && !STAFF_ROLES.contains(token.role())) {
-                // Si un utilisateur connecté en tant que TOURISTE tente un POST catalogue
+        if (isCatalogPath && isMutationMethod) {
+            if (token == null) {
+                writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                        tokenError != null ? tokenError : "Authentification requise pour effectuer une modification sur le catalogue.");
+                return;
+            }
+            if (!STAFF_ROLES.contains(token.role())) {
                 writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
-                        "Accès interdit : un compte Touriste ne peut pas créer d'élément dans le catalogue officiel.");
+                        "Accès interdit : rôle du personnel requis (ADMINISTRATEUR, GESTIONNAIRE_SITE, CONSERVATEUR).");
                 return;
             }
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private String normalizePath(String uri) {
+        if (uri == null) return "";
+        String trimmed = uri.trim();
+        while (trimmed.length() > 1 && trimmed.endsWith("/")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed;
     }
 
     private String extractToken(HttpServletRequest request) {
