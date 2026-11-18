@@ -15,5 +15,9 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     @Query("SELECT COALESCE(SUM(r.nombrePlaces), 0) FROM Reservation r WHERE r.evenementId = :evenementId AND r.statut <> :statutExclu")
     int sumPlacesByEvenementIdAndStatutNot(@Param("evenementId") Long evenementId,
                                            @Param("statutExclu") StatutReservation statutExclu);
+
+    java.util.List<Reservation> findByUtilisateurId(Long utilisateurId);
+
+    java.util.List<Reservation> findByUtilisateurIdOrEmailClient(Long utilisateurId, String emailClient);
 }
 

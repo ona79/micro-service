@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public class ReservationDto {
 
     private Long id;
+    private Long utilisateurId;
     private String nomClient;
     private String emailClient;
     private String telephoneClient;
@@ -22,5 +23,12 @@ public class ReservationDto {
     private double montantTotal;
     private Long circuitId;
     private Long evenementId;
+
+    public ReservationDto(Long id, String nomClient, String emailClient, String telephoneClient,
+                          int nombrePlaces, LocalDateTime dateReservation, String typeReservation,
+                          String statut, double montantTotal, Long circuitId, Long evenementId) {
+        this(id, null, nomClient, emailClient, telephoneClient, nombrePlaces, dateReservation,
+                typeReservation, statut, montantTotal, circuitId, evenementId);
+    }
 }
 

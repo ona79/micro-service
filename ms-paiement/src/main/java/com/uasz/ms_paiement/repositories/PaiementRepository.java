@@ -7,5 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface PaiementRepository extends JpaRepository<Paiement, Long> {
 
     boolean existsByReservationIdAndStatut(Long reservationId, StatutPaiement statut);
+
+    java.util.List<Paiement> findByUtilisateurId(Long utilisateurId);
 }
 

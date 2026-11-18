@@ -40,6 +40,17 @@ public class ReservationService implements IReservationService {
         reservation.setDateReservation(LocalDateTime.now());
         reservation.setStatut(StatutReservation.CONFIRMEE);
 
+        // Protection BOLA / IDOR : force l'utilisateurId à l'identité du token authentifié
+        com.uasz.ms_reservation.security.SecurityUserContext caller = com.uasz.ms_reservation.security.SecurityUserContextHolder.getContext();
+        if (caller != null && !caller.isStaffOrAdmin() && !caller.isServiceCall()) {
+            if (caller.userId() != null) {
+                reservation.setUtilisateurId(caller.userId());
+            }
+            if (caller.email() != null && !caller.email().isBlank()) {
+                reservation.setEmailClient(caller.email());
+            }
+        }
+
         if (dto.getTypeReservation() == TypeReservation.CIRCUIT) {
             if (dto.getCircuitId() == null) {
                 throw new BadRequestException("L'identifiant du circuit (circuitId) est obligatoire pour une réservation de type CIRCUIT");
@@ -80,6 +91,14 @@ public class ReservationService implements IReservationService {
     @Override
     @Transactional(readOnly = true)
     public List<ReservationDto> getAllReservations() {
+        com.uasz.ms_reservation.security.SecurityUserContext caller = com.uasz.ms_reservation.security.SecurityUserContextHolder.getContext();
+        if (caller != null && !caller.isStaffOrAdmin() && !caller.isServiceCall()) {
+            if (caller.userId() != null || (caller.email() != null && !caller.email().isBlank())) {
+                return reservationRepository.findByUtilisateurIdOrEmailClient(caller.userId(), caller.email()).stream()
+                        .map(reservationMapper::toDto)
+                        .toList();
+            }
+        }
         return reservationRepository.findAll().stream()
                 .map(reservationMapper::toDto)
                 .toList();
@@ -89,6 +108,10 @@ public class ReservationService implements IReservationService {
     @Transactional(readOnly = true)
     public ReservationDto getByIdReservation(Long id) {
         Reservation reservation = findReservation(id);
+
+        // Contrôle horizontal BOLA / IDOR
+        checkReservationOwnership(reservation, "consulter");
+
         ReservationDto dto = reservationMapper.toDto(reservation);
         try {
             if (reservation.getTypeReservation() == TypeReservation.CIRCUIT && reservation.getCircuitId() != null) {
@@ -105,16 +128,36 @@ public class ReservationService implements IReservationService {
     @Override
     public ReservationDto annulerReservation(Long id) {
         Reservation reservation = findReservation(id);
+
+        // Contrôle horizontal BOLA / IDOR
+        checkReservationOwnership(reservation, "annuler");
+
         reservation.setStatut(StatutReservation.ANNULEE);
         return reservationMapper.toDto(reservationRepository.save(reservation));
     }
 
     @Override
     public void deleteReservation(Long id) {
-        if (!reservationRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Réservation introuvable avec l'id : " + id);
-        }
+        Reservation reservation = findReservation(id);
+
+        // Contrôle horizontal BOLA / IDOR
+        checkReservationOwnership(reservation, "supprimer");
+
         reservationRepository.deleteById(id);
+    }
+
+    private void checkReservationOwnership(Reservation reservation, String action) {
+        com.uasz.ms_reservation.security.SecurityUserContext caller = com.uasz.ms_reservation.security.SecurityUserContextHolder.getContext();
+        if (caller != null && !caller.isStaffOrAdmin() && !caller.isServiceCall()) {
+            boolean isOwnerById = caller.userId() != null && caller.userId().equals(reservation.getUtilisateurId());
+            boolean isOwnerByEmail = caller.email() != null && !caller.email().isBlank()
+                    && caller.email().equalsIgnoreCase(reservation.getEmailClient());
+
+            if (!isOwnerById && !isOwnerByEmail) {
+                throw new com.uasz.ms_reservation.exceptions.ForbiddenException(
+                        "Accès interdit : vous ne pouvez pas " + action + " la réservation d'un autre utilisateur.");
+            }
+        }
     }
 
     private Reservation findReservation(Long id) {
