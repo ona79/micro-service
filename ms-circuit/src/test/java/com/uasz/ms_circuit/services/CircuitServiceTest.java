@@ -28,6 +28,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +40,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -70,8 +75,11 @@ class CircuitServiceTest {
         SecurityUserContextHolder.clear();
     }
 
+    // =========================================================================
+    // Test 1 : Circuit publié + patrimoine publié : accepté
+    // =========================================================================
     @Test
-    void saveCircuit_calculeDureeEtDistanceOrthodromiqueIndicativeEtEnrichitEtapes() {
+    void saveCircuit_circuitPublieAvecPatrimoinePublie_accepteEtCalculeDureeEtDistance() {
         when(patrimoineClient.getPatrimoineById(1L)).thenReturn(p1);
         when(patrimoineClient.getPatrimoineById(2L)).thenReturn(p2);
         when(circuitRepository.save(any(Circuit.class))).thenAnswer(inv -> {
@@ -88,6 +96,7 @@ class CircuitServiceTest {
         CircuitDto saved = circuitService.saveCircuit(input);
 
         assertThat(saved.getId()).isEqualTo(10L);
+        assertThat(saved.getStatutCircuit()).isEqualTo(StatutCircuit.PUBLIE);
         assertThat(saved.getDureeEstimee()).isEqualTo(105);
         assertThat(saved.getDistanceTotale()).isGreaterThan(10.0);
         assertThat(saved.getModeCalculDistance()).isEqualTo("ESTIMATION_ORTHODROMIQUE_INDICATIVE");
@@ -98,6 +107,51 @@ class CircuitServiceTest {
         assertThat(saved.getEtapes().get(1).getPatrimoine().getNomPatrimoine()).isEqualTo("Comptoir de Carabane");
     }
 
+    // =========================================================================
+    // Test 2 : Circuit publié + patrimoine brouillon : refusé
+    // =========================================================================
+    @Test
+    void saveCircuit_circuitPublieAvecPatrimoineBrouillon_refuse() {
+        PatrimoineDto pBrouillon = new PatrimoineDto(3L, "Site Brouillon", "PAT-BR-003", "Desc", "Hist",
+                "Ziguinchor", 100, 12.58f, -16.27f);
+        pBrouillon.setStatutPublication("BROUILLON");
+        when(patrimoineClient.getPatrimoineById(3L)).thenReturn(pBrouillon);
+
+        EtapeDto e1 = new EtapeDto(null, 1, 60, 3L, null);
+        CircuitDto input = new CircuitDto(null, "Circuit Public", "Desc", Difficulte.FACILE,
+                0, 0.0, 20, 3000.0, List.of(e1));
+        input.setStatutCircuit(StatutCircuit.PUBLIE);
+
+        assertThatThrownBy(() -> circuitService.saveCircuit(input))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("BROUILLON");
+    }
+
+    // =========================================================================
+    // Test 3 : Circuit publié + patrimoine soumis : refusé
+    // =========================================================================
+    @Test
+    void publierCircuit_avecPatrimoineSoumis_refuse() {
+        PatrimoineDto pSoumis = new PatrimoineDto(4L, "Site Soumis", "PAT-SM-004", "Desc", "Hist",
+                "Oussouye", 100, 12.48f, -16.54f);
+        pSoumis.setStatutPublication("SOUMIS");
+        when(patrimoineClient.getPatrimoineById(4L)).thenReturn(pSoumis);
+
+        Etape etape = Etape.builder().id(1L).ordre(1).dureeVisite(60).patrimoineId(4L).build();
+        Circuit circuit = Circuit.builder()
+                .id(1L).nomCircuit("Circuit En Attente").statutCircuit(StatutCircuit.BROUILLON)
+                .etapes(new ArrayList<>(List.of(etape))).build();
+        etape.setCircuit(circuit);
+        when(circuitRepository.findById(1L)).thenReturn(Optional.of(circuit));
+
+        assertThatThrownBy(() -> circuitService.publierCircuit(1L))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("SOUMIS");
+    }
+
+    // =========================================================================
+    // Test 4 : Circuit publié + patrimoine archivé : refusé
+    // =========================================================================
     @Test
     void saveCircuit_patrimoineArchive_leveBadRequest() {
         PatrimoineDto pArchive = new PatrimoineDto(5L, "Site Archivé", "PAT-ARC-005", "Desc", "Hist",
@@ -126,34 +180,100 @@ class CircuitServiceTest {
                 .hasMessageContaining("ordre 1");
     }
 
+    // =========================================================================
+    // Tests 7, 8, 9, 10 : BOLA strict des Guides sur les circuits
+    // =========================================================================
     @Test
-    void rbacEtBola_verificationPermissionsCinqRolesEtPerimetreGuideSurCircuits() {
+    void bolaGuide_propreCircuitAccepte_autreGuideRefuse_sansResponsableRefuse_changementResponsableRefuse() {
+        SecurityUserContextHolder.setContext(new SecurityUserContext(5L, "GUIDE", "guide5@uasz.sn", false, null));
         EtapeDto e1 = new EtapeDto(null, 1, 60, 1L, null);
-        CircuitDto input = new CircuitDto(null, "Circuit", "Desc", Difficulte.FACILE, 0, 0.0, 20, 3000.0, List.of(e1));
+        CircuitDto updateDto = new CircuitDto(1L, "Circuit Mis à Jour", "Desc", Difficulte.FACILE,
+                0, 0.0, 20, 3000.0, List.of(e1));
+        updateDto.setStatutCircuit(StatutCircuit.BROUILLON);
 
-        // 1. CONSERVATEUR ne possède pas CIRCUIT:CREER ni CIRCUIT:MODIFIER -> 403
-        SecurityUserContextHolder.setContext(new SecurityUserContext(4L, "CONSERVATEUR", "fatou@uasz.sn", false, null));
-        assertThatThrownBy(() -> circuitService.saveCircuit(input)).isInstanceOf(ForbiddenException.class);
-        assertThatThrownBy(() -> circuitService.updateCircuit(1L, input)).isInstanceOf(ForbiddenException.class);
-
-        // 2. GUIDE possède CIRCUIT:MODIFIER mais pas CIRCUIT:CREER, CIRCUIT:PUBLIER ni CIRCUIT:SUPPRIMER
-        SecurityUserContextHolder.setContext(new SecurityUserContext(5L, "GUIDE", "guide@uasz.sn", false, null));
-        assertThatThrownBy(() -> circuitService.saveCircuit(input)).isInstanceOf(ForbiddenException.class);
-        assertThatThrownBy(() -> circuitService.publierCircuit(1L)).isInstanceOf(ForbiddenException.class);
-        assertThatThrownBy(() -> circuitService.archiverCircuit(1L, "Motif")).isInstanceOf(ForbiddenException.class);
-        assertThatThrownBy(() -> circuitService.deleteCircuit(1L)).isInstanceOf(ForbiddenException.class);
-
-        // 3. BOLA : GUIDE (id=5) tente de modifier un circuit assigné à un autre guide (guideResponsableId=99) -> 403
-        Circuit circuitAutreGuide = Circuit.builder()
+        // Test 7 : Guide (id=5) modifiant son propre circuit (guideResponsableId=5) -> ACCEPTÉ
+        Circuit circuitDuGuide5 = Circuit.builder()
                 .id(1L)
-                .nomCircuit("Circuit Guide 99")
-                .guideResponsableId(99L)
+                .nomCircuit("Circuit Guide 5")
+                .guideResponsableId(5L)
+                .statutCircuit(StatutCircuit.BROUILLON)
                 .etapes(new ArrayList<>())
                 .build();
-        when(circuitRepository.findById(1L)).thenReturn(Optional.of(circuitAutreGuide));
-        assertThatThrownBy(() -> circuitService.updateCircuit(1L, input))
+        when(circuitRepository.findById(1L)).thenReturn(Optional.of(circuitDuGuide5));
+        when(patrimoineClient.getPatrimoineById(1L)).thenReturn(p1);
+        when(circuitRepository.save(any(Circuit.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CircuitDto updatedOwn = circuitService.updateCircuit(1L, updateDto);
+        assertThat(updatedOwn.getGuideResponsableId()).isEqualTo(5L);
+        assertThat(updatedOwn.getNomCircuit()).isEqualTo("Circuit Mis à Jour");
+
+        // Test 8 : Guide (id=5) modifiant le circuit d'un autre guide (guideResponsableId=99) -> REFUSÉ (403)
+        Circuit circuitAutreGuide = Circuit.builder()
+                .id(2L)
+                .nomCircuit("Circuit Guide 99")
+                .guideResponsableId(99L)
+                .statutCircuit(StatutCircuit.BROUILLON)
+                .etapes(new ArrayList<>())
+                .build();
+        when(circuitRepository.findById(2L)).thenReturn(Optional.of(circuitAutreGuide));
+        assertThatThrownBy(() -> circuitService.updateCircuit(2L, updateDto))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("autre guide");
+
+        // Test 9 : Guide (id=5) modifiant ou soumettant un circuit sans responsable (guideResponsableId=null) -> REFUSÉ (403)
+        Circuit circuitSansResponsable = Circuit.builder()
+                .id(3L)
+                .nomCircuit("Circuit Sans Guide")
+                .guideResponsableId(null)
+                .statutCircuit(StatutCircuit.BROUILLON)
+                .etapes(new ArrayList<>())
+                .build();
+        when(circuitRepository.findById(3L)).thenReturn(Optional.of(circuitSansResponsable));
+        assertThatThrownBy(() -> circuitService.updateCircuit(3L, updateDto))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("sans guide responsable");
+        assertThatThrownBy(() -> circuitService.soumettreCircuit(3L))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("sans guide responsable");
+
+        // Test 10 : Guide (id=5) tentant de changer le responsable de son circuit (guideResponsableId=5 -> 99) -> REFUSÉ (403)
+        CircuitDto tentativeChangementGuide = new CircuitDto(1L, "Circuit", "Desc", Difficulte.FACILE,
+                0, 0.0, 20, 3000.0, List.of(e1));
+        tentativeChangementGuide.setGuideResponsableId(99L);
+        assertThatThrownBy(() -> circuitService.updateCircuit(1L, tentativeChangementGuide))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("réaffecter");
+    }
+
+    // =========================================================================
+    // Test 11 & Test 12 : Suppression ressource publiée refusée & Permission PUBLIER
+    // =========================================================================
+    @Test
+    void suppressionCircuitPublieRefusee_etUtilisateurSansPermissionPublierRefuse() {
+        Circuit circuitPublie = Circuit.builder()
+                .id(1L).nomCircuit("Circuit Publié").statutCircuit(StatutCircuit.PUBLIE).build();
+        when(circuitRepository.findById(1L)).thenReturn(Optional.of(circuitPublie));
+
+        // Test 11 : Suppression physique d'un circuit publié -> refusée (400)
+        assertThatThrownBy(() -> circuitService.deleteCircuit(1L))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Suppression physique refusée");
+        verify(circuitRepository, never()).deleteById(any());
+
+        // Test 12 : Utilisateur avec CIRCUIT:CREER et CIRCUIT:MODIFIER mais sans CIRCUIT:PUBLIER -> publication refusée (403)
+        SecurityUserContextHolder.setContext(new SecurityUserContext(
+                30L, "GESTIONNAIRE_SITE", List.of("CIRCUIT:LIRE", "CIRCUIT:CREER", "CIRCUIT:MODIFIER"),
+                "junior@uasz.sn", false, null));
+        assertThatThrownBy(() -> circuitService.publierCircuit(1L))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("CIRCUIT:PUBLIER");
+
+        EtapeDto e1 = new EtapeDto(null, 1, 60, 1L, null);
+        CircuitDto dtoPublie = new CircuitDto(null, "Nouveau", "Desc", Difficulte.FACILE, 0, 0.0, 20, 3000.0, List.of(e1));
+        dtoPublie.setStatutCircuit(StatutCircuit.PUBLIE);
+        assertThatThrownBy(() -> circuitService.saveCircuit(dtoPublie))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("CIRCUIT:PUBLIER");
     }
 
     @Test
@@ -185,7 +305,8 @@ class CircuitServiceTest {
         CircuitDto publie = circuitService.publierCircuit(1L);
         assertThat(publie.getStatutCircuit()).isEqualTo(StatutCircuit.PUBLIE);
 
-        when(circuitRepository.findAll()).thenReturn(List.of(circuit));
+        when(circuitRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenAnswer(inv -> new PageImpl<>(List.of(circuit), inv.getArgument(1), 1));
         PageResponseDto<CircuitDto> page = circuitService.rechercherCircuits(
                 "Pirogue", Difficulte.MOYEN, MoyenTransport.PIROGUE, "BASSE_CASAMANCE",
                 StatutCircuit.PUBLIE, 120, 25.0, 15000.0, false, 0, 10, "prix", "asc");

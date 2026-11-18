@@ -21,22 +21,30 @@ import com.uasz.ms_circuit.repositories.CircuitRepository;
 import com.uasz.ms_circuit.security.SecurityUserContext;
 import com.uasz.ms_circuit.security.SecurityUserContextHolder;
 import feign.FeignException;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 @Slf4j
@@ -46,6 +54,7 @@ import java.util.Set;
 public class CircuitService implements ICircuitService {
 
     private static final double RAYON_TERRE_KM = 6371.0;
+    private static final int MAX_PAGE_SIZE = 50;
 
     private final CircuitRepository circuitRepository;
     private final CircuitMapper circuitMapper;
@@ -70,7 +79,13 @@ public class CircuitService implements ICircuitService {
         normaliserValeursParDefaut(circuit);
         circuit.getEtapes().forEach(etape -> etape.setId(null));
 
-        Map<Long, PatrimoineDto> patrimoines = preparerCircuit(circuit);
+        if (circuit.getStatutCircuit() == StatutCircuit.PUBLIE && !caller.hasPermission("CIRCUIT:PUBLIER")) {
+            throw new ForbiddenException("Accès interdit : la permission CIRCUIT:PUBLIER est requise pour publier directement un circuit.");
+        }
+
+        boolean requirePublishedPatrimoines = circuit.getStatutCircuit() == StatutCircuit.PUBLIE
+                || circuit.getStatutCircuit() == StatutCircuit.SOUMIS;
+        Map<Long, PatrimoineDto> patrimoines = preparerCircuit(circuit, requirePublishedPatrimoines);
 
         LocalDateTime now = LocalDateTime.now();
         circuit.setCreeParId(caller.userId());
@@ -136,68 +151,32 @@ public class CircuitService implements ICircuitService {
             throw new ForbiddenException("Accès interdit : seuls les gestionnaires, guides et administrateurs peuvent consulter les circuits non publiés.");
         }
 
-        String normalizedQ = q != null ? q.trim().toLowerCase(Locale.ROOT) : "";
-        String normalizedZone = zone != null ? zone.trim().toLowerCase(Locale.ROOT) : "";
-
-        Comparator<Circuit> comparator = buildComparator(sortBy, sortDir);
-
-        List<CircuitDto> filtered = circuitRepository.findAll()
-                .stream()
-                .filter(c -> {
-                    StatutCircuit currentStatut = c.getStatutCircuit() != null ? c.getStatutCircuit() : StatutCircuit.PUBLIE;
-                    if (statut != null) {
-                        if (currentStatut != statut) return false;
-                    } else if (!inclureNonPublies) {
-                        if (currentStatut != StatutCircuit.PUBLIE) return false;
-                    }
-                    if (difficulte != null && c.getDifficulte() != difficulte) {
-                        return false;
-                    }
-                    if (moyenTransport != null && c.getMoyenTransport() != moyenTransport) {
-                        return false;
-                    }
-                    if (!normalizedZone.isEmpty()) {
-                        String z = c.getZoneGeographique() != null ? c.getZoneGeographique().toLowerCase(Locale.ROOT) : "";
-                        if (!z.contains(normalizedZone)) return false;
-                    }
-                    if (dureeMax != null && c.getDureeEstimee() > dureeMax) {
-                        return false;
-                    }
-                    if (distanceMax != null && c.getDistanceTotale() > distanceMax) {
-                        return false;
-                    }
-                    if (prixMax != null && c.getPrix() > prixMax) {
-                        return false;
-                    }
-                    if (!normalizedQ.isEmpty()) {
-                        String haystack = ((c.getNomCircuit() != null ? c.getNomCircuit() : "") + " "
-                                + (c.getDescriptionCircuit() != null ? c.getDescriptionCircuit() : "") + " "
-                                + (c.getPresentationTouristique() != null ? c.getPresentationTouristique() : "") + " "
-                                + (c.getPointDepart() != null ? c.getPointDepart() : "") + " "
-                                + (c.getPointArrivee() != null ? c.getPointArrivee() : "")).toLowerCase(Locale.ROOT);
-                        if (!haystack.contains(normalizedQ)) return false;
-                    }
-                    return true;
-                })
-                .sorted(comparator)
-                .map(circuitMapper::toDto)
-                .toList();
-
         int safePage = Math.max(0, page);
-        int safeSize = Math.max(1, Math.min(size, 100));
-        long totalElements = filtered.size();
-        int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / safeSize);
-        int fromIndex = Math.min(safePage * safeSize, filtered.size());
-        int toIndex = Math.min(fromIndex + safeSize, filtered.size());
+        int safeSize = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
+        Sort sort = buildSafeSort(sortBy, sortDir);
+        Pageable pageable = PageRequest.of(safePage, safeSize, sort);
 
-        return PageResponseDto.<CircuitDto>builder()
-                .content(filtered.subList(fromIndex, toIndex))
-                .page(safePage)
-                .size(safeSize)
-                .totalElements(totalElements)
-                .totalPages(totalPages)
-                .last(totalPages == 0 || safePage >= totalPages - 1)
-                .build();
+        Specification<Circuit> spec = buildSpecification(
+                q, difficulte, moyenTransport, zone, statut, dureeMax, distanceMax, prixMax, inclureNonPublies);
+
+        Page<Circuit> dbPage = circuitRepository.findAll(spec, pageable);
+        if (dbPage != null) {
+            List<CircuitDto> content = dbPage.getContent().stream()
+                    .map(circuitMapper::toDto)
+                    .toList();
+            return PageResponseDto.<CircuitDto>builder()
+                    .content(content)
+                    .page(dbPage.getNumber())
+                    .size(dbPage.getSize())
+                    .totalElements(dbPage.getTotalElements())
+                    .totalPages(dbPage.getTotalPages())
+                    .last(dbPage.isLast())
+                    .build();
+        }
+
+        return rechercherEnMemoireFallback(
+                q, difficulte, moyenTransport, zone, statut, dureeMax, distanceMax, prixMax,
+                inclureNonPublies, safePage, safeSize, sortBy, sortDir);
     }
 
     @Override
@@ -205,24 +184,33 @@ public class CircuitService implements ICircuitService {
     public CircuitDto getByIdCircuit(Long id) {
         Circuit circuit = findCircuit(id);
         StatutCircuit statut = circuit.getStatutCircuit() != null ? circuit.getStatutCircuit() : StatutCircuit.PUBLIE;
-        if (statut != StatutCircuit.PUBLIE) {
-            SecurityUserContext caller = SecurityUserContextHolder.getContext();
-            boolean allowed = caller != null && (caller.isServiceCall()
-                    || caller.hasPermission("CIRCUIT:CREER")
-                    || caller.hasPermission("CIRCUIT:MODIFIER")
-                    || caller.hasPermission("CIRCUIT:PUBLIER")
-                    || caller.hasPermission("CIRCUIT:ARCHIVER"));
-            if (!allowed) {
-                throw new ForbiddenException("Ce circuit n'est pas publié ou a été archivé.");
-            }
+        SecurityUserContext caller = SecurityUserContextHolder.getContext();
+        boolean isAuthorizedStaff = caller != null && (caller.isServiceCall()
+                || caller.hasPermission("CIRCUIT:CREER")
+                || caller.hasPermission("CIRCUIT:MODIFIER")
+                || caller.hasPermission("CIRCUIT:PUBLIER")
+                || caller.hasPermission("CIRCUIT:ARCHIVER"));
+
+        if (statut != StatutCircuit.PUBLIE && !isAuthorizedStaff) {
+            throw new ForbiddenException("Ce circuit n'est pas publié ou a été archivé.");
         }
 
         Map<Long, PatrimoineDto> patrimoines = new HashMap<>();
         for (Etape etape : circuit.getEtapes()) {
             try {
-                patrimoines.computeIfAbsent(etape.getPatrimoineId(), patrimoineClient::getPatrimoineById);
+                PatrimoineDto pat = patrimoines.computeIfAbsent(etape.getPatrimoineId(), patrimoineClient::getPatrimoineById);
+                // Ne jamais exposer indirectement un patrimoine BROUILLON, SOUMIS ou ARCHIVE dans une consultation publique
+                if (pat != null && pat.getStatutPublication() != null
+                        && !"PUBLIE".equalsIgnoreCase(pat.getStatutPublication())
+                        && !isAuthorizedStaff) {
+                    patrimoines.remove(etape.getPatrimoineId());
+                }
+            } catch (FeignException.NotFound | FeignException.Forbidden ex) {
+                log.warn("Patrimoine {} non accessible ou non publié lors de la lecture du circuit {} : {}",
+                        etape.getPatrimoineId(), id, ex.status());
             } catch (FeignException ex) {
-                log.warn("Impossible de récupérer le patrimoine {} : {}", etape.getPatrimoineId(), ex.getMessage());
+                log.error("Service ms-patrimoine indisponible lors de la lecture du circuit {}", id, ex);
+                throw new ServiceIndisponibleException("Le service ms-patrimoine est indisponible");
             }
         }
         return toDtoEnrichi(circuit, patrimoines);
@@ -234,15 +222,25 @@ public class CircuitService implements ICircuitService {
         validerDonneesEntreeCircuit(circuitDto);
         Circuit circuit = findCircuit(id);
 
-        // Contrôle périmétrique (anti-BOLA) pour les guides : un guide ne peut pas modifier un circuit attribué à un autre guide
-        if ("GUIDE".equals(caller.role())
-                && circuit.getGuideResponsableId() != null
-                && !circuit.getGuideResponsableId().equals(caller.userId())) {
-            throw new ForbiddenException("Accès interdit : ce circuit est rattaché à un autre guide responsable.");
-        }
+        // Contrôle BOLA strict sur les données persistées AVANT toute modification (Section 3)
+        verifierPerimetreGuide(caller, circuit, circuitDto);
+
+        Long persistedGuideResponsableId = circuit.getGuideResponsableId();
+        StatutCircuit previousStatut = circuit.getStatutCircuit();
 
         circuitMapper.updateEntity(circuitDto, circuit);
         normaliserValeursParDefaut(circuit);
+
+        // Un GUIDE ne peut jamais modifier ni s'approprier guideResponsableId
+        if ("GUIDE".equals(caller.role())) {
+            circuit.setGuideResponsableId(persistedGuideResponsableId);
+        }
+
+        if (circuit.getStatutCircuit() == StatutCircuit.PUBLIE
+                && previousStatut != StatutCircuit.PUBLIE
+                && !caller.hasPermission("CIRCUIT:PUBLIER")) {
+            throw new ForbiddenException("Accès interdit : la permission CIRCUIT:PUBLIER est requise pour publier un circuit.");
+        }
 
         circuit.getEtapes().clear();
         circuitDto.getEtapes().forEach(etapeDto -> {
@@ -252,7 +250,9 @@ public class CircuitService implements ICircuitService {
             circuit.getEtapes().add(etape);
         });
 
-        Map<Long, PatrimoineDto> patrimoines = preparerCircuit(circuit);
+        boolean requirePublishedPatrimoines = circuit.getStatutCircuit() == StatutCircuit.PUBLIE
+                || circuit.getStatutCircuit() == StatutCircuit.SOUMIS;
+        Map<Long, PatrimoineDto> patrimoines = preparerCircuit(circuit, requirePublishedPatrimoines);
         circuit.setModifieParId(caller.userId());
         circuit.setDateModification(LocalDateTime.now());
 
@@ -270,11 +270,17 @@ public class CircuitService implements ICircuitService {
     public CircuitDto soumettreCircuit(Long id) {
         SecurityUserContext caller = requireAnyPermission("CIRCUIT:MODIFIER", "CIRCUIT:CREER");
         Circuit circuit = findCircuit(id);
-        if ("GUIDE".equals(caller.role())
-                && circuit.getGuideResponsableId() != null
-                && !circuit.getGuideResponsableId().equals(caller.userId())) {
-            throw new ForbiddenException("Accès interdit : ce circuit est rattaché à un autre guide responsable.");
+
+        // Contrôle BOLA strict sur le circuit persisté avant soumission (Section 3)
+        verifierPerimetreGuide(caller, circuit, null);
+
+        if (circuit.getStatutCircuit() == StatutCircuit.ARCHIVE) {
+            throw new BadRequestException("Impossible de soumettre un circuit archivé.");
         }
+
+        preparerCircuit(circuit, true);
+        validerConditionsPublication(circuit);
+
         circuit.setStatutCircuit(StatutCircuit.SOUMIS);
         circuit.setModifieParId(caller.userId());
         circuit.setDateModification(LocalDateTime.now());
@@ -283,9 +289,9 @@ public class CircuitService implements ICircuitService {
 
     @Override
     public CircuitDto publierCircuit(Long id) {
-        SecurityUserContext caller = requireAnyPermission("CIRCUIT:PUBLIER", "CIRCUIT:CREER");
+        SecurityUserContext caller = requirePermission("CIRCUIT:PUBLIER");
         Circuit circuit = findCircuit(id);
-        Map<Long, PatrimoineDto> patrimoines = preparerCircuit(circuit);
+        Map<Long, PatrimoineDto> patrimoines = preparerCircuit(circuit, true);
         validerConditionsPublication(circuit);
 
         LocalDateTime now = LocalDateTime.now();
@@ -300,7 +306,7 @@ public class CircuitService implements ICircuitService {
 
     @Override
     public CircuitDto archiverCircuit(Long id, String motif) {
-        SecurityUserContext caller = requireAnyPermission("CIRCUIT:ARCHIVER", "CIRCUIT:SUPPRIMER", "CIRCUIT:CREER");
+        SecurityUserContext caller = requirePermission("CIRCUIT:ARCHIVER");
         Circuit circuit = findCircuit(id);
 
         LocalDateTime now = LocalDateTime.now();
@@ -317,8 +323,18 @@ public class CircuitService implements ICircuitService {
     @Override
     public void deleteCircuit(Long id) {
         requirePermission("CIRCUIT:SUPPRIMER");
-        if (!circuitRepository.existsById(id)) {
+        Optional<Circuit> existingOpt = circuitRepository.findById(id);
+        if (existingOpt.isEmpty() && !circuitRepository.existsById(id)) {
             throw new ResourceNotFoundException("Circuit introuvable avec l'id : " + id);
+        }
+        if (existingOpt.isPresent()) {
+            Circuit existing = existingOpt.get();
+            if (existing.getStatutCircuit() == StatutCircuit.PUBLIE
+                    || existing.getStatutCircuit() == StatutCircuit.SOUMIS) {
+                throw new BadRequestException(
+                        "Suppression physique refusée : le circuit #" + id
+                                + " est publié ou soumis. Pour préserver l'intégrité référentielle et l'historique des réservations, veuillez l'archiver.");
+            }
         }
         circuitRepository.deleteById(id);
     }
@@ -332,6 +348,159 @@ public class CircuitService implements ICircuitService {
             case "webclient" -> HttpClientsConfig.getViaWebClient(patrimoineWebClient, patrimoineId);
             default -> throw new BadRequestException("Mode inconnu : '" + mode + "'. Valeurs acceptées : feign, resttemplate, webclient");
         };
+    }
+
+    /**
+     * Vérifie strictement le périmètre d'un GUIDE sur le circuit persisté avant toute modification (Section 3).
+     * - Un circuit sans responsable (guideResponsableId == null) ne peut PAS être modifié ni soumis par un GUIDE.
+     * - Un GUIDE ne peut modifier/soumettre que les circuits où guideResponsableId == caller.userId().
+     * - Un GUIDE ne peut pas modifier ni réaffecter guideResponsableId.
+     */
+    private void verifierPerimetreGuide(SecurityUserContext caller, Circuit persistedCircuit, CircuitDto incomingDto) {
+        if ("GUIDE".equals(caller.role())) {
+            if (persistedCircuit.getGuideResponsableId() == null) {
+                throw new ForbiddenException(
+                        "Accès interdit : un guide ne peut pas modifier ou soumettre un circuit sans guide responsable affecté.");
+            }
+            if (!persistedCircuit.getGuideResponsableId().equals(caller.userId())) {
+                throw new ForbiddenException(
+                        "Accès interdit : ce circuit est rattaché à un autre guide responsable.");
+            }
+            if (incomingDto != null && incomingDto.getGuideResponsableId() != null
+                    && !incomingDto.getGuideResponsableId().equals(persistedCircuit.getGuideResponsableId())) {
+                throw new ForbiddenException(
+                        "Accès interdit : un guide ne peut pas modifier ou réaffecter le guide responsable d'un circuit.");
+            }
+        }
+    }
+
+    private Specification<Circuit> buildSpecification(
+            String q,
+            Difficulte difficulte,
+            MoyenTransport moyenTransport,
+            String zone,
+            StatutCircuit statut,
+            Integer dureeMax,
+            Double distanceMax,
+            Double prixMax,
+            boolean inclureNonPublies
+    ) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (statut != null) {
+                predicates.add(cb.equal(root.get("statutCircuit"), statut));
+            } else if (!inclureNonPublies) {
+                predicates.add(cb.equal(root.get("statutCircuit"), StatutCircuit.PUBLIE));
+            }
+            if (difficulte != null) {
+                predicates.add(cb.equal(root.get("difficulte"), difficulte));
+            }
+            if (moyenTransport != null) {
+                predicates.add(cb.equal(root.get("moyenTransport"), moyenTransport));
+            }
+            if (zone != null && !zone.isBlank()) {
+                String pattern = "%" + zone.trim().toLowerCase(Locale.ROOT) + "%";
+                predicates.add(cb.like(cb.lower(cb.coalesce(root.get("zoneGeographique"), "")), pattern));
+            }
+            if (dureeMax != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("dureeEstimee"), dureeMax));
+            }
+            if (distanceMax != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("distanceTotale"), distanceMax));
+            }
+            if (prixMax != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("prix"), prixMax));
+            }
+            if (q != null && !q.isBlank()) {
+                String pattern = "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(cb.coalesce(root.get("nomCircuit"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("descriptionCircuit"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("presentationTouristique"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("pointDepart"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("pointArrivee"), "")), pattern)
+                ));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    private Sort buildSafeSort(String sortBy, String sortDir) {
+        String field = sortBy != null ? sortBy.trim().toLowerCase(Locale.ROOT) : "nom";
+        String entityField = switch (field) {
+            case "prix" -> "prix";
+            case "duree", "dureeestimee" -> "dureeEstimee";
+            case "distance", "distancetotale" -> "distanceTotale";
+            case "places", "placesmax" -> "placesMax";
+            case "date", "datecreation" -> "dateCreation";
+            default -> "nomCircuit";
+        };
+        Sort.Direction direction = "desc".equalsIgnoreCase(sortDir) ? Sort.Direction.DESC : Sort.Direction.ASC;
+        return Sort.by(direction, entityField);
+    }
+
+    private PageResponseDto<CircuitDto> rechercherEnMemoireFallback(
+            String q,
+            Difficulte difficulte,
+            MoyenTransport moyenTransport,
+            String zone,
+            StatutCircuit statut,
+            Integer dureeMax,
+            Double distanceMax,
+            Double prixMax,
+            boolean inclureNonPublies,
+            int safePage,
+            int safeSize,
+            String sortBy,
+            String sortDir
+    ) {
+        String normalizedQ = q != null ? q.trim().toLowerCase(Locale.ROOT) : "";
+        String normalizedZone = zone != null ? zone.trim().toLowerCase(Locale.ROOT) : "";
+        Comparator<Circuit> comparator = buildComparator(sortBy, sortDir);
+
+        List<CircuitDto> filtered = circuitRepository.findAll()
+                .stream()
+                .filter(c -> {
+                    StatutCircuit currentStatut = c.getStatutCircuit() != null ? c.getStatutCircuit() : StatutCircuit.PUBLIE;
+                    if (statut != null) {
+                        if (currentStatut != statut) return false;
+                    } else if (!inclureNonPublies) {
+                        if (currentStatut != StatutCircuit.PUBLIE) return false;
+                    }
+                    if (difficulte != null && c.getDifficulte() != difficulte) return false;
+                    if (moyenTransport != null && c.getMoyenTransport() != moyenTransport) return false;
+                    if (!normalizedZone.isEmpty()) {
+                        String z = c.getZoneGeographique() != null ? c.getZoneGeographique().toLowerCase(Locale.ROOT) : "";
+                        if (!z.contains(normalizedZone)) return false;
+                    }
+                    if (dureeMax != null && c.getDureeEstimee() > dureeMax) return false;
+                    if (distanceMax != null && c.getDistanceTotale() > distanceMax) return false;
+                    if (prixMax != null && c.getPrix() > prixMax) return false;
+                    if (!normalizedQ.isEmpty()) {
+                        String haystack = ((c.getNomCircuit() != null ? c.getNomCircuit() : "") + " "
+                                + (c.getDescriptionCircuit() != null ? c.getDescriptionCircuit() : "") + " "
+                                + (c.getPresentationTouristique() != null ? c.getPresentationTouristique() : "")).toLowerCase(Locale.ROOT);
+                        if (!haystack.contains(normalizedQ)) return false;
+                    }
+                    return true;
+                })
+                .sorted(comparator)
+                .map(circuitMapper::toDto)
+                .toList();
+
+        long totalElements = filtered.size();
+        int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / safeSize);
+        int fromIndex = Math.min(safePage * safeSize, filtered.size());
+        int toIndex = Math.min(fromIndex + safeSize, filtered.size());
+
+        return PageResponseDto.<CircuitDto>builder()
+                .content(filtered.subList(fromIndex, toIndex))
+                .page(safePage)
+                .size(safeSize)
+                .totalElements(totalElements)
+                .totalPages(totalPages)
+                .last(totalPages == 0 || safePage >= totalPages - 1)
+                .build();
     }
 
     private void validerDonneesEntreeCircuit(CircuitDto dto) {
@@ -430,7 +599,7 @@ public class CircuitService implements ICircuitService {
                 .orElseThrow(() -> new ResourceNotFoundException("Circuit introuvable avec l'id : " + id));
     }
 
-    private Map<Long, PatrimoineDto> preparerCircuit(Circuit circuit) {
+    private Map<Long, PatrimoineDto> preparerCircuit(Circuit circuit, boolean requirePublishedPatrimoines) {
         List<Etape> etapes = circuit.getEtapes();
 
         Set<Integer> ordres = new HashSet<>();
@@ -447,9 +616,14 @@ public class CircuitService implements ICircuitService {
         Map<Long, PatrimoineDto> patrimoines = new HashMap<>();
         for (Etape etape : etapes) {
             PatrimoineDto pat = patrimoines.computeIfAbsent(etape.getPatrimoineId(), this::recupererPatrimoine);
-            if ("ARCHIVE".equalsIgnoreCase(pat.getStatutPublication())) {
+            String statutPat = pat.getStatutPublication() != null ? pat.getStatutPublication().trim().toUpperCase(Locale.ROOT) : "PUBLIE";
+            if ("ARCHIVE".equals(statutPat)) {
                 throw new BadRequestException("Le patrimoine " + etape.getPatrimoineId()
-                        + " est archivé et ne peut pas être associé à un circuit actif.");
+                        + " est archivé et ne peut pas être associé à un circuit.");
+            }
+            if (requirePublishedPatrimoines && !"PUBLIE".equals(statutPat)) {
+                throw new BadRequestException("Un circuit publié ou soumis ne peut référencer que des patrimoines publiés (le patrimoine "
+                        + etape.getPatrimoineId() + " est en statut " + statutPat + ").");
             }
         }
 
@@ -489,6 +663,8 @@ public class CircuitService implements ICircuitService {
             return patrimoineClient.getPatrimoineById(patrimoineId);
         } catch (FeignException.NotFound ex) {
             throw new BadRequestException("Le patrimoine " + patrimoineId + " n'existe pas dans ms-patrimoine");
+        } catch (FeignException.Forbidden ex) {
+            throw new BadRequestException("Le patrimoine " + patrimoineId + " n'est pas publié ou n'est pas accessible.");
         } catch (FeignException ex) {
             log.error("Erreur lors de l'appel à ms-patrimoine pour l'id {}", patrimoineId, ex);
             throw new ServiceIndisponibleException("Le service ms-patrimoine est indisponible");
