@@ -140,7 +140,7 @@ import { DateFrPipe } from '../../pipes/date-fr.pipe';
                   <span class="field-label">Réservation associée</span>
                   <select class="field-input" [(ngModel)]="selectedReservationId" name="resId">
                     @for (rid of elig.reservationsEligiblesIds; track rid) {
-                      <option [ngValue]="rid">Réservation confirmée #{{ rid }}</option>
+                      <option [ngValue]="rid">Réservation confirmée {{ rid }}</option>
                     }
                   </select>
                 </label>

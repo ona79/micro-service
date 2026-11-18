@@ -256,7 +256,7 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
                     </td>
                     <td>
                       <strong>{{ item.nomCircuit }}</strong>
-                      <span class="bo-cell-sub" style="display: block;">Réf circuit #{{ item.circuitId }}</span>
+                      <span class="bo-cell-sub" style="display: block;">Réf circuit {{ item.circuitId }}</span>
                     </td>
                     <td class="tabular-nums">
                       <strong>{{ item.placesOccupees }}</strong>

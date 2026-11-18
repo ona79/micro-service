@@ -149,9 +149,9 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
                     <span class="ui-badge ui-badge--neutral">{{ r.typeReservation }}</span>
                     <span class="bo-cell-sub">
                       @if (r.typeReservation === 'CIRCUIT') {
-                        Circuit #{{ r.circuitId }}
+                        Circuit {{ r.circuitId }}
                       } @else {
-                        Événement #{{ r.evenementId }}
+                        Événement {{ r.evenementId }}
                       }
                     </span>
                   </td>
