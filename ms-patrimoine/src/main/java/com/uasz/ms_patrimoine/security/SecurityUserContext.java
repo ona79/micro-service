@@ -20,6 +20,12 @@ public record SecurityUserContext(
                 || "ADMINISTRATEUR".equals(role);
     }
 
+    public boolean isStaffCatalog() {
+        return "CONSERVATEUR".equals(role)
+                || "GESTIONNAIRE_SITE".equals(role)
+                || "ADMINISTRATEUR".equals(role);
+    }
+
     public static List<String> defaultPermissionsForRole(String role) {
         if (role == null) return Collections.emptyList();
         return switch (role) {
@@ -30,22 +36,28 @@ public record SecurityUserContext(
             );
             case "GUIDE" -> List.of(
                     "PATRIMOINE:LIRE", "CIRCUIT:LIRE", "CIRCUIT:MODIFIER",
-                    "EVENEMENT:LIRE", "RESERVATION:LIRE_PROPRE", "UTILISATEUR:LIRE_PROFIL"
+                    "EVENEMENT:LIRE", "RESERVATION:LIRE_PROPRE", "RESERVATION:LIRE_TOUT", "UTILISATEUR:LIRE_PROFIL"
             );
             case "CONSERVATEUR" -> List.of(
                     "PATRIMOINE:LIRE", "PATRIMOINE:CREER", "PATRIMOINE:MODIFIER", "PATRIMOINE:SUPPRIMER",
+                    "PATRIMOINE:PUBLIER", "PATRIMOINE:ARCHIVER",
                     "CIRCUIT:LIRE", "EVENEMENT:LIRE", "UTILISATEUR:LIRE_PROFIL"
             );
             case "GESTIONNAIRE_SITE" -> List.of(
                     "PATRIMOINE:LIRE",
                     "CIRCUIT:LIRE", "CIRCUIT:CREER", "CIRCUIT:MODIFIER", "CIRCUIT:SUPPRIMER",
+                    "CIRCUIT:PUBLIER", "CIRCUIT:ARCHIVER",
                     "EVENEMENT:LIRE", "EVENEMENT:CREER", "EVENEMENT:MODIFIER", "EVENEMENT:SUPPRIMER",
+                    "EVENEMENT:PUBLIER", "EVENEMENT:ANNULER", "EVENEMENT:ARCHIVER",
                     "RESERVATION:LIRE_TOUT", "RESERVATION:GERER", "UTILISATEUR:LIRE_PROFIL"
             );
             case "ADMINISTRATEUR" -> List.of(
                     "PATRIMOINE:LIRE", "PATRIMOINE:CREER", "PATRIMOINE:MODIFIER", "PATRIMOINE:SUPPRIMER",
+                    "PATRIMOINE:PUBLIER", "PATRIMOINE:ARCHIVER",
                     "CIRCUIT:LIRE", "CIRCUIT:CREER", "CIRCUIT:MODIFIER", "CIRCUIT:SUPPRIMER",
+                    "CIRCUIT:PUBLIER", "CIRCUIT:ARCHIVER",
                     "EVENEMENT:LIRE", "EVENEMENT:CREER", "EVENEMENT:MODIFIER", "EVENEMENT:SUPPRIMER",
+                    "EVENEMENT:PUBLIER", "EVENEMENT:ANNULER", "EVENEMENT:ARCHIVER",
                     "RESERVATION:CREER", "RESERVATION:LIRE_PROPRE", "RESERVATION:LIRE_TOUT",
                     "RESERVATION:ANNULER_PROPRE", "RESERVATION:GERER",
                     "PAIEMENT:INITIER", "PAIEMENT:LIRE_PROPRE", "PAIEMENT:LIRE_TOUT",
