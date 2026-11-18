@@ -62,6 +62,7 @@ export class EvenementsListPageComponent implements OnInit {
   protected readonly search = signal('');
   protected readonly typeFilter = signal<'' | TypeEvenement>('');
   protected readonly dateMin = signal('');
+  protected readonly aVenirUniquement = signal(false);
 
   protected readonly typeChips: readonly TypeFilterChip[] = [
     { value: '', label: 'Tous' },
@@ -77,12 +78,26 @@ export class EvenementsListPageComponent implements OnInit {
     const type = this.typeFilter();
     const dateMinStr = this.dateMin().trim();
     const dateMinParsed = dateMinStr ? startOfDay(parseISO(dateMinStr)) : null;
+    const onlyUpcoming = this.aVenirUniquement();
+    const now = new Date();
 
     return this.store.items().filter((ev) => {
+      if (ev.statutEvenement === 'ARCHIVE' || ev.statutEvenement === 'BROUILLON' || ev.statutEvenement === 'SOUMIS') {
+        return false;
+      }
+      if (onlyUpcoming) {
+        if (ev.statutEvenement === 'ANNULE' || ev.statutEvenement === 'TERMINE') {
+          return false;
+        }
+        const end = parseISO(ev.dateFin || ev.dateDebut);
+        if (isValid(end) && end < now) {
+          return false;
+        }
+      }
       if (q) {
         const text = `${ev.nomEvenement ?? ''} ${ev.descriptionEvenement ?? ''} ${
           ev.lieu ?? ''
-        }`.toLowerCase();
+        } ${ev.organisateur ?? ''}`.toLowerCase();
         if (!text.includes(q)) return false;
       }
       if (type && ev.typeEvenement !== type) return false;
@@ -103,10 +118,13 @@ export class EvenementsListPageComponent implements OnInit {
     this.search.set('');
     this.typeFilter.set('');
     this.dateMin.set('');
+    this.aVenirUniquement.set(false);
   }
 
   protected resolvePatrimoine(ev: Evenement): Patrimoine | null {
-    return ev.patrimoine ?? this.patrimoineStore.byIdMap().get(ev.patrimoineId) ?? null;
+    if (ev.patrimoine) return ev.patrimoine;
+    if (ev.patrimoineId == null) return null;
+    return this.patrimoineStore.byIdMap().get(ev.patrimoineId) ?? null;
   }
 
   protected isMemorial(ev: Evenement): boolean {

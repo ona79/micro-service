@@ -23,8 +23,14 @@
             {{ orderedStops().length }} étape{{ orderedStops().length > 1 ? 's' : '' }}
           </span>
           <span class="ui-badge ui-badge--neutral tabular-nums">
-            {{ cir.dureeEstimee | durationMinutes }} · {{ cir.distanceTotale || 0 }} km
+            {{ cir.dureeEstimee | durationMinutes }} · ~{{ cir.distanceTotale || 0 }} km (orthodromique indicatif)
           </span>
+          @if (cir.moyenTransport) {
+            <span class="ui-badge">Transport : {{ cir.moyenTransport }}</span>
+          }
+          @if (cir.donneeDemonstration !== false) {
+            <span class="ui-badge ui-badge--terracotta">Donnée de démonstration</span>
+          }
         </div>
         <h1 class="circuit-header__title">{{ cir.nomCircuit }}</h1>
       </header>
@@ -41,7 +47,7 @@
               />
               <p class="route-map-caption">
                 Tracé reliant les {{ routeMapPoints().length }} étape(s) géolocalisée(s) du
-                parcours.
+                parcours (distance orthodromique indicative calculée à vol d'oiseau).
               </p>
             </section>
           } @else {
@@ -58,9 +64,18 @@
             <p class="circuit-panel__desc">
               {{
                 cir.descriptionCircuit ||
-                  'Ce circuit vous emmène à la découverte de plusieurs sites patrimoniaux majeurs.'
+                  'Ce circuit vous emmène à la découverte de plusieurs sites patrimoniaux majeurs de Casamance.'
               }}
             </p>
+
+            @if (cir.presentationTouristique) {
+              <p class="circuit-panel__desc">{{ cir.presentationTouristique }}</p>
+            }
+
+            @if (cir.informationsPratiques) {
+              <h2>Informations pratiques &amp; équipement</h2>
+              <p class="circuit-panel__desc">{{ cir.informationsPratiques }}</p>
+            }
 
             <h2>Étapes du circuit dans l'ordre de visite</h2>
             @if (orderedStops().length === 0) {
@@ -95,7 +110,9 @@
                         </p>
                       }
 
-                      @if (stop.resolvedPatrimoine?.descriptionPatrimoine) {
+                      @if (stop.descriptionEtape) {
+                        <p class="timeline-item__desc">{{ stop.descriptionEtape }}</p>
+                      } @else if (stop.resolvedPatrimoine?.descriptionPatrimoine) {
                         <p class="timeline-item__desc">
                           {{ stop.resolvedPatrimoine!.descriptionPatrimoine }}
                         </p>
@@ -117,7 +134,7 @@
         </div>
 
         <aside class="booking-sidebar">
-          <p class="booking-sidebar__eyebrow">Tarif par personne</p>
+          <p class="booking-sidebar__eyebrow">Tarif indicatif par personne</p>
           <p class="booking-sidebar__price tabular-nums">{{ cir.prix | fcfaPrice }}</p>
 
           <dl class="booking-facts">
@@ -125,13 +142,31 @@
               <dt>Difficulté</dt>
               <dd>{{ cir.difficulte | difficulteLabel }}</dd>
             </div>
+            @if (cir.moyenTransport) {
+              <div>
+                <dt>Déplacement</dt>
+                <dd>{{ cir.moyenTransport }}</dd>
+              </div>
+            }
+            @if (cir.pointDepart) {
+              <div>
+                <dt>Point de départ</dt>
+                <dd>{{ cir.pointDepart }}</dd>
+              </div>
+            }
+            @if (cir.pointArrivee) {
+              <div>
+                <dt>Point d'arrivée</dt>
+                <dd>{{ cir.pointArrivee }}</dd>
+              </div>
+            }
             <div>
               <dt>Durée totale estimée</dt>
               <dd class="tabular-nums">{{ cir.dureeEstimee | durationMinutes }}</dd>
             </div>
             <div>
-              <dt>Distance totale</dt>
-              <dd class="tabular-nums">{{ cir.distanceTotale || 0 }} km</dd>
+              <dt>Distance orthodromique indicative</dt>
+              <dd class="tabular-nums">~{{ cir.distanceTotale || 0 }} km</dd>
             </div>
             <div>
               <dt>Capacité du groupe</dt>

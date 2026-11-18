@@ -81,7 +81,9 @@ export class EvenementDetailPageComponent {
   protected readonly patLie = computed<Patrimoine | null>(() => {
     const ev = this.evenement();
     if (!ev) return null;
-    return ev.patrimoine ?? this.patrimoineStore.byIdMap().get(ev.patrimoineId) ?? null;
+    if (ev.patrimoine) return ev.patrimoine;
+    if (ev.patrimoineId == null) return null;
+    return this.patrimoineStore.byIdMap().get(ev.patrimoineId) ?? null;
   });
 
   protected readonly isMemorial = computed(() => isLieuDeMemoire(this.patLie()));
@@ -146,7 +148,9 @@ export class EvenementDetailPageComponent {
   }
 
   protected resolvePat(ev: Evenement): Patrimoine | null {
-    return ev.patrimoine ?? this.patrimoineStore.byIdMap().get(ev.patrimoineId) ?? null;
+    if (ev.patrimoine) return ev.patrimoine;
+    if (ev.patrimoineId == null) return null;
+    return this.patrimoineStore.byIdMap().get(ev.patrimoineId) ?? null;
   }
 
   private async loadDetail(evtId: string): Promise<void> {

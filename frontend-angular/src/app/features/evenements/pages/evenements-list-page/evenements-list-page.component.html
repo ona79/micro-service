@@ -1,11 +1,11 @@
 <div class="page-section">
   <div class="container">
     <header class="editorial-header">
-      <p class="editorial-header__eyebrow">Agenda culturel</p>
+      <p class="editorial-header__eyebrow">Agenda culturel de Casamance</p>
       <h1 class="editorial-header__title">Événements &amp; Rencontres</h1>
       <p class="editorial-header__subtitle">
         Expositions, ateliers culturels, conférences, visites guidées et festivals
-        organisés au cœur des sites patrimoniaux du Sénégal.
+        organisés au cœur des sites patrimoniaux et communes de Casamance.
       </p>
     </header>
 
@@ -33,7 +33,7 @@
       <div class="agenda-controls__inputs">
         <div class="agenda-field agenda-field--search">
           <label for="evt-search" class="agenda-field__label">
-            Recherche (nom, lieu, description)
+            Recherche (nom, lieu, organisateur, description)
           </label>
           <div class="search-wrap">
             <svg lucideSearch [size]="16" class="search-wrap__icon" aria-hidden="true"></svg>
@@ -41,7 +41,7 @@
               id="evt-search"
               type="search"
               class="agenda-input agenda-input--icon"
-              placeholder="Ex: Exposition, Gorée, Casamance..."
+              placeholder="Ex: Festival, Ziguinchor, Enampore, Joola..."
               [ngModel]="search()"
               (ngModelChange)="search.set($event)"
             />
@@ -58,6 +58,17 @@
             (ngModelChange)="dateMin.set($event)"
           />
         </div>
+
+        <div class="agenda-field" style="display:flex;align-items:flex-end;padding-bottom:0.35rem;">
+          <label style="display:inline-flex;align-items:center;gap:0.45rem;font-size:0.85rem;font-weight:600;cursor:pointer;">
+            <input
+              type="checkbox"
+              [ngModel]="aVenirUniquement()"
+              (ngModelChange)="aVenirUniquement.set($event)"
+            />
+            <span>Événements à venir confirmés uniquement</span>
+          </label>
+        </div>
       </div>
 
       <div class="agenda-controls__footer">
@@ -68,7 +79,7 @@
             <span> sur {{ store.items().length }}</span>
           }
         </p>
-        @if (search() || typeFilter() || dateMin()) {
+        @if (search() || typeFilter() || dateMin() || aVenirUniquement()) {
           <button type="button" class="btn-reset" (click)="resetFilters()">
             Réinitialiser les filtres
           </button>
@@ -129,6 +140,11 @@
                   @if (patLie) {
                     <span class="ui-badge">{{ patLie.nomPatrimoine }}</span>
                   }
+                  @if (ev.statutEvenement === 'ANNULE') {
+                    <span class="ui-badge ui-badge--danger">ANNULÉ</span>
+                  } @else if (ev.statutEvenement === 'TERMINE') {
+                    <span class="ui-badge">TERMINÉ</span>
+                  }
                 </div>
                 <span class="agenda-row__price tabular-nums">{{ ev.prix | fcfaPrice }}</span>
               </div>
@@ -152,7 +168,7 @@
                   </span>
                   <span>
                     <svg lucideMapPin [size]="14" aria-hidden="true"></svg>
-                    {{ ev.lieu || patLie?.adressePatrimoine || 'Sénégal' }}
+                    {{ ev.lieu || patLie?.adressePatrimoine || 'Casamance' }}
                   </span>
                   <span class="tabular-nums">
                     <svg lucideUsers [size]="14" aria-hidden="true"></svg>
@@ -168,14 +184,16 @@
                     <span>Détails</span>
                     <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
                   </a>
-                  <a
-                    routerLink="/reserver"
-                    [queryParams]="{ type: 'EVENEMENT', evenementId: ev.id }"
-                    class="agenda-btn agenda-btn--primary"
-                  >
-                    <svg lucideTicket [size]="14" aria-hidden="true"></svg>
-                    <span>Réserver</span>
-                  </a>
+                  @if (ev.statutEvenement !== 'ANNULE' && ev.statutEvenement !== 'TERMINE') {
+                    <a
+                      routerLink="/reserver"
+                      [queryParams]="{ type: 'EVENEMENT', evenementId: ev.id }"
+                      class="agenda-btn agenda-btn--primary"
+                    >
+                      <svg lucideTicket [size]="14" aria-hidden="true"></svg>
+                      <span>Réserver</span>
+                    </a>
+                  }
                 </div>
               </div>
             </div>
