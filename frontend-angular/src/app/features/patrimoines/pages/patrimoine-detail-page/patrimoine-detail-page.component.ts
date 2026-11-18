@@ -8,7 +8,6 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import {
   LucideArrowRight,
@@ -18,9 +17,9 @@ import {
   LucideRoute,
   LucideTicket,
 } from '@lucide/angular';
-import { APP_SITE_CONFIG } from '../../../../core/config/site.config';
 import { extractErrorMessage } from '../../../../core/models/api-error.model';
 import { Patrimoine } from '../../../../core/models/patrimoine.model';
+import { SeoService } from '../../../../core/services/seo.service';
 import {
   BreadcrumbItem,
   UiBreadcrumbComponent,
@@ -76,8 +75,7 @@ export class PatrimoineDetailPageComponent {
   protected readonly store = inject(PatrimoineStore);
   private readonly circuitStore = inject(CircuitStore);
   private readonly evenementStore = inject(EvenementStore);
-  private readonly titleService = inject(Title);
-  private readonly config = inject(APP_SITE_CONFIG);
+  private readonly seo = inject(SeoService);
 
   protected readonly patrimoine = signal<Patrimoine | null>(null);
   protected readonly loading = signal(true);
@@ -125,19 +123,33 @@ export class PatrimoineDetailPageComponent {
     const currentId = Number(this.id());
     return this.circuitStore
       .items()
-      .filter((c) => c.etapes?.some((e) => e.patrimoineId === currentId));
+      .filter(
+        (c) =>
+          (!c.statutCircuit || c.statutCircuit === 'PUBLIE') &&
+          c.etapes?.some((e) => e.patrimoineId === currentId)
+      );
   });
 
   protected readonly relatedEvenements = computed(() => {
     const currentId = Number(this.id());
-    return this.evenementStore.items().filter((ev) => ev.patrimoineId === currentId);
+    return this.evenementStore
+      .items()
+      .filter(
+        (ev) =>
+          (!ev.statutEvenement || ev.statutEvenement === 'PUBLIE') &&
+          ev.patrimoineId === currentId
+      );
   });
 
   protected readonly autresPatrimoines = computed(() => {
     const currentId = String(this.id());
     return this.store
       .items()
-      .filter((item) => String(item.id) !== currentId)
+      .filter(
+        (item) =>
+          String(item.id) !== currentId &&
+          (!item.statutPublication || item.statutPublication === 'PUBLIE')
+      )
       .slice(0, 3);
   });
 
@@ -173,7 +185,13 @@ export class PatrimoineDetailPageComponent {
       const detail = await this.store.loadById(patId);
       if (seq !== this.loadSeq) return;
       this.patrimoine.set(detail);
-      this.titleService.setTitle(`${detail.nomPatrimoine} — ${this.config.siteName}`);
+      this.seo.update({
+        title: detail.nomPatrimoine,
+        description:
+          detail.descriptionPatrimoine ??
+          `Découvrez ${detail.nomPatrimoine} (${detail.codePatrimoine}) en Casamance.`,
+        canonicalPath: `/patrimoines/${detail.id}`,
+      });
     } catch (err) {
       if (seq !== this.loadSeq) return;
       this.patrimoine.set(null);

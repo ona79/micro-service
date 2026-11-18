@@ -14,6 +14,9 @@ export interface EvenementSearchParams {
   zone?: string;
   patrimoineId?: number | null;
   statut?: StatutEvenement | '';
+  dateMin?: string;
+  dateMax?: string;
+  prixMax?: number | null;
   aVenirUniquement?: boolean;
   inclureNonPublies?: boolean;
   page?: number;
@@ -47,6 +50,9 @@ export class EvenementApiService {
       httpParams = httpParams.set('patrimoineId', String(params.patrimoineId));
     }
     if (params.statut) httpParams = httpParams.set('statut', params.statut);
+    if (params.dateMin) httpParams = httpParams.set('dateMin', params.dateMin);
+    if (params.dateMax) httpParams = httpParams.set('dateMax', params.dateMax);
+    if (params.prixMax != null) httpParams = httpParams.set('prixMax', String(params.prixMax));
     if (params.aVenirUniquement) httpParams = httpParams.set('aVenirUniquement', 'true');
     if (params.inclureNonPublies) httpParams = httpParams.set('inclureNonPublies', 'true');
     if (params.page != null) httpParams = httpParams.set('page', String(params.page));

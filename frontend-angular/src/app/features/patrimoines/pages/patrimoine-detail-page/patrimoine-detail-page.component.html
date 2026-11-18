@@ -51,6 +51,7 @@
               <app-ui-patrimoine-image
                 [codePatrimoine]="pat.codePatrimoine"
                 [nomPatrimoine]="pat.nomPatrimoine"
+                [imageUrl]="pat.imageUrl"
                 [sobriete]="isMemorial()"
               />
             </div>
@@ -234,6 +235,7 @@
                   <app-ui-patrimoine-image
                     [codePatrimoine]="autre.codePatrimoine"
                     [nomPatrimoine]="autre.nomPatrimoine"
+                    [imageUrl]="autre.imageUrl"
                     [sobriete]="isPatMemorial(autre)"
                   />
                 </a>

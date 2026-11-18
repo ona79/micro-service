@@ -8,7 +8,6 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import {
   LucideArrowRight,
@@ -17,11 +16,11 @@ import {
   LucideMapPin,
   LucideTicket,
 } from '@lucide/angular';
-import { APP_SITE_CONFIG } from '../../../../core/config/site.config';
 import { extractErrorMessage } from '../../../../core/models/api-error.model';
 import { Circuit } from '../../../../core/models/circuit.model';
 import { GuideProfil } from '../../../../core/models/guide.model';
 import { Patrimoine } from '../../../../core/models/patrimoine.model';
+import { SeoService } from '../../../../core/services/seo.service';
 import { UiAvisSectionComponent } from '../../../../shared/components/ui-avis-section/ui-avis-section.component';
 import { GuideApiService } from '../../../guides/data-access/guide-api.service';
 import {
@@ -80,8 +79,7 @@ export class CircuitDetailPageComponent {
   protected readonly patrimoineStore = inject(PatrimoineStore);
   private readonly guideApi = inject(GuideApiService);
   private readonly reservationApi = inject(ReservationApiService);
-  private readonly titleService = inject(Title);
-  private readonly config = inject(APP_SITE_CONFIG);
+  private readonly seo = inject(SeoService);
 
   protected readonly circuit = signal<Circuit | null>(null);
   protected readonly guide = signal<GuideProfil | null>(null);
@@ -195,10 +193,19 @@ export class CircuitDetailPageComponent {
       const detail = await this.store.loadById(circuitId);
       if (seq !== this.loadSeq) return;
       this.circuit.set(detail);
-      this.titleService.setTitle(`${detail.nomCircuit} — ${this.config.siteName}`);
+      this.seo.update({
+        title: detail.nomCircuit,
+        description:
+          detail.presentationTouristique ??
+          detail.descriptionCircuit ??
+          `Parcours touristique ${detail.nomCircuit} en Casamance (${detail.etapes?.length ?? 0} étape(s)).`,
+        canonicalPath: `/circuits/${detail.id}`,
+      });
       if (detail.guideResponsableId) {
         const g = await firstValueFrom(this.guideApi.getByUtilisateurId(detail.guideResponsableId)).catch(() => null);
-        if (seq === this.loadSeq) this.guide.set(g);
+        if (seq === this.loadSeq && g?.statutValidation === 'VALIDE' && g.visibilitePublique) {
+          this.guide.set(g);
+        }
       }
     } catch (err) {
       if (seq !== this.loadSeq) return;

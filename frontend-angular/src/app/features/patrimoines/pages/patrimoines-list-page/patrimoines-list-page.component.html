@@ -1,106 +1,87 @@
 <div class="page-section">
   <div class="container">
     <header class="editorial-header">
-      <p class="editorial-header__eyebrow">Archive culturelle &amp; écologique de Casamance</p>
+      <p class="editorial-header__eyebrow">Catalogue patrimonial · Casamance</p>
       <h1 class="editorial-header__title">Sites &amp; Monuments Patrimoniaux</h1>
       <p class="editorial-header__subtitle">
-        Explorez la diversité du patrimoine naturel, culturel, historique, architectural et
-        immatériel de la Casamance (Basse, Moyenne et Haute-Casamance).
+        Parcourez les sites culturels, historiques, naturels et mémoriels publiés de Basse, Moyenne
+        et Haute-Casamance.
       </p>
     </header>
 
-    <section class="controls-bar" aria-label="Filtres et mode d'affichage">
-      <div class="controls-bar__fields">
-        <div class="control-field control-field--search">
-          <label for="pat-search" class="control-field__label">
-            Recherche (nom, localité, code)
-          </label>
+    <section class="controls-bar" aria-label="Filtres de recherche des patrimoines">
+      <form class="controls-bar__fields" (ngSubmit)="onSearchSubmit()">
+        <div class="control-field">
+          <label for="pat-search" class="control-field__label">Rechercher</label>
           <div class="search-input-wrap">
             <svg lucideSearch [size]="16" class="search-input-wrap__icon" aria-hidden="true"></svg>
             <input
               id="pat-search"
+              name="search"
               type="search"
-              class="control-input control-input--with-icon"
-              placeholder="Ex: Ziguinchor, Carabane, Oussouye, Sédhiou, Kolda..."
-              [ngModel]="urlQuery()"
+              [ngModel]="searchTerm()"
               (ngModelChange)="onSearchChange($event)"
+              placeholder="Nom, localité, code ou description (Carabane, Sédhiou…)"
+              class="control-input control-input--with-icon"
             />
           </div>
+        </div>
+
+        <div class="control-field">
+          <label for="pat-zone" class="control-field__label">Zone</label>
+          <select
+            id="pat-zone"
+            name="zone"
+            [ngModel]="selectedZone()"
+            (ngModelChange)="onZoneChange($event)"
+            class="control-input"
+          >
+            @for (z of zones; track z.value) {
+              <option [value]="z.value">{{ z.label }}</option>
+            }
+          </select>
         </div>
 
         <div class="control-field">
           <label for="pat-cat" class="control-field__label">Catégorie</label>
           <select
             id="pat-cat"
+            name="categorie"
+            [ngModel]="selectedCategorie()"
+            (ngModelChange)="onCategorieChange($event)"
             class="control-input"
-            [ngModel]="categorie()"
-            (ngModelChange)="categorie.set($event); currentPage.set(1)"
           >
-            <option value="">Toutes les catégories</option>
-            <option value="NATUREL">Patrimoine naturel</option>
-            <option value="CULTUREL">Patrimoine culturel</option>
-            <option value="HISTORIQUE">Patrimoine historique</option>
-            <option value="ARCHITECTURAL">Patrimoine architectural</option>
-            <option value="IMMATERIEL">Patrimoine immatériel</option>
+            @for (cat of categories; track cat.value) {
+              <option [value]="cat.value">{{ cat.label }}</option>
+            }
           </select>
         </div>
 
         <div class="control-field">
-          <label for="pat-zone" class="control-field__label">Région de Casamance</label>
+          <label for="pat-sort" class="control-field__label">Trier par</label>
           <select
-            id="pat-zone"
+            id="pat-sort"
+            name="sort"
+            [ngModel]="sortBy()"
+            (ngModelChange)="onSortChange($event)"
             class="control-input"
-            [ngModel]="zone()"
-            (ngModelChange)="zone.set($event); currentPage.set(1)"
-          >
-            <option value="">Toute la Casamance</option>
-            <option value="BASSE_CASAMANCE">Basse-Casamance (Ziguinchor)</option>
-            <option value="MOYENNE_CASAMANCE">Moyenne-Casamance (Sédhiou)</option>
-            <option value="HAUTE_CASAMANCE">Haute-Casamance (Kolda)</option>
-          </select>
-        </div>
-
-        <div class="control-field">
-          <label for="pat-cap" class="control-field__label">Capacité min. (pers.)</label>
-          <input
-            id="pat-cap"
-            type="number"
-            min="0"
-            step="50"
-            class="control-input"
-            placeholder="Ex: 100"
-            [ngModel]="capaciteMin()"
-            (ngModelChange)="capaciteMin.set($event); currentPage.set(1)"
-          />
-        </div>
-
-        <div class="control-field">
-          <label for="pat-tri" class="control-field__label">Trier par</label>
-          <select
-            id="pat-tri"
-            class="control-input"
-            [ngModel]="tri()"
-            (ngModelChange)="tri.set($event)"
           >
             <option value="nom_asc">Nom (A → Z)</option>
-            <option value="capacite_desc">Capacité (plus grande d’abord)</option>
-            <option value="capacite_asc">Capacité (plus petite d’abord)</option>
-            <option value="tarif_asc">Tarif indicatif (croissant)</option>
+            <option value="capacite_desc">Capacité d'accueil</option>
+            <option value="tarif_asc">Tarif croissant</option>
+            <option value="date_desc">Ajoutés récemment</option>
           </select>
         </div>
-      </div>
+      </form>
 
       <div class="controls-bar__footer">
         <p class="controls-bar__count tabular-nums">
-          <strong>{{ filteredPatrimoines().length }}</strong>
-          résultat{{ filteredPatrimoines().length > 1 ? 's' : '' }}
-          @if (store.items().length !== filteredPatrimoines().length) {
-            <span> sur {{ store.items().length }}</span>
-          }
+          <strong>{{ totalElements() }}</strong>
+          {{ totalElements() > 1 ? 'sites publiés trouvés' : 'site publié trouvé' }}
         </p>
 
         <div class="controls-bar__actions">
-          @if (urlQuery() || categorie() || zone() || capaciteMin() || tri() !== 'nom_asc') {
+          @if (hasActiveFilters()) {
             <button type="button" class="btn-reset" (click)="resetFilters()">
               Réinitialiser les filtres
             </button>
@@ -108,9 +89,9 @@
 
           <div
             ngToolbar
-            orientation="horizontal"
             class="view-switcher"
-            aria-label="Mode d'affichage"
+            role="toolbar"
+            aria-label="Mode d'affichage des sites"
           >
             <button
               type="button"
@@ -139,16 +120,16 @@
       </div>
     </section>
 
-    @if (store.loading() && store.items().length === 0) {
+    @if (loading() && publishedItems().length === 0) {
       <app-ui-skeleton-grid [count]="3" label="Chargement des sites patrimoniaux..." />
-    } @else if (store.error() && store.items().length === 0) {
+    } @else if (error() && publishedItems().length === 0) {
       <app-ui-error-banner
         title="Erreur lors du chargement des patrimoines"
-        [message]="store.error()"
+        [message]="error()"
         [showRetry]="true"
-        (retry)="store.reload()"
+        (retry)="reload()"
       />
-    } @else if (filteredPatrimoines().length === 0) {
+    } @else if (publishedItems().length === 0) {
       <app-ui-empty-state
         title="Aucun site patrimonial trouvé"
         description="Essayez d'élargir vos critères de recherche ou réinitialisez les filtres."
@@ -161,7 +142,7 @@
         <app-ui-heritage-map
           [points]="mapPoints()"
           [height]="440"
-          ariaLabel="Carte géographique des sites patrimoniaux filtrés"
+          ariaLabel="Carte géographique des sites patrimoniaux de Casamance"
           (pointSelected)="onMapPointSelected($event)"
         />
 
@@ -174,13 +155,16 @@
               <app-ui-patrimoine-image
                 [codePatrimoine]="pat.codePatrimoine"
                 [nomPatrimoine]="pat.nomPatrimoine"
+                [imageUrl]="pat.imageUrl"
                 [sobriete]="isMemorial(pat)"
               />
             </div>
             <div class="map-preview-card__body">
               <div class="heritage-card__badges">
                 <span class="ui-badge">{{ pat.codePatrimoine }}</span>
-                <span class="ui-badge ui-badge--ochre">{{ formatCategorie(pat.categoriePatrimoine) }}</span>
+                <span class="ui-badge ui-badge--ochre">
+                  {{ formatCategorie(pat.categoriePatrimoine) }}
+                </span>
                 @if (isMemorial(pat)) {
                   <span class="ui-badge ui-badge--memorial">Lieu de mémoire</span>
                 }
@@ -207,7 +191,7 @@
       </div>
     } @else {
       <div class="patrimoines-grid">
-        @for (pat of pagedPatrimoines(); track pat.id) {
+        @for (pat of publishedItems(); track pat.id) {
           <article
             class="pat-card"
             [class.pat-card--memorial]="isMemorial(pat)"
@@ -220,6 +204,7 @@
               <app-ui-patrimoine-image
                 [codePatrimoine]="pat.codePatrimoine"
                 [nomPatrimoine]="pat.nomPatrimoine"
+                [imageUrl]="pat.imageUrl"
                 [sobriete]="isMemorial(pat)"
               />
             </a>
@@ -231,8 +216,21 @@
                     {{ formatCategorie(pat.categoriePatrimoine) }}
                   </span>
                 }
+                @if (pat.zoneGeographique) {
+                  <span class="ui-badge ui-badge--neutral">
+                    {{ formatZone(pat.zoneGeographique) }}
+                  </span>
+                }
                 @if (isMemorial(pat)) {
                   <span class="ui-badge ui-badge--memorial">Lieu de mémoire</span>
+                }
+                @if (getResume(pat.id); as res) {
+                  @if (res.totalAvis > 0) {
+                    <span class="ui-badge ui-badge--success tabular-nums">
+                      <svg lucideStar [size]="12" aria-hidden="true"></svg>
+                      {{ res.noteMoyenne }}/5 ({{ res.totalAvis }})
+                    </span>
+                  }
                 }
               </div>
               <h2 class="pat-card__title">
@@ -261,7 +259,11 @@
       </div>
 
       @if (totalPages() > 1) {
-        <nav class="pagination-bar" aria-label="Pagination des sites patrimoniaux" style="display:flex;justify-content:center;align-items:center;gap:0.75rem;margin-top:2rem;">
+        <nav
+          class="pagination-bar"
+          aria-label="Pagination des sites patrimoniaux"
+          style="display:flex;justify-content:center;align-items:center;gap:0.75rem;margin-top:2rem;"
+        >
           <button
             type="button"
             class="btn-reset"
