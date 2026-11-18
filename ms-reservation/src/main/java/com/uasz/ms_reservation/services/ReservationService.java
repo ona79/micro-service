@@ -20,7 +20,9 @@ import com.uasz.ms_reservation.entities.DisponibilitePrestation;
 import com.uasz.ms_reservation.entities.Reservation;
 import com.uasz.ms_reservation.entities.ReservationEvenementRecu;
 import com.uasz.ms_reservation.entities.ReservationHistorique;
+import com.uasz.ms_reservation.entities.ReservationNotificationOutbox;
 import com.uasz.ms_reservation.entities.ReservationParticipant;
+import com.uasz.ms_reservation.entities.StatutOutbox;
 import com.uasz.ms_reservation.entities.StatutReservation;
 import com.uasz.ms_reservation.entities.TypeReservation;
 import com.uasz.ms_reservation.exceptions.BadRequestException;
@@ -32,6 +34,7 @@ import com.uasz.ms_reservation.exceptions.UnauthorizedException;
 import com.uasz.ms_reservation.mappers.ReservationMapper;
 import com.uasz.ms_reservation.repositories.DisponibilitePrestationRepository;
 import com.uasz.ms_reservation.repositories.ReservationEvenementRecuRepository;
+import com.uasz.ms_reservation.repositories.ReservationNotificationOutboxRepository;
 import com.uasz.ms_reservation.repositories.ReservationRepository;
 import com.uasz.ms_reservation.security.SecurityUserContext;
 import com.uasz.ms_reservation.security.SecurityUserContextHolder;
@@ -48,6 +51,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -88,6 +93,12 @@ public class ReservationService implements IReservationService {
     private final EvenementClient evenementClient;
     private final PaiementClient paiementClient;
     private final NotificationClient notificationClient;
+
+    @Autowired(required = false)
+    private ReservationNotificationOutboxRepository notificationOutboxRepository;
+
+    @Autowired(required = false)
+    private ReservationNotificationOutboxRelayService notificationOutboxRelayService;
 
     @Value("${reservation.expiration-minutes:30}")
     private int expirationMinutes = 30;
@@ -1163,12 +1174,72 @@ public class ReservationService implements IReservationService {
     }
 
     private void notifierAsyncNonBloquant(Reservation res, String sujet, String contenu) {
-        if (notificationClient == null || res.getEmailClient() == null || res.getEmailClient().isBlank()) {
+        if (res.getEmailClient() == null || res.getEmailClient().isBlank()) {
+            return;
+        }
+        String eventType = switch (res.getStatut()) {
+            case CONFIRMEE -> "RESERVATION_CONFIRMEE";
+            case ANNULEE -> "RESERVATION_ANNULEE";
+            case REMBOURSEE -> "RESERVATION_REMBOURSEE";
+            case ECHEC -> "RESERVATION_ECHEC";
+            case EXPIREE -> "RESERVATION_EXPIREE";
+            default -> "RESERVATION_MISE_A_JOUR";
+        };
+        String corrId = res.getCorrelationId() != null ? res.getCorrelationId() : "RES-" + res.getId();
+        String idemKey = "RES:" + res.getId() + ":" + eventType;
+
+        if (notificationOutboxRepository != null) {
+            LocalDateTime now = LocalDateTime.now(Reservation.CASAMANCE_ZONE);
+            ReservationNotificationOutbox savedOutbox = notificationOutboxRepository.save(
+                    ReservationNotificationOutbox.builder()
+                            .eventId(UUID.randomUUID().toString())
+                            .correlationId(corrId)
+                            .utilisateurId(res.getUtilisateurId())
+                            .destinataire(res.getEmailClient())
+                            .sujet(sujet)
+                            .contenu(contenu)
+                            .reservationId(res.getId())
+                            .typeEvenement(eventType)
+                            .cibleType("RESERVATION")
+                            .cibleId(res.getId())
+                            .idempotencyKey(idemKey)
+                            .statut(StatutOutbox.EN_ATTENTE)
+                            .prochaineTentativeAt(now)
+                            .createdAt(now)
+                            .build()
+            );
+            if (notificationOutboxRelayService != null) {
+                if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            notificationOutboxRelayService.tenterLivraison(savedOutbox.getId());
+                        }
+                    });
+                } else {
+                    notificationOutboxRelayService.tenterLivraison(savedOutbox.getId());
+                }
+            }
+            return;
+        }
+
+        if (notificationClient == null) {
             return;
         }
         try {
-            notificationClient.envoyerNotification(new NotificationRequest(
-                    res.getEmailClient(), sujet, contenu, "EMAIL", res.getId()));
+            notificationClient.envoyerNotification(NotificationRequest.builder()
+                    .destinataire(res.getEmailClient())
+                    .utilisateurId(res.getUtilisateurId())
+                    .sujet(sujet)
+                    .contenu(contenu)
+                    .canal("EMAIL")
+                    .reservationId(res.getId())
+                    .typeEvenement(eventType)
+                    .cibleType("RESERVATION")
+                    .cibleId(res.getId())
+                    .correlationId(corrId)
+                    .idempotencyKey(idemKey)
+                    .build());
         } catch (Exception ex) {
             log.warn("Notification non envoyée pour réservation {} : {}", res.getId(), ex.getMessage());
         }
