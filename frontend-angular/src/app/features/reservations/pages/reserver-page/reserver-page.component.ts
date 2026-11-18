@@ -16,6 +16,7 @@ import { toast } from 'ngx-sonner';
 import { firstValueFrom, map } from 'rxjs';
 import { AuthStore } from '../../../../core/auth/auth.store';
 import { extractErrorMessage } from '../../../../core/models/api-error.model';
+import { SeoService } from '../../../../core/services/seo.service';
 import {
   Reservation,
   ReservationParticipant,
@@ -69,6 +70,7 @@ export class ReserverPageComponent implements OnInit {
   private readonly fb = inject(FormBuilder).nonNullable;
   private readonly route = inject(ActivatedRoute);
   private readonly dialog = inject(Dialog);
+  private readonly seo = inject(SeoService);
 
   protected readonly submittedAttempt = signal(false);
   protected readonly lastCreated = signal<Reservation | null>(null);
@@ -137,6 +139,12 @@ export class ReserverPageComponent implements OnInit {
     if (!id) return null;
     return this.evenementStore.items().find((ev) => ev.id === id) ?? null;
   });
+
+  protected readonly reservableCircuits = computed(() =>
+    this.circuitStore
+      .items()
+      .filter((c) => (c.statutCircuit ?? 'PUBLIE') === 'PUBLIE')
+  );
 
   protected readonly reservableEvenements = computed(() =>
     this.evenementStore
@@ -215,14 +223,14 @@ export class ReserverPageComponent implements OnInit {
     });
 
     effect(() => {
-      const circuits = this.circuitStore.items();
+      const circuits = this.reservableCircuits();
       if (circuits.length > 0 && !this.form.controls.circuitId.value) {
         this.form.controls.circuitId.setValue(String(circuits[0].id));
       }
     });
 
     effect(() => {
-      const evts = this.evenementStore.items();
+      const evts = this.reservableEvenements();
       if (evts.length > 0 && !this.form.controls.evenementId.value) {
         const firstOpen = evts.find((e) => e.ouvertReservation === true) ?? evts[0];
         this.form.controls.evenementId.setValue(String(firstOpen.id));
@@ -231,6 +239,12 @@ export class ReserverPageComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.seo.update({
+      title: 'Réserver une Visite',
+      description:
+        'Comptoir de réservation de circuits et événements culturels de Casamance avec contrôle de capacité serveur.',
+      canonicalPath: '/reserver',
+    });
     void this.refreshAll();
   }
 

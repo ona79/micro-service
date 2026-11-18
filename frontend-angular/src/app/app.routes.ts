@@ -10,6 +10,10 @@ export const routes: Routes = [
       {
         path: '',
         title: 'Accueil',
+        data: {
+          description:
+            'Explorez la Casamance : sites patrimoniaux de Basse, Moyenne et Haute-Casamance, circuits sur les bolongs, agenda culturel et guides agréés.',
+        },
         loadComponent: () =>
           import('./features/home/pages/home-page/home-page.component').then(
             (m) => m.HomePageComponent
@@ -18,6 +22,10 @@ export const routes: Routes = [
       {
         path: 'patrimoines',
         title: 'Sites & Monuments Patrimoniaux',
+        data: {
+          description:
+            'Catalogue des sites culturels, mémoriels et naturels publiés de Casamance : filtres par zone géographique, catégorie et capacité d’accueil.',
+        },
         loadComponent: () =>
           import(
             './features/patrimoines/pages/patrimoines-list-page/patrimoines-list-page.component'
@@ -26,6 +34,10 @@ export const routes: Routes = [
       {
         path: 'patrimoines/:id',
         title: 'Fiche Patrimoine',
+        data: {
+          description:
+            'Fiche détaillée d’un site patrimonial de Casamance : histoire, localisation GPS, tarifs, avis vérifiés et réservations.',
+        },
         loadComponent: () =>
           import(
             './features/patrimoines/pages/patrimoine-detail-page/patrimoine-detail-page.component'
@@ -34,6 +46,10 @@ export const routes: Routes = [
       {
         path: 'circuits',
         title: 'Circuits Touristiques',
+        data: {
+          description:
+            'Itinéraires culturels et immersions fluviales ou pédestres en Casamance : étapes détaillées, guides locaux et estimation orthodromique.',
+        },
         loadComponent: () =>
           import(
             './features/circuits/pages/circuits-list-page/circuits-list-page.component'
@@ -42,6 +58,10 @@ export const routes: Routes = [
       {
         path: 'circuits/:id',
         title: 'Détail du Circuit',
+        data: {
+          description:
+            'Parcours étape par étape, durée estimée, carte interactive et avis de voyageurs pour ce circuit touristique en Casamance.',
+        },
         loadComponent: () =>
           import(
             './features/circuits/pages/circuit-detail-page/circuit-detail-page.component'
@@ -50,6 +70,10 @@ export const routes: Routes = [
       {
         path: 'evenements',
         title: 'Agenda Culturel',
+        data: {
+          description:
+            'Agenda culturel et festivals de Casamance en heure officielle Africa/Dakar : cérémonies, foires artisanales, visites et ateliers.',
+        },
         loadComponent: () =>
           import(
             './features/evenements/pages/evenements-list-page/evenements-list-page.component'
@@ -58,6 +82,10 @@ export const routes: Routes = [
       {
         path: 'evenements/:id',
         title: 'Détail de l’Événement',
+        data: {
+          description:
+            'Horaires, site hôte, places disponibles et modalités de réservation pour cet événement culturel en Casamance.',
+        },
         loadComponent: () =>
           import(
             './features/evenements/pages/evenement-detail-page/evenement-detail-page.component'
@@ -66,6 +94,10 @@ export const routes: Routes = [
       {
         path: 'guides',
         title: 'Guides Touristiques Agréés',
+        data: {
+          description:
+            'Annuaire officiel des guides touristiques validés en Casamance : zones couvertes, spécialités culturelles et langues parlées.',
+        },
         loadComponent: () =>
           import(
             './features/guides/pages/guides-list-page/guides-list-page.component'
@@ -74,6 +106,10 @@ export const routes: Routes = [
       {
         path: 'guides/:id',
         title: 'Profil du Guide Touristique',
+        data: {
+          description:
+            'Présentation publique, langues, spécialités et notes des voyageurs vérifiés pour ce guide touristique agréé en Casamance.',
+        },
         loadComponent: () =>
           import(
             './features/guides/pages/guide-detail-page/guide-detail-page.component'
@@ -100,11 +136,28 @@ export const routes: Routes = [
       {
         path: 'reserver',
         title: 'Réserver une Visite',
+        data: {
+          description:
+            'Réservez en ligne vos places sur les circuits touristiques et événements culturels publiés de Casamance.',
+        },
         canActivate: [authGuard],
         loadComponent: () =>
           import(
             './features/reservations/pages/reserver-page/reserver-page.component'
           ).then((m) => m.ReserverPageComponent),
+      },
+      {
+        path: 'reservations/:id',
+        title: 'Détail de la Réservation',
+        data: {
+          description:
+            'Suivi détaillé d’une réservation, participants, paiements simulés et historique d’état.',
+        },
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import(
+            './features/reservations/pages/reservation-detail-page/reservation-detail-page.component'
+          ).then((m) => m.ReservationDetailPageComponent),
       },
       {
         path: 'paiements',

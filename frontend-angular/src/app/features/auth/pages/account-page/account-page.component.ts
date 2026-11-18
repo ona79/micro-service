@@ -1,24 +1,25 @@
 import { Dialog } from '@angular/cdk/dialog';
-import { HttpClient } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
   Component,
+  OnInit,
   computed,
   inject,
-  OnInit,
   signal,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import {
   LucideAward,
   LucideBell,
   LucideCheckCircle2,
   LucideCreditCard,
+  LucideEye,
   LucideLogOut,
   LucideShieldCheck,
   LucideStar,
   LucideTicket,
+  LucideUser,
 } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { toast } from 'ngx-sonner';
@@ -37,7 +38,9 @@ import {
   formatReservationStatusLabel,
   reservationStatusBadgeClass,
 } from '../../../../core/models/reservation.model';
+import { SeoService } from '../../../../core/services/seo.service';
 import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confirm-dialog/ui-confirm-dialog.component';
+import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
 import { AvisApiService } from '../../../avis/data-access/avis-api.service';
@@ -46,15 +49,19 @@ import { NotificationStore } from '../../../notifications/data-access/notificati
 import { PaiementStore } from '../../../paiements/data-access/paiement.store';
 import { ReservationStore } from '../../../reservations/data-access/reservation.store';
 
+type AccountTab = 'reservations' | 'paiements' | 'avis' | 'notifications' | 'profil';
+
 @Component({
   selector: 'app-account-page',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FormsModule,
+    ReactiveFormsModule,
     RouterLink,
     FcfaPricePipe,
     DateFrPipe,
+    UiErrorBannerComponent,
     LucideShieldCheck,
     LucideTicket,
     LucideCreditCard,
@@ -63,6 +70,8 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
     LucideLogOut,
     LucideAward,
     LucideStar,
+    LucideEye,
+    LucideUser,
   ],
   template: `
     <div class="page-section">
@@ -116,8 +125,65 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
             </div>
           </header>
 
-          <div class="account-grid">
-            <!-- Colonne principale : Réservations & Paiements -->
+          <nav class="account-tabs" role="tablist" aria-label="Sections de mon espace personnel">
+            <button
+              type="button"
+              role="tab"
+              class="account-tab"
+              [class.account-tab--active]="activeTab() === 'reservations'"
+              [attr.aria-selected]="activeTab() === 'reservations'"
+              (click)="activeTab.set('reservations')"
+            >
+              <svg lucideTicket [size]="15" aria-hidden="true"></svg>
+              <span>Réservations ({{ myReservations().length }})</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="account-tab"
+              [class.account-tab--active]="activeTab() === 'paiements'"
+              [attr.aria-selected]="activeTab() === 'paiements'"
+              (click)="activeTab.set('paiements')"
+            >
+              <svg lucideCreditCard [size]="15" aria-hidden="true"></svg>
+              <span>Paiements simulés ({{ paiements().length }})</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="account-tab"
+              [class.account-tab--active]="activeTab() === 'avis'"
+              [attr.aria-selected]="activeTab() === 'avis'"
+              (click)="activeTab.set('avis')"
+            >
+              <svg lucideStar [size]="15" aria-hidden="true"></svg>
+              <span>Mes avis ({{ mesAvis().length }})</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="account-tab"
+              [class.account-tab--active]="activeTab() === 'notifications'"
+              [attr.aria-selected]="activeTab() === 'notifications'"
+              (click)="activeTab.set('notifications')"
+            >
+              <svg lucideBell [size]="15" aria-hidden="true"></svg>
+              <span>Notifications ({{ myNotifications().length }})</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="account-tab"
+              [class.account-tab--active]="activeTab() === 'profil'"
+              [attr.aria-selected]="activeTab() === 'profil'"
+              (click)="openProfileTab()"
+            >
+              <svg lucideUser [size]="15" aria-hidden="true"></svg>
+              <span>Profil &amp; coordonnées</span>
+            </button>
+          </nav>
+
+          @if (activeTab() === 'reservations') {
             <section class="account-card" aria-labelledby="my-res-heading">
               <div class="account-card__header">
                 <h2 id="my-res-heading" class="account-card__title">
@@ -156,13 +222,15 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
                         </div>
 
                         <h3 class="res-row__title">
-                          {{
-                            res.circuit?.nomCircuit ||
-                              res.evenement?.nomEvenement ||
-                              (res.typeReservation === 'CIRCUIT'
-                                ? 'Circuit #' + res.circuitId
-                                : 'Événement #' + res.evenementId)
-                          }}
+                          <a [routerLink]="['/reservations', res.id]" class="res-title-link">
+                            {{
+                              res.circuit?.nomCircuit ||
+                                res.evenement?.nomEvenement ||
+                                (res.typeReservation === 'CIRCUIT'
+                                  ? 'Circuit #' + res.circuitId
+                                  : 'Événement #' + res.evenementId)
+                            }}
+                          </a>
                         </h3>
                         <p class="res-row__meta tabular-nums">
                           {{ res.nombrePlaces }} place(s) · Total :
@@ -172,6 +240,11 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
                       </div>
 
                       <div class="res-row__pay">
+                        <a [routerLink]="['/reservations', res.id]" class="btn-detail-sm">
+                          <svg lucideEye [size]="14" aria-hidden="true"></svg>
+                          <span>Détail</span>
+                        </a>
+
                         @if (res.statut === 'EN_ATTENTE_PAIEMENT') {
                           <label [attr.for]="'pay-mode-' + res.id" class="sr-only">
                             Portefeuille simulé
@@ -205,11 +278,8 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
                             Soumettre
                           </button>
                         } @else {
-                          <a
-                            [routerLink]="['/paiements', res.id]"
-                            class="btn-admin"
-                          >
-                            Voir reçu / suivi
+                          <a [routerLink]="['/paiements', res.id]" class="btn-admin">
+                            Suivi paiement
                           </a>
                         }
 
@@ -229,105 +299,221 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
                 </div>
               }
             </section>
+          }
 
-            <!-- Colonne latérale : Transactions Simulées & Notifications -->
-            <aside class="account-sidebar">
-              <section class="account-card" aria-labelledby="tx-heading">
-                <div class="account-card__header">
-                  <h2 id="tx-heading" class="account-card__title">
-                    <svg lucideCreditCard [size]="18" aria-hidden="true"></svg>
-                    <span>Transactions simulées ({{ paiements().length }})</span>
-                  </h2>
-                </div>
-                <p class="ui-sim-banner" style="margin-bottom: 0.75rem;">
-                  Mode simulation Wave / Orange Money — aucun débit réel.
+          @if (activeTab() === 'paiements') {
+            <section class="account-card" aria-labelledby="tx-heading">
+              <div class="account-card__header">
+                <h2 id="tx-heading" class="account-card__title">
+                  <svg lucideCreditCard [size]="18" aria-hidden="true"></svg>
+                  <span>Transactions simulées ({{ paiements().length }})</span>
+                </h2>
+              </div>
+              <p class="ui-sim-banner" style="margin-bottom: 0.9rem;">
+                Mode simulation pédagogique Wave / Orange Money — aucun débit réel.
+              </p>
+              @if (paiements().length === 0) {
+                <p class="sidebar-muted">
+                  Aucune transaction simulée enregistrée pour le moment.
                 </p>
-                @if (paiements().length === 0) {
-                  <p class="sidebar-muted">
-                    Aucune transaction simulée enregistrée pour le moment.
-                  </p>
-                } @else {
-                  <ul class="notif-list">
-                    @for (p of paiements().slice(0, 6); track p.id) {
-                      <li class="notif-item">
-                        <div class="notif-item__top">
-                          <span [class]="paiementStatusBadgeClass(p.statut)">
-                            {{ formatPaiementStatusLabel(p.statut) }}
-                          </span>
-                          <span class="notif-item__date">{{ (p.datePaiement || p.dateCreation) | dateFr }}</span>
-                        </div>
-                        <p class="notif-item__subject">
-                          {{ p.referenceTransaction }} · {{ p.montant | fcfaPrice }}
-                        </p>
-                        <p class="notif-item__body">
-                          {{ p.modePaiement }} · Réservation #{{ p.reservationId }}
-                          <a [routerLink]="['/paiements', p.reservationId]">Détails</a>
-                        </p>
-                      </li>
-                    }
-                  </ul>
-                }
-              </section>
+              } @else {
+                <ul class="notif-list">
+                  @for (p of paiements(); track p.id) {
+                    <li class="notif-item">
+                      <div class="notif-item__top">
+                        <span [class]="paiementStatusBadgeClass(p.statut)">
+                          {{ formatPaiementStatusLabel(p.statut) }}
+                        </span>
+                        <span class="notif-item__date">{{ (p.datePaiement || p.dateCreation) | dateFr }}</span>
+                      </div>
+                      <p class="notif-item__subject">
+                        {{ p.referenceTransaction }} · {{ p.montant | fcfaPrice }}
+                      </p>
+                      <p class="notif-item__body">
+                        {{ p.modePaiement }} · Réservation #{{ p.reservationId }}
+                        · <a [routerLink]="['/paiements', p.reservationId]">Reçu &amp; simulation</a>
+                        · <a [routerLink]="['/reservations', p.reservationId]">Fiche réservation</a>
+                      </p>
+                    </li>
+                  }
+                </ul>
+              }
+            </section>
+          }
 
-              <section class="account-card" aria-labelledby="notif-heading">
-                <div class="account-card__header">
-                  <h2 id="notif-heading" class="account-card__title">
-                    <svg lucideBell [size]="18" aria-hidden="true"></svg>
-                    <span>Notifications reçues ({{ myNotifications().length }})</span>
-                  </h2>
-                  <a routerLink="/notifications" class="account-card__link">Centre complet</a>
+          @if (activeTab() === 'avis') {
+            <section class="account-card" aria-labelledby="avis-heading">
+              <div class="account-card__header">
+                <h2 id="avis-heading" class="account-card__title">
+                  <svg lucideStar [size]="18" aria-hidden="true"></svg>
+                  <span>Mes avis &amp; évaluations vérifiées ({{ mesAvis().length }})</span>
+                </h2>
+              </div>
+
+              @if (mesAvis().length === 0) {
+                <p class="sidebar-muted">
+                  Vous n’avez pas encore déposé d’avis. Après une réservation confirmée, rendez-vous
+                  sur la fiche du site, circuit ou guide concerné.
+                </p>
+              } @else {
+                <ul class="notif-list">
+                  @for (a of mesAvis(); track a.id) {
+                    <li class="notif-item">
+                      <div class="notif-item__top">
+                        <span class="ui-badge ui-badge--ochre">{{ a.cibleType }} · {{ a.note }}/5</span>
+                        <span [class]="moderationBadge(a.statutModeration)">
+                          {{ formatModerationLabel(a.statutModeration) }}
+                        </span>
+                      </div>
+                      @if (a.cibleNom) {
+                        <p class="notif-item__subject">{{ a.cibleNom }}</p>
+                      }
+                      <p class="notif-item__body">{{ a.commentaire }}</p>
+                      @if (a.motifModeration) {
+                        <p class="notif-item__date" style="margin-top: 0.35rem;">
+                          Note modération : {{ a.motifModeration }}
+                        </p>
+                      }
+                    </li>
+                  }
+                </ul>
+              }
+            </section>
+          }
+
+          @if (activeTab() === 'notifications') {
+            <section class="account-card" aria-labelledby="notif-heading">
+              <div class="account-card__header" style="display:flex;justify-content:space-between;align-items:center;">
+                <h2 id="notif-heading" class="account-card__title">
+                  <svg lucideBell [size]="18" aria-hidden="true"></svg>
+                  <span>Notifications reçues ({{ myNotifications().length }})</span>
+                </h2>
+                <a routerLink="/notifications" class="btn-detail-sm">Ouvrir le centre complet</a>
+              </div>
+
+              @if (myNotifications().length === 0) {
+                <p class="sidebar-muted">
+                  Aucune notification enregistrée pour votre compte pour le moment.
+                </p>
+              } @else {
+                <ul class="notif-list">
+                  @for (n of myNotifications(); track n.id) {
+                    <li class="notif-item">
+                      <div class="notif-item__top">
+                        <span class="ui-badge" [class.ui-badge--terracotta]="!n.lue" [class.ui-badge--success]="n.lue">
+                          {{ formatEventLabel(n.typeEvenement) }}
+                        </span>
+                        <span class="notif-item__date">{{ n.dateEnvoi | dateFr }}</span>
+                      </div>
+                      <p class="notif-item__subject">{{ n.sujet }}</p>
+                      <p class="notif-item__body">{{ n.contenu }}</p>
+                    </li>
+                  }
+                </ul>
+              }
+            </section>
+          }
+
+          @if (activeTab() === 'profil') {
+            <section class="account-card" aria-labelledby="profile-heading">
+              <div class="account-card__header">
+                <h2 id="profile-heading" class="account-card__title">
+                  <svg lucideUser [size]="18" aria-hidden="true"></svg>
+                  <span>Mes informations personnelles</span>
+                </h2>
+              </div>
+
+              <app-ui-error-banner
+                title="Impossible de mettre à jour le profil"
+                [message]="profileError()"
+              />
+
+              <form [formGroup]="profileForm" (ngSubmit)="saveProfile()" class="profile-form" novalidate>
+                <div class="profile-grid">
+                  <div class="profile-field">
+                    <label for="prof-prenom" class="profile-label">Prénom *</label>
+                    <input
+                      id="prof-prenom"
+                      type="text"
+                      formControlName="prenom"
+                      class="profile-input"
+                    />
+                    @if (profileForm.controls.prenom.invalid && profileForm.controls.prenom.touched) {
+                      <span class="profile-error">Le prénom est requis (2 caractères min).</span>
+                    }
+                  </div>
+
+                  <div class="profile-field">
+                    <label for="prof-nom" class="profile-label">Nom *</label>
+                    <input
+                      id="prof-nom"
+                      type="text"
+                      formControlName="nom"
+                      class="profile-input"
+                    />
+                    @if (profileForm.controls.nom.invalid && profileForm.controls.nom.touched) {
+                      <span class="profile-error">Le nom est requis (2 caractères min).</span>
+                    }
+                  </div>
                 </div>
 
-                @if (myNotifications().length === 0) {
-                  <p class="sidebar-muted">
-                    Aucune notification enregistrée pour votre compte pour le moment.
-                  </p>
-                } @else {
-                  <ul class="notif-list">
-                    @for (n of myNotifications().slice(0, 5); track n.id) {
-                      <li class="notif-item">
-                        <div class="notif-item__top">
-                          <span class="ui-badge" [class.ui-badge--terracotta]="!n.lue" [class.ui-badge--success]="n.lue">
-                            {{ formatEventLabel(n.typeEvenement) }}
-                          </span>
-                          <span class="notif-item__date">{{ n.dateEnvoi | dateFr }}</span>
-                        </div>
-                        <p class="notif-item__subject">{{ n.sujet }}</p>
-                        <p class="notif-item__body">{{ n.contenu }}</p>
-                      </li>
+                <div class="profile-grid">
+                  <div class="profile-field">
+                    <label for="prof-email" class="profile-label">Adresse e-mail *</label>
+                    <input
+                      id="prof-email"
+                      type="email"
+                      formControlName="email"
+                      class="profile-input"
+                    />
+                    @if (profileForm.controls.email.invalid && profileForm.controls.email.touched) {
+                      <span class="profile-error">Saisissez une adresse e-mail valide.</span>
                     }
-                  </ul>
-                }
-              </section>
+                  </div>
 
-              <section class="account-card" aria-labelledby="my-avis-heading">
-                <div class="account-card__header">
-                  <h2 id="my-avis-heading" class="account-card__title">
-                    <svg lucideStar [size]="18" aria-hidden="true"></svg>
-                    <span>Mes avis vérifiés ({{ mesAvis().length }})</span>
-                  </h2>
+                  <div class="profile-field">
+                    <label for="prof-tel" class="profile-label">Téléphone</label>
+                    <input
+                      id="prof-tel"
+                      type="tel"
+                      formControlName="telephone"
+                      placeholder="+221 77 000 00 00"
+                      class="profile-input"
+                    />
+                  </div>
                 </div>
-                @if (mesAvis().length === 0) {
-                  <p class="sidebar-muted">Vous n'avez pas encore publié d'avis après réservation.</p>
-                } @else {
-                  <ul class="notif-list">
-                    @for (a of mesAvis().slice(0, 5); track a.id) {
-                      <li class="notif-item">
-                        <div class="notif-item__top">
-                          <span [class]="moderationBadge(a.statutModeration)">
-                            {{ formatModerationLabel(a.statutModeration) }}
-                          </span>
-                          <span class="notif-item__date tabular-nums">{{ a.note }}/5 ★</span>
-                        </div>
-                        <p class="notif-item__subject">{{ a.cibleNom || (a.cibleType + ' #' + a.cibleId) }}</p>
-                        <p class="notif-item__body">{{ a.commentaire }}</p>
-                      </li>
-                    }
-                  </ul>
-                }
-              </section>
-            </aside>
-          </div>
+
+                <div class="profile-field">
+                  <label for="prof-pwd" class="profile-label">
+                    Nouveau mot de passe (optionnel — laisser vide pour conserver l’actuel)
+                  </label>
+                  <input
+                    id="prof-pwd"
+                    type="password"
+                    formControlName="motDePasse"
+                    autocomplete="new-password"
+                    class="profile-input"
+                    placeholder="Minimum 6 caractères si modification"
+                  />
+                  @if (profileForm.controls.motDePasse.invalid && profileForm.controls.motDePasse.touched) {
+                    <span class="profile-error">
+                      Le nouveau mot de passe doit contenir au moins 6 caractères.
+                    </span>
+                  }
+                </div>
+
+                <div class="profile-actions">
+                  <button
+                    type="submit"
+                    class="btn-primary"
+                    [disabled]="savingProfile()"
+                  >
+                    {{ savingProfile() ? 'Enregistrement...' : 'Enregistrer mes modifications' }}
+                  </button>
+                </div>
+              </form>
+            </section>
+          }
         }
       </div>
     </div>
@@ -338,33 +524,32 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: var(--space-6);
-      padding: var(--space-6) var(--space-8);
+      gap: var(--space-5);
+      padding: var(--space-6);
       background-color: var(--surface-elevated);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-xl);
       box-shadow: var(--shadow-sm);
-      margin-bottom: var(--space-8);
+      margin-bottom: var(--space-6);
     }
 
     .account-hero__identity {
       display: flex;
       align-items: center;
-      gap: var(--space-5);
+      gap: var(--space-4);
     }
 
     .account-avatar {
-      width: 68px;
-      height: 68px;
-      border-radius: var(--radius-pill);
-      background: linear-gradient(135deg, var(--brand-primary) 0%, var(--accent-terracotta) 100%);
-      color: #ffffff;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background-color: var(--brand-primary);
+      color: var(--ink-on-dark);
       font-family: var(--font-display);
       font-size: var(--text-xl);
       font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: grid;
+      place-items: center;
       flex-shrink: 0;
     }
 
@@ -372,18 +557,18 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
       display: flex;
       flex-wrap: wrap;
       gap: var(--space-2);
-      margin-bottom: var(--space-2);
+      margin-bottom: var(--space-1);
     }
 
     .account-hero__name {
-      font-size: var(--text-2xl);
-      color: var(--ink-primary);
-      margin-bottom: 0.15rem;
+      font-size: var(--text-xl);
+      margin: 0 0 0.15rem;
     }
 
     .account-hero__meta {
       font-size: var(--text-sm);
       color: var(--ink-secondary);
+      margin: 0;
     }
 
     .account-hero__actions {
@@ -392,18 +577,48 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
       gap: var(--space-3);
     }
 
-    .btn-primary,
-    .btn-admin,
-    .btn-logout {
+    .account-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      margin-bottom: var(--space-5);
+    }
+
+    .account-tab {
       display: inline-flex;
       align-items: center;
       gap: var(--space-2);
-      padding: 0.65rem 1.2rem;
+      padding: 0.6rem 1rem;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--border-strong);
+      background-color: var(--surface-elevated);
+      color: var(--ink-secondary);
+      font-family: var(--font-sans);
+      font-size: var(--text-sm);
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .account-tab--active {
+      background-color: var(--brand-primary);
+      border-color: var(--brand-primary);
+      color: var(--ink-on-dark);
+    }
+
+    .btn-primary,
+    .btn-admin,
+    .btn-logout,
+    .btn-detail-sm {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: 0.58rem 1.05rem;
       border-radius: var(--radius-pill);
       font-size: var(--text-sm);
       font-weight: 700;
       cursor: pointer;
       font-family: var(--font-sans);
+      text-decoration: none;
     }
 
     .btn-primary {
@@ -418,17 +633,18 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
       border: none;
     }
 
+    .btn-detail-sm {
+      padding: 0.45rem 0.85rem;
+      background-color: var(--surface-sand);
+      color: var(--ink-primary);
+      border: 1px solid var(--border-strong);
+      font-size: var(--text-xs);
+    }
+
     .btn-logout {
       background-color: var(--surface-sand);
       color: var(--danger);
       border: 1px solid rgba(166, 44, 44, 0.25);
-    }
-
-    .account-grid {
-      display: grid;
-      grid-template-columns: 1.55fr 1fr;
-      gap: var(--space-6);
-      align-items: start;
     }
 
     .account-card {
@@ -451,12 +667,17 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
       gap: var(--space-2);
       font-size: var(--text-lg);
       color: var(--ink-primary);
+      margin: 0;
     }
 
-    .res-stack {
+    .res-stack,
+    .notif-list {
       display: flex;
       flex-direction: column;
       gap: var(--space-4);
+      list-style: none;
+      margin: 0;
+      padding: 0;
     }
 
     .res-row {
@@ -484,17 +705,28 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
 
     .res-row__title {
       font-size: var(--text-base);
+      margin: 0 0 0.2rem;
+    }
+
+    .res-title-link {
       color: var(--ink-primary);
-      margin-bottom: 0.2rem;
+      text-decoration: none;
+    }
+
+    .res-title-link:hover {
+      color: var(--brand-primary);
+      text-decoration: underline;
     }
 
     .res-row__meta {
       font-size: var(--text-sm);
       color: var(--ink-secondary);
+      margin: 0;
     }
 
     .res-row__pay {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: var(--space-2);
     }
@@ -522,17 +754,8 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
       cursor: pointer;
     }
 
-    .notif-list {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-3);
-    }
-
     .notif-item {
-      padding: var(--space-3) var(--space-4);
+      padding: var(--space-4);
       border-radius: var(--radius-md);
       background-color: var(--surface-sand);
       border: 1px solid var(--border-subtle);
@@ -543,6 +766,8 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
       align-items: center;
       justify-content: space-between;
       margin-bottom: 0.3rem;
+      gap: 0.5rem;
+      flex-wrap: wrap;
     }
 
     .notif-item__date {
@@ -554,13 +779,14 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
       font-size: var(--text-sm);
       font-weight: 700;
       color: var(--ink-primary);
-      margin-bottom: 0.2rem;
+      margin: 0 0 0.2rem;
     }
 
     .notif-item__body {
       font-size: var(--text-xs);
       color: var(--ink-secondary);
       line-height: 1.5;
+      margin: 0;
     }
 
     .empty-box {
@@ -577,16 +803,11 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
     .sidebar-muted {
       font-size: var(--text-sm);
       color: var(--ink-secondary);
-    }
-
-    .account-sidebar {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-5);
+      margin: 0;
     }
 
     .btn-cancel-sm {
-      padding: 0.4rem 0.75rem;
+      padding: 0.45rem 0.8rem;
       border-radius: var(--radius-pill);
       border: 1px solid var(--status-error-border);
       background: var(--status-error-bg);
@@ -596,17 +817,59 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
       cursor: pointer;
     }
 
-    @media (max-width: 920px) {
-      .account-grid {
+    .profile-form {
+      display: grid;
+      gap: var(--space-4);
+      max-width: 720px;
+    }
+
+    .profile-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-4);
+    }
+
+    @media (max-width: 680px) {
+      .profile-grid {
         grid-template-columns: 1fr;
       }
+    }
+
+    .profile-field {
+      display: grid;
+      gap: var(--space-1);
+    }
+
+    .profile-label {
+      font-size: var(--text-xs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--ink-muted);
+    }
+
+    .profile-input {
+      padding: 0.65rem 0.85rem;
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: var(--text-sm);
+      background-color: var(--surface-canvas);
+      color: var(--ink-primary);
+    }
+
+    .profile-error {
+      font-size: var(--text-xs);
+      color: var(--danger);
+      font-weight: 600;
     }
   `,
 })
 export class AccountPageComponent implements OnInit {
-  private readonly http = inject(HttpClient);
+  private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
   private readonly dialog = inject(Dialog);
+  private readonly seo = inject(SeoService);
   protected readonly authStore = inject(AuthStore);
   protected readonly reservationStore = inject(ReservationStore);
   protected readonly paiementStore = inject(PaiementStore);
@@ -614,10 +877,13 @@ export class AccountPageComponent implements OnInit {
   private readonly notifStore = inject(NotificationStore);
   private readonly avisApi = inject(AvisApiService);
 
+  protected readonly activeTab = signal<AccountTab>('reservations');
   protected readonly paiements = computed(() => this.paiementStore.items());
   protected readonly notifications = signal<NotificationItem[]>([]);
   protected readonly mesAvis = signal<Avis[]>([]);
   protected readonly payingId = signal<number | null>(null);
+  protected readonly savingProfile = signal<boolean>(false);
+  protected readonly profileError = signal<string | null>(null);
   protected readonly selectedModes = signal<Record<number, ModePaiement>>({});
 
   protected readonly formatReservationStatusLabel = formatReservationStatusLabel;
@@ -627,6 +893,14 @@ export class AccountPageComponent implements OnInit {
   protected readonly formatEventLabel = formatNotificationEventLabel;
   protected readonly formatModerationLabel = formatModerationStatusLabel;
   protected readonly moderationBadge = moderationBadgeClass;
+
+  protected readonly profileForm = this.fb.nonNullable.group({
+    prenom: ['', [Validators.required, Validators.minLength(2)]],
+    nom: ['', [Validators.required, Validators.minLength(2)]],
+    email: ['', [Validators.required, Validators.email]],
+    telephone: [''],
+    motDePasse: ['', [Validators.minLength(6)]],
+  });
 
   protected readonly myReservations = computed(() => {
     const user = this.authStore.user();
@@ -646,8 +920,53 @@ export class AccountPageComponent implements OnInit {
   protected readonly myNotifications = computed(() => this.notifications());
 
   ngOnInit(): void {
+    this.seo.update({
+      title: 'Mon Espace Personnel',
+      description: 'Gérez vos réservations, paiements simulés, avis et coordonnées personnelles.',
+      canonicalPath: '/mon-espace',
+    });
+    this.syncProfileForm();
     void this.reservationStore.reload();
     void this.loadTransactionsAndNotifications();
+  }
+
+  protected openProfileTab(): void {
+    this.syncProfileForm();
+    this.profileError.set(null);
+    this.activeTab.set('profil');
+  }
+
+  protected async saveProfile(): Promise<void> {
+    const user = this.authStore.user();
+    if (!user) return;
+
+    this.profileError.set(null);
+    const pwdCtrl = this.profileForm.controls.motDePasse;
+    if (!pwdCtrl.value.trim()) {
+      pwdCtrl.setErrors(null);
+    }
+    if (this.profileForm.invalid) {
+      this.profileForm.markAllAsTouched();
+      return;
+    }
+
+    const raw = this.profileForm.getRawValue();
+    this.savingProfile.set(true);
+    try {
+      await this.authStore.updateUser(user.id, {
+        prenom: raw.prenom.trim(),
+        nom: raw.nom.trim(),
+        email: raw.email.trim(),
+        telephone: raw.telephone.trim() || null,
+        ...(raw.motDePasse.trim() ? { motDePasse: raw.motDePasse.trim() } : {}),
+      });
+      this.profileForm.patchValue({ motDePasse: '' });
+      toast.success('Vos informations personnelles ont été enregistrées.');
+    } catch (err) {
+      this.profileError.set(extractErrorMessage(err));
+    } finally {
+      this.savingProfile.set(false);
+    }
   }
 
   protected getSelectedMode(reservationId: number): ModePaiement {
@@ -726,10 +1045,22 @@ export class AccountPageComponent implements OnInit {
     await this.router.navigate(['/connexion']);
   }
 
+  private syncProfileForm(): void {
+    const u = this.authStore.user();
+    if (!u) return;
+    this.profileForm.patchValue({
+      prenom: u.prenom ?? '',
+      nom: u.nom ?? '',
+      email: u.email ?? '',
+      telephone: u.telephone ?? '',
+      motDePasse: '',
+    });
+  }
+
   private async loadTransactionsAndNotifications(): Promise<void> {
     await this.paiementStore.reload();
     const [notifPage, avis] = await Promise.all([
-      firstValueFrom(this.notifApi.getMesNotifications(0, 10)).catch(() => null),
+      firstValueFrom(this.notifApi.getMesNotifications(0, 15)).catch(() => null),
       firstValueFrom(this.avisApi.getMesAvis()).catch(() => []),
     ]);
     if (notifPage) {

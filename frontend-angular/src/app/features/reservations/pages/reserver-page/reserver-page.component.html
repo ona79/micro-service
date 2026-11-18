@@ -1,12 +1,22 @@
 <div class="page-section">
   <div class="container">
     <header class="editorial-header">
-      <p class="editorial-header__eyebrow">Comptoir de réservation · P04</p>
+      <p class="editorial-header__eyebrow">Comptoir de réservation · Parcours guidé</p>
       <h1 class="editorial-header__title">Réserver une Visite ou un Événement</h1>
       <p class="editorial-header__subtitle">
         Sélectionnez un circuit ou un événement ouvert, vérifiez la disponibilité en temps réel
         puis réglez en environnement simulé Wave ou Orange Money.
       </p>
+      <ol
+        class="booking-steps"
+        aria-label="Étapes de réservation"
+        style="display:flex;flex-wrap:wrap;gap:0.65rem;list-style:none;padding:0;margin:1rem 0 0;"
+      >
+        <li class="ui-badge ui-badge--ochre">1. Prestation &amp; disponibilité</li>
+        <li class="ui-badge ui-badge--neutral">2. Coordonnées &amp; participants</li>
+        <li class="ui-badge ui-badge--neutral">3. Confirmation serveur</li>
+        <li class="ui-badge ui-badge--neutral">4. Paiement simulé</li>
+      </ol>
     </header>
 
     <div class="desk-layout">
@@ -44,6 +54,9 @@
                 } @else {
                   <span class="ui-badge ui-badge--neutral">{{ formatReservationStatusLabel(created.statut) }}</span>
                 }
+                <a [routerLink]="['/reservations', created.id]" class="refresh-btn">
+                  Voir le détail
+                </a>
               </div>
             </div>
           </div>
@@ -89,9 +102,10 @@
                 formControlName="circuitId"
                 class="form-control"
                 [class.form-control--invalid]="submittedAttempt() && !hasTargetSelection()"
+                (change)="verifierDisponibilite()"
               >
                 <option value="">-- Sélectionner un circuit --</option>
-                @for (cir of circuitStore.items(); track cir.id) {
+                @for (cir of reservableCircuits(); track cir.id) {
                   <option [value]="cir.id">
                     {{ cir.nomCircuit }} ({{ cir.prix | fcfaPrice }} — max
                     {{ cir.placesMax }} places)
@@ -114,6 +128,7 @@
                   type="date"
                   formControlName="datePrestation"
                   class="form-control"
+                  (change)="verifierDisponibilite()"
                 />
               </div>
               <div class="form-group">
@@ -133,6 +148,7 @@
                 formControlName="evenementId"
                 class="form-control"
                 [class.form-control--invalid]="submittedAttempt() && !hasTargetSelection()"
+                (change)="verifierDisponibilite()"
               >
                 <option value="">-- Sélectionner un événement --</option>
                 @for (ev of reservableEvenements(); track ev.id) {
@@ -495,6 +511,12 @@
 
                 <div class="res-item__actions res-item__actions--spread">
                   <div class="res-item__left-actions">
+                    <a
+                      [routerLink]="['/reservations', res.id]"
+                      class="refresh-btn"
+                    >
+                      Détails complets
+                    </a>
                     @if (res.statut === 'EN_ATTENTE_PAIEMENT') {
                       <a
                         [routerLink]="['/paiements', res.id]"
