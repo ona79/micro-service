@@ -1,0 +1,342 @@
+<section class="page-section container checkout-page">
+  <header class="checkout-header">
+    <div>
+      <p class="eyebrow">Caisse Mobile Money Casamance · P04</p>
+      <h1 class="checkout-title">Règlement simulé Wave &amp; Orange Money</h1>
+      <p class="checkout-subtitle">
+        Environnement pédagogique de test. Les montants sont calculés côté serveur en XOF et
+        aucun transfert financier réel n’est effectué.
+      </p>
+    </div>
+
+    <div class="checkout-nav-actions">
+      <a routerLink="/mon-espace" class="ui-btn ui-btn--secondary">Mon espace</a>
+      <a routerLink="/reserver" class="ui-btn ui-btn--ghost">Nouvelle réservation</a>
+    </div>
+  </header>
+
+  <div class="ui-sim-banner" role="note" aria-label="Avertissement simulation">
+    <strong>SIMULATION DE PAIEMENT P04 :</strong> aucune clé API marchande, aucune redirection
+    bancaire réelle et aucun prélèvement réel ne sont effectués. Utilisez les contrôles de
+    simulation ci-dessous pour tester les scénarios métier (acceptation, refus, expiration, annulation).
+  </div>
+
+  @if (loading()) {
+    <div class="checkout-loading">
+      <app-ui-skeleton-grid [count]="2" />
+    </div>
+  } @else if (loadError(); as errorMsg) {
+    <div class="checkout-error-box">
+      <app-ui-error-banner [message]="errorMsg" (retry)="loadAll()" />
+      <div class="checkout-fallback-links">
+        <a routerLink="/reserver" class="ui-btn ui-btn--primary">Aller aux réservations</a>
+      </div>
+    </div>
+  } @else if (reservation(); as res) {
+    <div class="checkout-grid">
+      <!-- Colonne gauche : récapitulatif serveur non falsifiable -->
+      <aside class="checkout-card checkout-summary" aria-label="Récapitulatif de réservation">
+        <div class="summary-top">
+          <span [class]="reservationStatusBadgeClass(res.statut)">
+            {{ formatReservationStatusLabel(res.statut) }}
+          </span>
+          <span class="ref-chip">
+            <svg lucideTicket [size]="14" aria-hidden="true"></svg>
+            {{ res.referenceReservation || ('#' + res.id) }}
+          </span>
+        </div>
+
+        <h2 class="summary-title">
+          @if (res.typeReservation === 'CIRCUIT') {
+            {{ res.circuit?.nomCircuit || ('Circuit #' + res.circuitId) }}
+          } @else {
+            {{ res.evenement?.nomEvenement || ('Événement #' + res.evenementId) }}
+          }
+        </h2>
+
+        <dl class="summary-details">
+          <div>
+            <dt>Type</dt>
+            <dd>{{ res.typeReservation === 'CIRCUIT' ? 'Circuit touristique' : 'Événement culturel' }}</dd>
+          </div>
+          <div>
+            <dt>Titulaire</dt>
+            <dd>{{ res.nomClient }} ({{ res.emailClient }})</dd>
+          </div>
+          @if (res.datePrestation) {
+            <div>
+              <dt><svg lucideCalendar [size]="14" aria-hidden="true"></svg> Date de prestation</dt>
+              <dd>
+                {{ res.datePrestation | dateFr: 'date' }}
+                @if (res.creneauPrestation) {
+                  · {{ res.creneauPrestation }}
+                }
+              </dd>
+            </div>
+          }
+          <div>
+            <dt><svg lucideUsers [size]="14" aria-hidden="true"></svg> Participants</dt>
+            <dd>{{ res.nombrePlaces }} place(s)</dd>
+          </div>
+          @if (res.expiresAt && res.statut === 'EN_ATTENTE_PAIEMENT') {
+            <div>
+              <dt>Maintien du créneau jusqu’à</dt>
+              <dd>{{ res.expiresAt | dateFr: 'datetime' }}</dd>
+            </div>
+          }
+        </dl>
+
+        <div class="summary-total">
+          <span>Montant total garanti (serveur)</span>
+          <strong>{{ res.montantTotal | fcfaPrice }}</strong>
+        </div>
+
+        @if (res.statut === 'BROUILLON') {
+          <div class="summary-draft-action">
+            <p class="field-hint">
+              Cette réservation est en brouillon. Soumettez-la pour verrouiller les places et
+              débloquer le paiement simulé.
+            </p>
+            <button
+              type="button"
+              class="ui-btn ui-btn--primary"
+              [disabled]="syncing()"
+              (click)="submitDraftReservation()"
+            >
+              Soumettre pour paiement
+            </button>
+          </div>
+        }
+      </aside>
+
+      <!-- Colonne droite : initiation Wave / Orange Money & simulateur -->
+      <div class="checkout-card checkout-simulator">
+        @if (paiementStore.error(); as payErr) {
+          <app-ui-error-banner [message]="payErr" [showRetry]="false" />
+        }
+
+        @if (needsManualSync()) {
+          <div class="sync-warning-box" role="status">
+            <div>
+              <strong>Synchronisation inter-services en attente :</strong> le paiement simulé a
+              bien été accepté, mais la confirmation de la réservation peut encore être reprise.
+            </div>
+            <button
+              type="button"
+              class="ui-btn ui-btn--secondary ui-btn--sm"
+              [disabled]="syncing()"
+              (click)="relancerSynchronisation()"
+            >
+              <svg lucideRefreshCw [size]="15" aria-hidden="true"></svg>
+              Synchroniser le statut
+            </button>
+          </div>
+        }
+
+        @if (activePaiement(); as p) {
+          <section class="active-transaction" aria-label="Transaction simulée en cours ou terminée">
+            <div class="tx-header">
+              <div>
+                <span class="eyebrow">Transaction {{ p.estSimule ? 'SIMULÉE' : '' }}</span>
+                <h2 class="tx-ref">{{ p.referenceTransaction }}</h2>
+              </div>
+              <span [class]="paiementStatusBadgeClass(p.statut)">
+                {{ formatPaiementStatusLabel(p.statut) }}
+              </span>
+            </div>
+
+            <div class="tx-meta-grid">
+              <div>
+                <span class="meta-label">Portefeuille</span>
+                <strong>{{ formatModePaiementLabel(p.modePaiement) }}</strong>
+              </div>
+              <div>
+                <span class="meta-label">Montant simulé</span>
+                <strong>{{ p.montant | fcfaPrice }}</strong>
+              </div>
+              <div>
+                <span class="meta-label">Téléphone masqué</span>
+                <strong>{{ p.numeroTelephoneMasque || 'Non renseigné' }}</strong>
+              </div>
+              <div>
+                <span class="meta-label">Synchro réservation</span>
+                <strong>{{ p.synchroReservationStatut || 'N/A' }}</strong>
+              </div>
+            </div>
+
+            @if (p.mentionSimulation) {
+              <p class="tx-mention">{{ p.mentionSimulation }}</p>
+            }
+
+            @if (canSimulate()) {
+              <div class="simulator-console" aria-label="Console de simulation Mobile Money">
+                <h3>Console de décision simulée ({{ p.modePaiement === 'WAVE' ? 'Wave' : 'Orange Money' }})</h3>
+                <p class="field-hint">
+                  Choisissez l’issue de la validation mobile simulée pour tester la cohérence
+                  transactionnelle :
+                </p>
+
+                <label class="field-label" for="sim-motif">Motif / note de test (optionnel)</label>
+                <input
+                  id="sim-motif"
+                  type="text"
+                  class="field-input"
+                  [ngModel]="simulationMotif()"
+                  (ngModelChange)="simulationMotif.set($event)"
+                  placeholder="Ex: Validation OTP simulée / Solde insuffisant"
+                />
+
+                <div class="sim-buttons">
+                  <button
+                    type="button"
+                    class="ui-btn ui-btn--primary"
+                    [disabled]="paiementStore.processing()"
+                    (click)="executerSimulation('ACCEPTER')"
+                  >
+                    <svg lucideCheck [size]="16" aria-hidden="true"></svg>
+                    Simuler acceptation
+                  </button>
+                  <button
+                    type="button"
+                    class="ui-btn ui-btn--danger"
+                    [disabled]="paiementStore.processing()"
+                    (click)="executerSimulation('REFUSER')"
+                  >
+                    <svg lucideAlertCircle [size]="16" aria-hidden="true"></svg>
+                    Simuler refus
+                  </button>
+                  <button
+                    type="button"
+                    class="ui-btn ui-btn--secondary"
+                    [disabled]="paiementStore.processing()"
+                    (click)="executerSimulation('EXPIRER')"
+                  >
+                    Simuler expiration
+                  </button>
+                  <button
+                    type="button"
+                    class="ui-btn ui-btn--ghost"
+                    [disabled]="paiementStore.processing()"
+                    (click)="executerSimulation('ANNULER')"
+                  >
+                    Annuler la tentative
+                  </button>
+                </div>
+              </div>
+            }
+
+            @if (p.statut === 'ACCEPTE') {
+              <div class="receipt-box" role="status">
+                <div class="receipt-title">
+                  <svg lucideShieldCheck [size]="20" aria-hidden="true"></svg>
+                  <strong>Justificatif de paiement simulé P04</strong>
+                </div>
+                <p>
+                  Référence transaction : <code>{{ p.referenceTransaction }}</code> · Corrélation :
+                  <code>{{ p.correlationId || 'N/A' }}</code>
+                </p>
+                <p class="field-hint">
+                  Mention réglementaire : document généré en mode simulation sans valeur fiscale ni
+                  débit réel.
+                </p>
+                <div class="receipt-actions">
+                  <a routerLink="/mon-espace" class="ui-btn ui-btn--primary">
+                    Retour à Mon Espace
+                    <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
+                  </a>
+                </div>
+              </div>
+            }
+          </section>
+        }
+
+        @if (canInitiate()) {
+          <section class="initiate-wallet" aria-label="Choix du portefeuille mobile simulé">
+            <h2 class="init-title">
+              {{ activePaiement() ? 'Relancer une tentative simulée' : 'Choisir le mode de paiement simulé' }}
+            </h2>
+
+            <div class="wallet-selector" role="radiogroup" aria-label="Mode de paiement simulé">
+              <button
+                type="button"
+                class="wallet-card"
+                [class.is-selected]="selectedMode() === 'WAVE'"
+                (click)="selectedMode.set('WAVE')"
+              >
+                <span class="wallet-badge">SIMULÉ</span>
+                <strong>Wave Sénégal</strong>
+                <small>Validation OTP instantanée en mode bac à sable</small>
+              </button>
+
+              <button
+                type="button"
+                class="wallet-card"
+                [class.is-selected]="selectedMode() === 'ORANGE_MONEY'"
+                (click)="selectedMode.set('ORANGE_MONEY')"
+              >
+                <span class="wallet-badge">SIMULÉ</span>
+                <strong>Orange Money Sénégal</strong>
+                <small>Code USSD #144# simulé sans transfert réel</small>
+              </button>
+            </div>
+
+            <div class="phone-field">
+              <label for="sim-phone" class="field-label">
+                Numéro de mobile simulé (masqué en base)
+              </label>
+              <input
+                id="sim-phone"
+                type="tel"
+                class="field-input"
+                [ngModel]="telephoneSimule()"
+                (ngModelChange)="telephoneSimule.set($event)"
+                placeholder="+221 77 123 45 67"
+              />
+            </div>
+
+            <button
+              type="button"
+              class="ui-btn ui-btn--primary init-btn"
+              [disabled]="paiementStore.processing()"
+              (click)="lancerInitiation()"
+            >
+              Démarrer le paiement simulé ({{ res.montantTotal | fcfaPrice }})
+              <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
+            </button>
+          </section>
+        } @else if (!canSimulate() && activePaiement()?.statut !== 'ACCEPTE' && res.statut !== 'EN_ATTENTE_PAIEMENT') {
+          <div class="closed-payment-note">
+            <p>
+              Le règlement n’est pas disponible pour une réservation au statut
+              <strong>{{ formatReservationStatusLabel(res.statut) }}</strong>.
+            </p>
+            @if (res.motifStatut) {
+              <p class="field-hint">Motif : {{ res.motifStatut }}</p>
+            }
+          </div>
+        }
+
+        @if (activePaiement()?.historique?.length) {
+          <section class="history-section" aria-label="Historique des transitions de paiement">
+            <h3>Journal des transitions de transaction</h3>
+            <ul class="history-list">
+              @for (h of activePaiement()!.historique!; track h.id) {
+                <li>
+                  <span class="hist-transition">
+                    {{ h.ancienStatut || 'NOUVEAU' }} -> <strong>{{ h.nouveauStatut }}</strong>
+                  </span>
+                  <span class="hist-meta">
+                    {{ h.dateTransition | dateFr: 'datetime' }} · {{ h.acteurType || 'SYSTEM' }}
+                  </span>
+                  @if (h.motif) {
+                    <p class="hist-motif">{{ h.motif }}</p>
+                  }
+                </li>
+              }
+            </ul>
+          </section>
+        }
+      </div>
+    </div>
+  }
+</section>

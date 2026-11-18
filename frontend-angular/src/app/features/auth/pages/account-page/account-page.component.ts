@@ -1,3 +1,4 @@
+import { Dialog } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -20,14 +21,23 @@ import {
 import { firstValueFrom } from 'rxjs';
 import { toast } from 'ngx-sonner';
 import { AuthStore } from '../../../../core/auth/auth.store';
-import { normalizeHttpError } from '../../../../core/interceptors/http-error.interceptor';
+import { extractErrorMessage } from '../../../../core/models/api-error.model';
 import {
   ModePaiement,
-  NotificationItem,
   Paiement,
-} from '../../../../core/models/utilisateur.model';
+  formatPaiementStatusLabel,
+  paiementStatusBadgeClass,
+} from '../../../../core/models/paiement.model';
+import {
+  Reservation,
+  formatReservationStatusLabel,
+  reservationStatusBadgeClass,
+} from '../../../../core/models/reservation.model';
+import { NotificationItem } from '../../../../core/models/utilisateur.model';
+import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confirm-dialog/ui-confirm-dialog.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
+import { PaiementStore } from '../../../paiements/data-access/paiement.store';
 import { ReservationStore } from '../../../reservations/data-access/reservation.store';
 
 @Component({
@@ -110,23 +120,23 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
               } @else {
                 <div class="res-stack">
                   @for (res of myReservations(); track res.id) {
-                    @let paid = getPaymentForReservation(res.id);
-                    <article class="res-row" [class.res-row--cancelled]="res.statut === 'ANNULEE'">
+                    @let latestPay = getPaymentForReservation(res.id);
+                    <article
+                      class="res-row"
+                      [class.res-row--cancelled]="res.statut === 'ANNULEE' || res.statut === 'EXPIREE'"
+                    >
                       <div class="res-row__main">
                         <div class="res-row__badges">
-                          <span class="ui-badge">#{{ res.id }}</span>
+                          <span class="ui-badge">{{ res.referenceReservation || ('#' + res.id) }}</span>
                           <span class="ui-badge ui-badge--ochre">{{ res.typeReservation }}</span>
-                          <span
-                            class="ui-badge"
-                            [class.ui-badge--success]="res.statut === 'CONFIRMEE'"
-                            [class.ui-badge--danger]="res.statut === 'ANNULEE'"
-                          >
-                            {{ res.statut }}
+                          <span [class]="reservationStatusBadgeClass(res.statut)">
+                            {{ formatReservationStatusLabel(res.statut) }}
                           </span>
-                          @if (paid) {
-                            <span class="ui-badge ui-badge--success">
+                          @if (latestPay) {
+                            <span [class]="paiementStatusBadgeClass(latestPay.statut)">
                               <svg lucideCheckCircle2 [size]="12" aria-hidden="true"></svg>
-                              Payé ({{ paid.modePaiement }} · {{ paid.referenceTransaction }})
+                              {{ latestPay.modePaiement }} · {{ latestPay.referenceTransaction }}
+                              ({{ formatPaiementStatusLabel(latestPay.statut) }})
                             </span>
                           }
                         </div>
@@ -147,42 +157,104 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
                         </p>
                       </div>
 
-                      @if (res.statut !== 'ANNULEE' && !paid) {
-                        <div class="res-row__pay">
+                      <div class="res-row__pay">
+                        @if (res.statut === 'EN_ATTENTE_PAIEMENT') {
                           <label [attr.for]="'pay-mode-' + res.id" class="sr-only">
-                            Mode de paiement
+                            Portefeuille simulé
                           </label>
                           <select
                             [id]="'pay-mode-' + res.id"
                             class="pay-select"
-                            [(ngModel)]="selectedPayMode"
+                            [ngModel]="getSelectedMode(res.id)"
+                            (ngModelChange)="setSelectedMode(res.id, $event)"
                           >
-                            <option value="WAVE">Wave Mobile Money</option>
-                            <option value="ORANGE_MONEY">Orange Money</option>
-                            <option value="CARTE_BANCAIRE">Carte Bancaire</option>
-                            <option value="ESPECES">Espèces sur place</option>
+                            <option value="WAVE">Wave Sénégal (Simulé)</option>
+                            <option value="ORANGE_MONEY">Orange Money (Simulé)</option>
                           </select>
                           <button
                             type="button"
                             class="btn-pay"
                             [disabled]="payingId() === res.id"
-                            (click)="payReservation(res.id)"
+                            (click)="startSimulatedCheckout(res)"
                           >
                             <svg lucideCreditCard [size]="15" aria-hidden="true"></svg>
                             <span>
-                              {{ payingId() === res.id ? 'Traitement...' : 'Régler maintenant' }}
+                              {{ payingId() === res.id ? 'Ouverture...' : 'Régler (Simulé)' }}
                             </span>
                           </button>
-                        </div>
-                      }
+                        } @else if (res.statut === 'BROUILLON') {
+                          <button
+                            type="button"
+                            class="btn-admin"
+                            (click)="submitDraft(res.id)"
+                          >
+                            Soumettre
+                          </button>
+                        } @else {
+                          <a
+                            [routerLink]="['/paiements', res.id]"
+                            class="btn-admin"
+                          >
+                            Voir reçu / suivi
+                          </a>
+                        }
+
+                        @if (canCancel(res)) {
+                          <button
+                            type="button"
+                            class="btn-cancel-sm"
+                            [disabled]="reservationStore.cancelingId() === res.id"
+                            (click)="confirmCancel(res)"
+                          >
+                            Annuler
+                          </button>
+                        }
+                      </div>
                     </article>
                   }
                 </div>
               }
             </section>
 
-            <!-- Colonne latérale : Notifications & Transactions -->
+            <!-- Colonne latérale : Transactions Simulées & Notifications -->
             <aside class="account-sidebar">
+              <section class="account-card" aria-labelledby="tx-heading">
+                <div class="account-card__header">
+                  <h2 id="tx-heading" class="account-card__title">
+                    <svg lucideCreditCard [size]="18" aria-hidden="true"></svg>
+                    <span>Transactions simulées ({{ paiements().length }})</span>
+                  </h2>
+                </div>
+                <p class="ui-sim-banner" style="margin-bottom: 0.75rem;">
+                  Mode simulation Wave / Orange Money — aucun débit réel.
+                </p>
+                @if (paiements().length === 0) {
+                  <p class="sidebar-muted">
+                    Aucune transaction simulée enregistrée pour le moment.
+                  </p>
+                } @else {
+                  <ul class="notif-list">
+                    @for (p of paiements().slice(0, 6); track p.id) {
+                      <li class="notif-item">
+                        <div class="notif-item__top">
+                          <span [class]="paiementStatusBadgeClass(p.statut)">
+                            {{ formatPaiementStatusLabel(p.statut) }}
+                          </span>
+                          <span class="notif-item__date">{{ (p.datePaiement || p.dateCreation) | dateFr }}</span>
+                        </div>
+                        <p class="notif-item__subject">
+                          {{ p.referenceTransaction }} · {{ p.montant | fcfaPrice }}
+                        </p>
+                        <p class="notif-item__body">
+                          {{ p.modePaiement }} · Réservation #{{ p.reservationId }}
+                          <a [routerLink]="['/paiements', p.reservationId]">Détails</a>
+                        </p>
+                      </li>
+                    }
+                  </ul>
+                }
+              </section>
+
               <section class="account-card" aria-labelledby="notif-heading">
                 <div class="account-card__header">
                   <h2 id="notif-heading" class="account-card__title">
@@ -463,6 +535,23 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
       color: var(--ink-secondary);
     }
 
+    .account-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-5);
+    }
+
+    .btn-cancel-sm {
+      padding: 0.4rem 0.75rem;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--status-error-border);
+      background: var(--status-error-bg);
+      color: var(--status-error-ink);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      cursor: pointer;
+    }
+
     @media (max-width: 920px) {
       .account-grid {
         grid-template-columns: 1fr;
@@ -473,22 +562,34 @@ import { ReservationStore } from '../../../reservations/data-access/reservation.
 export class AccountPageComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly dialog = inject(Dialog);
   protected readonly authStore = inject(AuthStore);
   protected readonly reservationStore = inject(ReservationStore);
+  protected readonly paiementStore = inject(PaiementStore);
 
-  protected readonly paiements = signal<Paiement[]>([]);
+  protected readonly paiements = computed(() => this.paiementStore.items());
   protected readonly notifications = signal<NotificationItem[]>([]);
   protected readonly payingId = signal<number | null>(null);
-  protected selectedPayMode: ModePaiement = 'WAVE';
+  protected readonly selectedModes = signal<Record<number, ModePaiement>>({});
+
+  protected readonly formatReservationStatusLabel = formatReservationStatusLabel;
+  protected readonly reservationStatusBadgeClass = reservationStatusBadgeClass;
+  protected readonly formatPaiementStatusLabel = formatPaiementStatusLabel;
+  protected readonly paiementStatusBadgeClass = paiementStatusBadgeClass;
 
   protected readonly myReservations = computed(() => {
-    const email = this.authStore.user()?.email?.toLowerCase();
+    const user = this.authStore.user();
+    const email = user?.email?.toLowerCase();
     const all = this.reservationStore.items();
     if (!email) return [];
     if (this.authStore.isStaff()) {
       return all;
     }
-    return all.filter((r) => r.emailClient?.toLowerCase() === email);
+    return all.filter(
+      (r) =>
+        (user?.id != null && r.utilisateurId === user.id) ||
+        r.emailClient?.toLowerCase() === email
+    );
   });
 
   protected readonly myNotifications = computed(() => {
@@ -506,31 +607,73 @@ export class AccountPageComponent implements OnInit {
     void this.loadTransactionsAndNotifications();
   }
 
+  protected getSelectedMode(reservationId: number): ModePaiement {
+    return this.selectedModes()[reservationId] ?? 'WAVE';
+  }
+
+  protected setSelectedMode(reservationId: number, mode: ModePaiement): void {
+    this.selectedModes.update((curr) => ({ ...curr, [reservationId]: mode }));
+  }
+
   protected getPaymentForReservation(reservationId: number): Paiement | undefined {
-    return this.paiements().find(
-      (p) => p.reservationId === reservationId && p.statut === 'REUSSI'
+    const matches = this.paiements().filter((p) => p.reservationId === reservationId);
+    return (
+      matches.find((p) => p.statut === 'ACCEPTE') ??
+      matches.find((p) => p.statut === 'EN_COURS' || p.statut === 'INITIE') ??
+      matches[0]
     );
   }
 
-  protected async payReservation(reservationId: number): Promise<void> {
-    this.payingId.set(reservationId);
+  protected canCancel(res: Reservation): boolean {
+    return ['BROUILLON', 'EN_ATTENTE_PAIEMENT', 'CONFIRMEE'].includes(res.statut);
+  }
+
+  protected async submitDraft(reservationId: number): Promise<void> {
     try {
-      const created = await firstValueFrom(
-        this.http.post<Paiement>(
-          '/api/paiements',
-          {
-            reservationId,
-            modePaiement: this.selectedPayMode,
-          },
-          { withCredentials: true }
-        )
-      );
-      toast.success(`Paiement confirmé (${created.referenceTransaction})`);
-      await this.loadTransactionsAndNotifications();
+      await this.reservationStore.soumettreReservation(reservationId);
+      toast.success(`Réservation #${reservationId} prête pour paiement.`);
     } catch (err) {
-      toast.error(normalizeHttpError(err).message);
+      toast.error(extractErrorMessage(err));
+    }
+  }
+
+  protected async startSimulatedCheckout(res: Reservation): Promise<void> {
+    this.payingId.set(res.id);
+    try {
+      const existing = this.getPaymentForReservation(res.id);
+      if (!existing || !['EN_COURS', 'INITIE', 'ACCEPTE'].includes(existing.statut)) {
+        await this.paiementStore.initierPaiement({
+          reservationId: res.id,
+          modePaiement: this.getSelectedMode(res.id),
+          numeroTelephoneSimule: this.authStore.user()?.telephone || null,
+        });
+      }
+      await this.router.navigate(['/paiements', res.id]);
+    } catch (err) {
+      toast.error(extractErrorMessage(err));
     } finally {
       this.payingId.set(null);
+    }
+  }
+
+  protected async confirmCancel(res: Reservation): Promise<void> {
+    const ref = this.dialog.open<boolean>(UiConfirmDialogComponent, {
+      data: {
+        title: `Annuler la réservation ${res.referenceReservation || '#' + res.id} ?`,
+        message: `Voulez-vous annuler cette réservation de ${res.nombrePlaces} place(s) ?`,
+        confirmLabel: 'Confirmer l’annulation',
+        cancelLabel: 'Conserver',
+        variant: 'danger',
+      },
+    });
+    const confirmed = await firstValueFrom(ref.closed);
+    if (!confirmed) return;
+
+    try {
+      await this.reservationStore.cancelReservation(res.id);
+      toast.success('Réservation annulée.');
+    } catch (err) {
+      toast.error(extractErrorMessage(err));
     }
   }
 
@@ -541,17 +684,12 @@ export class AccountPageComponent implements OnInit {
   }
 
   private async loadTransactionsAndNotifications(): Promise<void> {
+    await this.paiementStore.reload();
     try {
-      const [payList, notifList] = await Promise.all([
-        firstValueFrom(this.http.get<Paiement[]>('/api/paiements', { withCredentials: true })),
-        firstValueFrom(
-          this.http.get<NotificationItem[]>('/api/notifications', { withCredentials: true })
-        ),
-      ]);
-      this.paiements.set(payList ?? []);
+      const notifList = await firstValueFrom(this.http.get<NotificationItem[]>('/notifications'));
       this.notifications.set(notifList ?? []);
     } catch {
-      // Les microservices de paiement/notification restent optionnels en cas de test unitaire isolé
+      // Les notifications peuvent être indisponibles en environnement isolé
     }
   }
 }

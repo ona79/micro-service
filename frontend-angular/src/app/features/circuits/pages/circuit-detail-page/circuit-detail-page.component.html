@@ -174,6 +174,27 @@
             </div>
           </dl>
 
+          @if (disponibilite(); as dispo) {
+            <div class="memorial-notice" style="margin-top: 0.75rem;">
+              @if (dispo.reservable) {
+                <strong>Disponibilité en direct :</strong>
+                {{ dispo.placesDisponibles }} place(s) disponible(s) sur {{ dispo.capaciteTotale }}
+              } @else {
+                <strong>Indisponible :</strong> {{ dispo.motifIndisponibilite || 'Complet' }}
+              }
+            </div>
+          } @else {
+            <button
+              type="button"
+              class="ui-btn ui-btn--ghost"
+              style="width: 100%; margin-bottom: 0.75rem;"
+              [disabled]="checkingDispo()"
+              (click)="checkDisponibilite(cir)"
+            >
+              {{ checkingDispo() ? 'Vérification...' : 'Vérifier les places en direct' }}
+            </button>
+          }
+
           @if (osmStartUrl(); as url) {
             <a
               [href]="url"
@@ -186,14 +207,20 @@
             </a>
           }
 
-          <a
-            routerLink="/reserver"
-            [queryParams]="{ type: 'CIRCUIT', circuitId: cir.id }"
-            class="booking-cta"
-          >
-            <svg lucideTicket [size]="16" aria-hidden="true"></svg>
-            <span>Réserver ce circuit</span>
-          </a>
+          @if ((cir.statutCircuit ?? 'PUBLIE') === 'PUBLIE') {
+            <a
+              routerLink="/reserver"
+              [queryParams]="{ type: 'CIRCUIT', circuitId: cir.id }"
+              class="booking-cta"
+            >
+              <svg lucideTicket [size]="16" aria-hidden="true"></svg>
+              <span>Réserver ce circuit</span>
+            </a>
+          } @else {
+            <p class="ui-badge ui-badge--neutral">
+              Circuit non ouvert à la réservation publique ({{ cir.statutCircuit }})
+            </p>
+          }
         </aside>
       </div>
 

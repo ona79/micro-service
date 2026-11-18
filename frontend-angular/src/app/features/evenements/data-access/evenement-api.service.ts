@@ -34,6 +34,10 @@ export class EvenementApiService {
     return this.http.get<Evenement[]>('/evenements/a-venir');
   }
 
+  getReservables(): Observable<Evenement[]> {
+    return this.http.get<Evenement[]>('/evenements/reservables');
+  }
+
   rechercher(params: EvenementSearchParams = {}): Observable<PageResponse<Evenement>> {
     let httpParams = new HttpParams();
     if (params.q) httpParams = httpParams.set('q', params.q);

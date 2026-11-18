@@ -41,6 +41,9 @@ import {
   isLieuDeMemoire,
 } from '../../../../shared/utils/patrimoine.utils';
 import { PatrimoineStore } from '../../../patrimoines/data-access/patrimoine.store';
+import { DisponibilitePrestation } from '../../../../core/models/reservation.model';
+import { ReservationApiService } from '../../../reservations/data-access/reservation-api.service';
+import { firstValueFrom } from 'rxjs';
 import { EvenementStore } from '../../data-access/evenement.store';
 
 @Component({
@@ -71,12 +74,15 @@ export class EvenementDetailPageComponent {
 
   protected readonly store = inject(EvenementStore);
   protected readonly patrimoineStore = inject(PatrimoineStore);
+  private readonly reservationApi = inject(ReservationApiService);
   private readonly titleService = inject(Title);
   private readonly config = inject(APP_SITE_CONFIG);
 
   protected readonly evenement = signal<Evenement | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
+  protected readonly disponibilite = signal<DisponibilitePrestation | null>(null);
+  protected readonly checkingDispo = signal(false);
 
   protected readonly patLie = computed<Patrimoine | null>(() => {
     const ev = this.evenement();
@@ -153,10 +159,25 @@ export class EvenementDetailPageComponent {
     return this.patrimoineStore.byIdMap().get(ev.patrimoineId) ?? null;
   }
 
+  protected async checkDisponibilite(ev: Evenement): Promise<void> {
+    this.checkingDispo.set(true);
+    try {
+      const dispo = await firstValueFrom(
+        this.reservationApi.getDisponibilite('EVENEMENT', ev.id)
+      );
+      this.disponibilite.set(dispo);
+    } catch {
+      this.disponibilite.set(null);
+    } finally {
+      this.checkingDispo.set(false);
+    }
+  }
+
   private async loadDetail(evtId: string): Promise<void> {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.error.set(null);
+    this.disponibilite.set(null);
 
     void this.store.ensureLoaded();
     void this.patrimoineStore.ensureLoaded();

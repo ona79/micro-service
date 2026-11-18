@@ -1,3 +1,4 @@
+import { Dialog } from '@angular/cdk/dialog';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -9,10 +10,13 @@ import {
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
   LucideCalendar,
+  LucideCreditCard,
   LucideLandmark,
   LucidePlus,
+  LucideRefreshCw,
   LucideRoute,
   LucideShieldCheck,
+  LucideTicket,
   LucideTrash2,
   LucideUsers,
 } from '@lucide/angular';
@@ -33,22 +37,48 @@ import {
   TypeEvenement,
 } from '../../../../core/models/evenement.model';
 import {
+  ModePaiement,
+  Paiement,
+  PaiementStats,
+  StatutPaiement,
+  formatPaiementStatusLabel,
+  paiementStatusBadgeClass,
+} from '../../../../core/models/paiement.model';
+import {
   CategoriePatrimoine,
   Patrimoine,
   StatutPublication,
   ZoneCasamance,
 } from '../../../../core/models/patrimoine.model';
+import {
+  Reservation,
+  ReservationStats,
+  StatutReservation,
+  TypeReservation,
+  formatReservationStatusLabel,
+  reservationStatusBadgeClass,
+} from '../../../../core/models/reservation.model';
 import { RoleUtilisateur, Utilisateur } from '../../../../core/models/utilisateur.model';
+import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confirm-dialog/ui-confirm-dialog.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
 import { CircuitApiService } from '../../../circuits/data-access/circuit-api.service';
 import { CircuitStore } from '../../../circuits/data-access/circuit.store';
 import { EvenementApiService } from '../../../evenements/data-access/evenement-api.service';
 import { EvenementStore } from '../../../evenements/data-access/evenement.store';
+import { PaiementApiService } from '../../../paiements/data-access/paiement-api.service';
 import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoine-api.service';
 import { PatrimoineStore } from '../../../patrimoines/data-access/patrimoine.store';
+import { ReservationApiService } from '../../../reservations/data-access/reservation-api.service';
 
-type AdminTab = 'patrimoines' | 'circuits' | 'evenements' | 'utilisateurs';
+type AdminTab =
+  | 'patrimoines'
+  | 'circuits'
+  | 'evenements'
+  | 'reservations'
+  | 'paiements'
+  | 'utilisateurs';
 
 interface EtapeFormItem {
   ordre: number;
@@ -66,10 +96,14 @@ interface EtapeFormItem {
     FormsModule,
     ReactiveFormsModule,
     FcfaPricePipe,
+    DateFrPipe,
     UiErrorBannerComponent,
     LucideLandmark,
     LucideRoute,
     LucideCalendar,
+    LucideTicket,
+    LucideCreditCard,
+    LucideRefreshCw,
     LucideUsers,
     LucidePlus,
     LucideTrash2,
@@ -124,6 +158,26 @@ interface EtapeFormItem {
           >
             <svg lucideCalendar [size]="16" aria-hidden="true"></svg>
             <span>Événements ({{ evenementStore.items().length }})</span>
+          </button>
+
+          <button
+            type="button"
+            class="admin-tab"
+            [class.admin-tab--active]="activeTab() === 'reservations'"
+            (click)="switchTab('reservations')"
+          >
+            <svg lucideTicket [size]="16" aria-hidden="true"></svg>
+            <span>Réservations</span>
+          </button>
+
+          <button
+            type="button"
+            class="admin-tab"
+            [class.admin-tab--active]="activeTab() === 'paiements'"
+            (click)="switchTab('paiements')"
+          >
+            <svg lucideCreditCard [size]="16" aria-hidden="true"></svg>
+            <span>Paiements Simulés</span>
           </button>
 
           <button
@@ -619,6 +673,11 @@ interface EtapeFormItem {
                   <textarea id="evt-desc" rows="2" formControlName="descriptionEvenement" class="form-input"></textarea>
                 </div>
 
+                <label class="checkbox-field">
+                  <input type="checkbox" formControlName="ouvertReservation" />
+                  <span>Ouvrir explicitement cet événement à la réservation en ligne (P04)</span>
+                </label>
+
                 <div class="form-actions">
                   <button type="submit" class="btn-primary">
                     <svg lucidePlus [size]="15" aria-hidden="true"></svg>
@@ -652,7 +711,14 @@ interface EtapeFormItem {
                         </td>
                         <td>
                           <span class="ui-badge">{{ ev.typeEvenement }}</span><br />
-                          <small>{{ ev.statutEvenement || 'PUBLIE' }}</small>
+                          <small>{{ ev.statutEvenement || 'PUBLIE' }}</small><br />
+                          <span
+                            class="ui-badge"
+                            [class.ui-badge--success]="ev.ouvertReservation === true"
+                            [class.ui-badge--neutral]="ev.ouvertReservation !== true"
+                          >
+                            {{ ev.ouvertReservation === true ? 'Réservable' : 'Consultation' }}
+                          </span>
                         </td>
                         <td class="tabular-nums">{{ ev.capaciteMax }} places</td>
                         <td class="table-actions">
@@ -673,7 +739,293 @@ interface EtapeFormItem {
           </div>
         }
 
-        <!-- ONGLET 4 : GESTION DES UTILISATEURS (ADMINISTRATEUR UNIQUEMENT) -->
+        <!-- ONGLET 4 : RÉSERVATIONS (ADMIN & GESTIONNAIRE) -->
+        @if (activeTab() === 'reservations') {
+          <div class="p04-stack">
+            @if (resStats(); as rs) {
+              <section class="kpi-grid" aria-label="Statistiques réservations">
+                <div class="kpi-card">
+                  <span class="kpi-label">Total réservations</span>
+                  <strong class="kpi-val tabular-nums">{{ rs.totalReservations }}</strong>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">En attente paiement</span>
+                  <strong class="kpi-val tabular-nums">{{ rs.enAttentePaiement }}</strong>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">Confirmées</span>
+                  <strong class="kpi-val tabular-nums">{{ rs.confirmees }}</strong>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">Revenu confirmé (serveur)</span>
+                  <strong class="kpi-val tabular-nums">{{ rs.montantTotalConfirme | fcfaPrice }}</strong>
+                </div>
+              </section>
+            }
+
+            <section class="admin-card">
+              <div class="section-head">
+                <h2 class="admin-card__title">Supervision des réservations</h2>
+                <button type="button" class="btn-xs" (click)="loadReservationsPage(resPage())">
+                  <svg lucideRefreshCw [size]="13" aria-hidden="true"></svg>
+                  <span>Actualiser</span>
+                </button>
+              </div>
+
+              <div class="filter-bar">
+                <input
+                  type="search"
+                  class="form-input"
+                  placeholder="Rechercher référence, client, email..."
+                  [ngModel]="resSearch()"
+                  (ngModelChange)="resSearch.set($event)"
+                />
+                <select
+                  class="form-input"
+                  [ngModel]="resStatutFilter()"
+                  (ngModelChange)="resStatutFilter.set($event); loadReservationsPage(0)"
+                >
+                  <option value="">Tous statuts</option>
+                  <option value="BROUILLON">Brouillon</option>
+                  <option value="EN_ATTENTE_PAIEMENT">En attente paiement</option>
+                  <option value="CONFIRMEE">Confirmée</option>
+                  <option value="EXPIREE">Expirée</option>
+                  <option value="ANNULEE">Annulée</option>
+                  <option value="REMBOURSEE">Remboursée</option>
+                </select>
+                <select
+                  class="form-input"
+                  [ngModel]="resTypeFilter()"
+                  (ngModelChange)="resTypeFilter.set($event); loadReservationsPage(0)"
+                >
+                  <option value="">Tous types</option>
+                  <option value="CIRCUIT">Circuit</option>
+                  <option value="EVENEMENT">Événement</option>
+                </select>
+                <button type="button" class="btn-secondary" (click)="loadReservationsPage(0)">
+                  Filtrer
+                </button>
+              </div>
+
+              <div class="table-wrap">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Référence</th>
+                      <th>Visiteur</th>
+                      <th>Prestation</th>
+                      <th>Places &amp; Total</th>
+                      <th>Statut</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (r of adminReservations(); track r.id) {
+                      <tr>
+                        <td class="tabular-nums">
+                          <strong>{{ r.referenceReservation || ('#' + r.id) }}</strong><br />
+                          <small>{{ r.dateReservation | dateFr }}</small>
+                        </td>
+                        <td>
+                          <strong>{{ r.nomClient }}</strong><br />
+                          <small>{{ r.emailClient }}</small>
+                        </td>
+                        <td>
+                          {{ r.typeReservation }} ·
+                          {{ r.circuit?.nomCircuit || r.evenement?.nomEvenement || ('#' + (r.circuitId ?? r.evenementId)) }}
+                        </td>
+                        <td class="tabular-nums">
+                          {{ r.nombrePlaces }} pl.<br />
+                          <strong>{{ r.montantTotal | fcfaPrice }}</strong>
+                        </td>
+                        <td>
+                          <span [class]="reservationStatusBadgeClass(r.statut)">
+                            {{ formatReservationStatusLabel(r.statut) }}
+                          </span>
+                        </td>
+                        <td class="table-actions">
+                          @if (r.statut === 'EN_ATTENTE_PAIEMENT') {
+                            <button type="button" class="btn-xs" (click)="syncAdminReservation(r.id)">
+                              Synchro paiement
+                            </button>
+                          }
+                          @if (['BROUILLON', 'EN_ATTENTE_PAIEMENT', 'CONFIRMEE'].includes(r.statut)) {
+                            <button type="button" class="btn-xs btn-xs--danger" (click)="cancelAdminReservation(r)">
+                              Annuler
+                            </button>
+                          }
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="6">Aucune réservation trouvée pour ces critères.</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              @if (resTotalPages() > 1) {
+                <div class="pager">
+                  <button type="button" class="btn-xs" [disabled]="resPage() === 0" (click)="loadReservationsPage(resPage() - 1)">
+                    Précédent
+                  </button>
+                  <span class="tabular-nums">Page {{ resPage() + 1 }} / {{ resTotalPages() }} ({{ resTotalElements() }} éléments)</span>
+                  <button type="button" class="btn-xs" [disabled]="resPage() + 1 >= resTotalPages()" (click)="loadReservationsPage(resPage() + 1)">
+                    Suivant
+                  </button>
+                </div>
+              }
+            </section>
+          </div>
+        }
+
+        <!-- ONGLET 5 : PAIEMENTS SIMULÉS & REMBOURSEMENTS (REMBOURSEMENT = ADMIN UNIQUEMENT) -->
+        @if (activeTab() === 'paiements') {
+          <div class="p04-stack">
+            <div class="ui-sim-banner">
+              <strong>P04 Simulation Paiement Wave &amp; Orange Money :</strong> les montants et
+              remboursements affichés ici sont strictement simulés en base P04. Seul le rôle
+              <code>ADMINISTRATEUR</code> (permission <code>PAIEMENT:REMBOURSER</code>) est autorisé à
+              déclencher un remboursement intégral simulé.
+            </div>
+
+            @if (payStats(); as ps) {
+              <section class="kpi-grid" aria-label="Statistiques paiements simulés">
+                <div class="kpi-card">
+                  <span class="kpi-label">Transactions simulées</span>
+                  <strong class="kpi-val tabular-nums">{{ ps.totalTransactions }} ({{ ps.acceptees }} acc.)</strong>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">Total Wave (simulé)</span>
+                  <strong class="kpi-val tabular-nums">{{ ps.montantWaveSimule | fcfaPrice }}</strong>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">Total Orange Money (simulé)</span>
+                  <strong class="kpi-val tabular-nums">{{ ps.montantOrangeMoneySimule | fcfaPrice }}</strong>
+                </div>
+                <div class="kpi-card">
+                  <span class="kpi-label">Outbox en attente</span>
+                  <strong class="kpi-val tabular-nums">{{ ps.outboxEnAttente }}</strong>
+                </div>
+              </section>
+            }
+
+            <section class="admin-card">
+              <div class="section-head">
+                <h2 class="admin-card__title">Journal des paiements simulés</h2>
+                <div class="table-actions">
+                  <button type="button" class="btn-xs" (click)="rejouerOutbox()">
+                    <svg lucideRefreshCw [size]="13" aria-hidden="true"></svg>
+                    <span>Rejouer outbox</span>
+                  </button>
+                  <button type="button" class="btn-xs" (click)="loadPaiementsPage(payPage())">
+                    Actualiser
+                  </button>
+                </div>
+              </div>
+
+              <div class="filter-bar">
+                <input
+                  type="search"
+                  class="form-input"
+                  placeholder="Référence transaction, téléphone..."
+                  [ngModel]="paySearch()"
+                  (ngModelChange)="paySearch.set($event)"
+                />
+                <select
+                  class="form-input"
+                  [ngModel]="payStatutFilter()"
+                  (ngModelChange)="payStatutFilter.set($event); loadPaiementsPage(0)"
+                >
+                  <option value="">Tous statuts</option>
+                  <option value="EN_COURS">En cours</option>
+                  <option value="ACCEPTE">Accepté</option>
+                  <option value="REFUSE">Refusé</option>
+                  <option value="EXPIRE">Expiré</option>
+                  <option value="ANNULE">Annulé</option>
+                  <option value="REMBOURSE">Remboursé</option>
+                </select>
+                <select
+                  class="form-input"
+                  [ngModel]="payModeFilter()"
+                  (ngModelChange)="payModeFilter.set($event); loadPaiementsPage(0)"
+                >
+                  <option value="">Wave &amp; Orange Money</option>
+                  <option value="WAVE">Wave Sénégal</option>
+                  <option value="ORANGE_MONEY">Orange Money</option>
+                </select>
+                <button type="button" class="btn-secondary" (click)="loadPaiementsPage(0)">
+                  Filtrer
+                </button>
+              </div>
+
+              <div class="table-wrap">
+                <table class="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Référence</th>
+                      <th>Réservation</th>
+                      <th>Mode</th>
+                      <th>Montant</th>
+                      <th>Synchro</th>
+                      <th>Statut</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (p of adminPaiements(); track p.id) {
+                      <tr>
+                        <td class="tabular-nums">
+                          <strong>{{ p.referenceTransaction }}</strong><br />
+                          <small>{{ (p.datePaiement || p.dateCreation) | dateFr: 'datetime' }}</small>
+                        </td>
+                        <td class="tabular-nums">#{{ p.reservationId }}</td>
+                        <td>{{ p.modePaiement }}</td>
+                        <td class="tabular-nums"><strong>{{ p.montant | fcfaPrice }}</strong></td>
+                        <td><small>{{ p.synchroReservationStatut || 'N/A' }}</small></td>
+                        <td>
+                          <span [class]="paiementStatusBadgeClass(p.statut)">
+                            {{ formatPaiementStatusLabel(p.statut) }}
+                          </span>
+                        </td>
+                        <td class="table-actions">
+                          @if (authStore.isAdmin() && p.statut === 'ACCEPTE') {
+                            <button
+                              type="button"
+                              class="btn-xs btn-xs--danger"
+                              (click)="rembourserAdminPaiement(p)"
+                            >
+                              Rembourser (simulé)
+                            </button>
+                          }
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="7">Aucune transaction simulée pour ces critères.</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+
+              @if (payTotalPages() > 1) {
+                <div class="pager">
+                  <button type="button" class="btn-xs" [disabled]="payPage() === 0" (click)="loadPaiementsPage(payPage() - 1)">
+                    Précédent
+                  </button>
+                  <span class="tabular-nums">Page {{ payPage() + 1 }} / {{ payTotalPages() }} ({{ payTotalElements() }} éléments)</span>
+                  <button type="button" class="btn-xs" [disabled]="payPage() + 1 >= payTotalPages()" (click)="loadPaiementsPage(payPage() + 1)">
+                    Suivant
+                  </button>
+                </div>
+              }
+            </section>
+          </div>
+        }
+
+        <!-- ONGLET 6 : GESTION DES UTILISATEURS (ADMINISTRATEUR UNIQUEMENT) -->
         @if (activeTab() === 'utilisateurs') {
           @if (!authStore.isAdmin()) {
             <section class="admin-card" role="alert">
@@ -986,9 +1338,76 @@ interface EtapeFormItem {
       overflow-x: auto;
     }
 
+    .p04-stack {
+      display: grid;
+      gap: var(--space-5);
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: var(--space-4);
+    }
+
+    .kpi-card {
+      background: var(--surface-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: var(--space-4);
+      display: grid;
+      gap: 0.35rem;
+    }
+
+    .kpi-label {
+      font-size: var(--text-xs);
+      color: var(--ink-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .kpi-val {
+      font-size: var(--text-lg);
+      color: var(--brand-primary);
+    }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
+    }
+
+    .filter-bar {
+      display: grid;
+      grid-template-columns: minmax(180px, 2fr) repeat(2, minmax(140px, 1fr)) auto;
+      gap: var(--space-2);
+      margin-bottom: var(--space-4);
+    }
+
+    .pager {
+      margin-top: var(--space-3);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: var(--space-3);
+      font-size: var(--text-xs);
+    }
+
+    .checkbox-field {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--text-sm);
+      color: var(--ink-primary);
+      cursor: pointer;
+    }
+
     @media (max-width: 920px) {
       .admin-split,
-      .form-row {
+      .form-row,
+      .filter-bar {
         grid-template-columns: 1fr;
       }
     }
@@ -996,14 +1415,22 @@ interface EtapeFormItem {
 })
 export class AdminDashboardPageComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
+  private readonly dialog = inject(Dialog);
   private readonly patrimoineApi = inject(PatrimoineApiService);
   private readonly circuitApi = inject(CircuitApiService);
   private readonly evenementApi = inject(EvenementApiService);
+  private readonly reservationApi = inject(ReservationApiService);
+  private readonly paiementApi = inject(PaiementApiService);
 
   protected readonly authStore = inject(AuthStore);
   protected readonly patrimoineStore = inject(PatrimoineStore);
   protected readonly circuitStore = inject(CircuitStore);
   protected readonly evenementStore = inject(EvenementStore);
+
+  protected readonly formatReservationStatusLabel = formatReservationStatusLabel;
+  protected readonly reservationStatusBadgeClass = reservationStatusBadgeClass;
+  protected readonly formatPaiementStatusLabel = formatPaiementStatusLabel;
+  protected readonly paiementStatusBadgeClass = paiementStatusBadgeClass;
 
   protected readonly activeTab = signal<AdminTab>('patrimoines');
   protected readonly editingPatrimoineId = signal<number | null>(null);
@@ -1012,6 +1439,24 @@ export class AdminDashboardPageComponent implements OnInit {
   protected readonly actionError = signal<string | null>(null);
   protected readonly users = signal<Utilisateur[]>([]);
   protected readonly commResult = signal<string | null>(null);
+
+  protected readonly adminReservations = signal<Reservation[]>([]);
+  protected readonly resStats = signal<ReservationStats | null>(null);
+  protected readonly resSearch = signal('');
+  protected readonly resStatutFilter = signal<StatutReservation | ''>('');
+  protected readonly resTypeFilter = signal<TypeReservation | ''>('');
+  protected readonly resPage = signal(0);
+  protected readonly resTotalPages = signal(1);
+  protected readonly resTotalElements = signal(0);
+
+  protected readonly adminPaiements = signal<Paiement[]>([]);
+  protected readonly payStats = signal<PaiementStats | null>(null);
+  protected readonly paySearch = signal('');
+  protected readonly payStatutFilter = signal<StatutPaiement | ''>('');
+  protected readonly payModeFilter = signal<ModePaiement | ''>('');
+  protected readonly payPage = signal(0);
+  protected readonly payTotalPages = signal(1);
+  protected readonly payTotalElements = signal(0);
 
   protected readonly circuitEtapes = signal<EtapeFormItem[]>([
     {
@@ -1075,6 +1520,7 @@ export class AdminDashboardPageComponent implements OnInit {
     lieu: ['Esplanade du Fleuve Casamance, Ziguinchor', [Validators.required]],
     conditionsAcces: ['Inscription préalable recommandée'],
     descriptionEvenement: [''],
+    ouvertReservation: [false],
   });
 
   protected readonly userForm = this.fb.nonNullable.group({
@@ -1103,6 +1549,10 @@ export class AdminDashboardPageComponent implements OnInit {
     this.actionError.set(null);
     if (tab === 'utilisateurs' && this.authStore.isAdmin()) {
       void this.loadUsers();
+    } else if (tab === 'reservations') {
+      void this.loadReservationsPage(0);
+    } else if (tab === 'paiements') {
+      void this.loadPaiementsPage(0);
     }
   }
 
@@ -1198,10 +1648,13 @@ export class AdminDashboardPageComponent implements OnInit {
   }
 
   protected async deletePatrimoine(id: number): Promise<void> {
+    if (!(await this.confirmDialog(`Archiver ou supprimer le patrimoine #${id} ?`, 'Cette action est soumise aux règles d’intégrité référentielle P03/P04.', 'Confirmer'))) {
+      return;
+    }
     this.actionError.set(null);
     try {
       await firstValueFrom(this.patrimoineApi.delete(id));
-      toast.success('Patrimoine supprimé');
+      toast.success('Patrimoine supprimé ou archivé');
       await this.patrimoineStore.reload();
     } catch (err) {
       this.actionError.set(normalizeHttpError(err).message);
@@ -1371,10 +1824,13 @@ export class AdminDashboardPageComponent implements OnInit {
   }
 
   protected async deleteCircuit(id: number): Promise<void> {
+    if (!(await this.confirmDialog(`Archiver ou supprimer le circuit #${id} ?`, 'Un circuit référencé par des réservations ne sera jamais détruit physiquement.', 'Confirmer'))) {
+      return;
+    }
     this.actionError.set(null);
     try {
       await firstValueFrom(this.circuitApi.delete(id));
-      toast.success('Circuit supprimé');
+      toast.success('Circuit supprimé ou archivé');
       await this.circuitStore.reload();
     } catch (err) {
       this.actionError.set(normalizeHttpError(err).message);
@@ -1396,6 +1852,7 @@ export class AdminDashboardPageComponent implements OnInit {
       lieu: ev.lieu ?? '',
       conditionsAcces: ev.conditionsAcces ?? '',
       descriptionEvenement: ev.descriptionEvenement ?? '',
+      ouvertReservation: ev.ouvertReservation === true,
     });
   }
 
@@ -1414,6 +1871,7 @@ export class AdminDashboardPageComponent implements OnInit {
       lieu: 'Esplanade du Fleuve Casamance, Ziguinchor',
       conditionsAcces: 'Inscription préalable recommandée',
       descriptionEvenement: '',
+      ouvertReservation: false,
     });
   }
 
@@ -1460,11 +1918,122 @@ export class AdminDashboardPageComponent implements OnInit {
   }
 
   protected async deleteEvenement(id: number): Promise<void> {
+    if (!(await this.confirmDialog(`Archiver ou supprimer l’événement #${id} ?`, 'Si des réservations sont rattachées à cet événement, il sera protégé ou archivé.', 'Confirmer'))) {
+      return;
+    }
     this.actionError.set(null);
     try {
       await firstValueFrom(this.evenementApi.delete(id));
-      toast.success('Événement supprimé');
+      toast.success('Événement supprimé ou archivé');
       await this.evenementStore.reload();
+    } catch (err) {
+      this.actionError.set(normalizeHttpError(err).message);
+    }
+  }
+
+  protected async loadReservationsPage(page: number): Promise<void> {
+    this.actionError.set(null);
+    try {
+      const [paged, stats] = await Promise.all([
+        firstValueFrom(
+          this.reservationApi.rechercher({
+            q: this.resSearch().trim() || undefined,
+            statut: this.resStatutFilter(),
+            type: this.resTypeFilter(),
+            page,
+            size: 10,
+          })
+        ),
+        firstValueFrom(this.reservationApi.getStatistiques()),
+      ]);
+      this.adminReservations.set(paged.content ?? []);
+      this.resPage.set(paged.page);
+      this.resTotalPages.set(Math.max(1, paged.totalPages));
+      this.resTotalElements.set(paged.totalElements);
+      this.resStats.set(stats);
+    } catch (err) {
+      this.actionError.set(normalizeHttpError(err).message);
+    }
+  }
+
+  protected async syncAdminReservation(id: number): Promise<void> {
+    this.actionError.set(null);
+    try {
+      await firstValueFrom(this.reservationApi.synchroniser(id));
+      toast.success(`Réservation #${id} synchronisée avec ms-paiement`);
+      await this.loadReservationsPage(this.resPage());
+    } catch (err) {
+      this.actionError.set(normalizeHttpError(err).message);
+    }
+  }
+
+  protected async cancelAdminReservation(r: Reservation): Promise<void> {
+    if (!(await this.confirmDialog(
+      `Annuler la réservation ${r.referenceReservation || '#' + r.id} ?`,
+      `Cette action libérera les ${r.nombrePlaces} place(s) de ${r.nomClient}.`,
+      'Annuler la réservation'
+    ))) {
+      return;
+    }
+    this.actionError.set(null);
+    try {
+      await firstValueFrom(this.reservationApi.cancel(r.id, 'Annulation administrative'));
+      toast.success(`Réservation #${r.id} annulée`);
+      await this.loadReservationsPage(this.resPage());
+    } catch (err) {
+      this.actionError.set(normalizeHttpError(err).message);
+    }
+  }
+
+  protected async loadPaiementsPage(page: number): Promise<void> {
+    this.actionError.set(null);
+    try {
+      const [paged, stats] = await Promise.all([
+        firstValueFrom(
+          this.paiementApi.rechercher({
+            q: this.paySearch().trim() || undefined,
+            statut: this.payStatutFilter(),
+            modePaiement: this.payModeFilter(),
+            page,
+            size: 10,
+          })
+        ),
+        firstValueFrom(this.paiementApi.getStatistiques()),
+      ]);
+      this.adminPaiements.set(paged.content ?? []);
+      this.payPage.set(paged.page);
+      this.payTotalPages.set(Math.max(1, paged.totalPages));
+      this.payTotalElements.set(paged.totalElements);
+      this.payStats.set(stats);
+    } catch (err) {
+      this.actionError.set(normalizeHttpError(err).message);
+    }
+  }
+
+  protected async rembourserAdminPaiement(p: Paiement): Promise<void> {
+    if (!(await this.confirmDialog(
+      `Rembourser intégralement ${p.referenceTransaction} ?`,
+      `Remboursement simulé P04 de ${p.montant} ${p.devise || 'XOF'} pour la réservation #${p.reservationId} (réservé ADMINISTRATEUR).`,
+      'Confirmer le remboursement simulé'
+    ))) {
+      return;
+    }
+    this.actionError.set(null);
+    try {
+      await firstValueFrom(this.paiementApi.rembourser(p.id, 'Remboursement intégral validé depuis le back-office'));
+      toast.success(`Paiement ${p.referenceTransaction} remboursé (simulé)`);
+      await this.loadPaiementsPage(this.payPage());
+    } catch (err) {
+      this.actionError.set(normalizeHttpError(err).message);
+    }
+  }
+
+  protected async rejouerOutbox(): Promise<void> {
+    this.actionError.set(null);
+    try {
+      const res = await firstValueFrom(this.paiementApi.rejouerOutbox());
+      toast.success(`${res.evenementsSynchronises} événement(s) outbox relancé(s)`);
+      await this.loadPaiementsPage(this.payPage());
     } catch (err) {
       this.actionError.set(normalizeHttpError(err).message);
     }
@@ -1503,6 +2072,9 @@ export class AdminDashboardPageComponent implements OnInit {
   }
 
   protected async deleteUser(id: number): Promise<void> {
+    if (!(await this.confirmDialog(`Supprimer l’utilisateur #${id} ?`, 'Cette action est irréversible.', 'Supprimer'))) {
+      return;
+    }
     this.actionError.set(null);
     try {
       await this.authStore.deleteUser(id);
@@ -1511,5 +2083,19 @@ export class AdminDashboardPageComponent implements OnInit {
     } catch (err) {
       this.actionError.set(normalizeHttpError(err).message);
     }
+  }
+
+  private async confirmDialog(title: string, message: string, confirmLabel: string): Promise<boolean> {
+    const ref = this.dialog.open<boolean>(UiConfirmDialogComponent, {
+      data: {
+        title,
+        message,
+        confirmLabel,
+        cancelLabel: 'Annuler',
+        variant: 'danger',
+      },
+    });
+    const confirmed = await firstValueFrom(ref.closed);
+    return Boolean(confirmed);
   }
 }
