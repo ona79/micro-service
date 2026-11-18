@@ -1,3 +1,10 @@
+# Environnements et secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
 # Dossiers de compilation Maven / Gradle (très lourds : .jar de 50+ Mo)
 **/target/
 **/build/

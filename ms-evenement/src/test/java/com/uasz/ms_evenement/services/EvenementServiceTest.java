@@ -45,8 +45,8 @@ class EvenementServiceTest {
     @BeforeEach
     void setUp() {
         evenementService = new EvenementService(evenementRepository, evenementMapper, patrimoineClient);
-        patrimoine = new PatrimoineDto(1L, "Maison de l'Esclave", "PAT-001", "Desc", "Hist",
-                "Île de Gorée", 150, 14.6672f, -17.3990f);
+        patrimoine = new PatrimoineDto(1L, "Mémorial du Joola", "PAT-ZIG-001", "Desc", "Hist",
+                "Boucotte, Ziguinchor", 150, 12.5833f, -16.2719f);
     }
 
     @Test
@@ -65,8 +65,8 @@ class EvenementServiceTest {
         EvenementDto saved = evenementService.saveEvenement(dto);
 
         assertThat(saved.getId()).isEqualTo(1L);
-        assertThat(saved.getLieu()).isEqualTo("Île de Gorée");
-        assertThat(saved.getPatrimoine().getNomPatrimoine()).isEqualTo("Maison de l'Esclave");
+        assertThat(saved.getLieu()).isEqualTo("Boucotte, Ziguinchor");
+        assertThat(saved.getPatrimoine().getNomPatrimoine()).isEqualTo("Mémorial du Joola");
     }
 
     @Test
@@ -75,7 +75,7 @@ class EvenementServiceTest {
 
         EvenementDto dto = new EvenementDto(null, "Grand Festival", "Trop grand",
                 TypeEvenement.FESTIVAL, LocalDateTime.of(2026, 12, 1, 9, 0),
-                LocalDateTime.of(2026, 12, 1, 17, 0), "Gorée", 300, 2000.0, 1L, null);
+                LocalDateTime.of(2026, 12, 1, 17, 0), "Ziguinchor", 300, 2000.0, 1L, null);
 
         assertThatThrownBy(() -> evenementService.saveEvenement(dto))
                 .isInstanceOf(BadRequestException.class)
@@ -86,7 +86,7 @@ class EvenementServiceTest {
     void saveEvenement_dateFinAvantDateDebut_leveBadRequest() {
         EvenementDto dto = new EvenementDto(null, "Atelier", "Dates inversées",
                 TypeEvenement.ATELIER, LocalDateTime.of(2026, 12, 2, 10, 0),
-                LocalDateTime.of(2026, 12, 1, 10, 0), "Gorée", 50, 1000.0, 1L, null);
+                LocalDateTime.of(2026, 12, 1, 10, 0), "Ziguinchor", 50, 1000.0, 1L, null);
 
         assertThatThrownBy(() -> evenementService.saveEvenement(dto))
                 .isInstanceOf(BadRequestException.class)
@@ -101,7 +101,7 @@ class EvenementServiceTest {
 
         EvenementDto dto = new EvenementDto(null, "Atelier", "Desc",
                 TypeEvenement.ATELIER, LocalDateTime.of(2026, 12, 1, 10, 0),
-                LocalDateTime.of(2026, 12, 1, 12, 0), "Gorée", 50, 1000.0, 999L, null);
+                LocalDateTime.of(2026, 12, 1, 12, 0), "Ziguinchor", 50, 1000.0, 999L, null);
 
         assertThatThrownBy(() -> evenementService.saveEvenement(dto))
                 .isInstanceOf(BadRequestException.class)

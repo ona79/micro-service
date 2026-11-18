@@ -1,0 +1,220 @@
+<div class="page-section">
+  <div class="container">
+    @if (loading()) {
+      <app-ui-skeleton-grid [count]="2" label="Chargement de la fiche du patrimoine..." />
+    } @else if (error() || !patrimoine()) {
+      <app-ui-breadcrumb [items]="breadcrumbs()" />
+      <app-ui-error-banner
+        title="Impossible d'afficher ce site patrimonial"
+        [message]="error() || 'Patrimoine introuvable.'"
+        [showRetry]="true"
+        (retry)="reload()"
+      />
+    } @else {
+      @let pat = patrimoine()!;
+      <app-ui-breadcrumb [items]="breadcrumbs()" />
+
+      <header class="monograph-header">
+        <div class="monograph-header__badges">
+          <span class="ui-badge">{{ pat.codePatrimoine }}</span>
+          @if (isMemorial()) {
+            <span class="ui-badge ui-badge--memorial">
+              Lieu de mémoire et de recueillement
+            </span>
+          } @else {
+            <span class="ui-badge ui-badge--ochre">Patrimoine culturel</span>
+          }
+        </div>
+        <h1 class="monograph-header__title">{{ pat.nomPatrimoine }}</h1>
+        @if (pat.adressePatrimoine) {
+          <p class="monograph-header__location">
+            <svg lucideMapPin [size]="16" aria-hidden="true"></svg>
+            <span>{{ pat.adressePatrimoine }}</span>
+          </p>
+        }
+      </header>
+
+      <div class="monograph-layout">
+        <article class="monograph-main">
+          <figure class="monograph-media">
+            <div class="monograph-media__frame">
+              <app-ui-patrimoine-image
+                [codePatrimoine]="pat.codePatrimoine"
+                [nomPatrimoine]="pat.nomPatrimoine"
+                [sobriete]="isMemorial()"
+              />
+            </div>
+            <figcaption class="monograph-media__caption">
+              {{ pat.nomPatrimoine }} — {{ pat.adressePatrimoine || 'Sénégal' }} (Code :
+              {{ pat.codePatrimoine }})
+            </figcaption>
+          </figure>
+
+          <div class="monograph-body">
+            @if (isMemorial()) {
+              <div class="memorial-notice">
+                <strong>Lieu de recueillement :</strong> Ce site honore une mémoire
+                historique et humaine profonde. Les visites s'y déroulent dans le calme,
+                la dignité et le respect.
+              </div>
+            }
+
+            <h2>Présentation du site</h2>
+            <p>
+              {{
+                pat.descriptionPatrimoine ||
+                  'Aucune description détaillée n’est encore renseignée pour ce site patrimonial.'
+              }}
+            </p>
+
+            @if (pat.historiquePatrimoine) {
+              <h2>Repères historiques</h2>
+              <p>{{ pat.historiquePatrimoine }}</p>
+            }
+
+            @if (relatedCircuits().length > 0 || relatedEvenements().length > 0) {
+              <div class="monograph-connections">
+                <h2>Découvrir sur place</h2>
+                @if (relatedCircuits().length > 0) {
+                  <div class="connection-group">
+                    <h3>
+                      <svg lucideRoute [size]="16" aria-hidden="true"></svg>
+                      Circuits incluant ce site
+                    </h3>
+                    <ul class="connection-list">
+                      @for (cir of relatedCircuits(); track cir.id) {
+                        <li>
+                          <a [routerLink]="['/circuits', cir.id]" class="connection-link">
+                            <span>{{ cir.nomCircuit }}</span>
+                            <span class="connection-meta tabular-nums">
+                              {{ cir.dureeEstimee | durationMinutes }} ·
+                              {{ cir.prix | fcfaPrice }}
+                            </span>
+                          </a>
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                }
+
+                @if (relatedEvenements().length > 0) {
+                  <div class="connection-group">
+                    <h3>
+                      <svg lucideCalendar [size]="16" aria-hidden="true"></svg>
+                      Événements organisés sur ce site
+                    </h3>
+                    <ul class="connection-list">
+                      @for (ev of relatedEvenements(); track ev.id) {
+                        <li>
+                          <a [routerLink]="['/evenements', ev.id]" class="connection-link">
+                            <span>{{ ev.nomEvenement }}</span>
+                            <span class="connection-meta tabular-nums">
+                              {{ ev.dateDebut | dateFr: 'd MMM yyyy' }} ·
+                              {{ ev.prix | fcfaPrice }}
+                            </span>
+                          </a>
+                        </li>
+                      }
+                    </ul>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </article>
+
+        <aside
+          class="practical-sidebar"
+          [class.practical-sidebar--memorial]="isMemorial()"
+        >
+          <h2 class="practical-sidebar__title">Informations pratiques</h2>
+
+          <dl class="practical-list">
+            <div class="practical-list__row">
+              <dt>Code officiel</dt>
+              <dd>{{ pat.codePatrimoine }}</dd>
+            </div>
+            <div class="practical-list__row">
+              <dt>Localisation</dt>
+              <dd>{{ pat.adressePatrimoine || 'Non renseignée' }}</dd>
+            </div>
+            <div class="practical-list__row">
+              <dt>Capacité maximale</dt>
+              <dd class="tabular-nums">{{ pat.capacitePatrimoine }} personnes</dd>
+            </div>
+            @if (hasCoords()) {
+              <div class="practical-list__row">
+                <dt>Coordonnées GPS</dt>
+                <dd class="tabular-nums">
+                  {{ pat.latitudePatrimoine.toFixed(4) }},
+                  {{ pat.longitudePatrimoine.toFixed(4) }}
+                </dd>
+              </div>
+            }
+          </dl>
+
+          @if (hasCoords()) {
+            <div class="practical-map">
+              <app-ui-heritage-map
+                [points]="mapPoints()"
+                [height]="220"
+                [ariaLabel]="'Localisation de ' + pat.nomPatrimoine"
+              />
+              @if (osmUrl(); as url) {
+                <a
+                  [href]="url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="osm-external-link"
+                >
+                  <span>Ouvrir dans OpenStreetMap</span>
+                  <svg lucideExternalLink [size]="14" aria-hidden="true"></svg>
+                </a>
+              }
+            </div>
+          }
+
+          <a routerLink="/reserver" class="practical-cta">
+            <svg lucideTicket [size]="16" aria-hidden="true"></svg>
+            <span>Réserver un circuit ou événement</span>
+          </a>
+        </aside>
+      </div>
+
+      @if (autresPatrimoines().length > 0) {
+        <section class="related-section">
+          <h2 class="related-section__title">À voir aussi</h2>
+          <div class="related-grid">
+            @for (autre of autresPatrimoines(); track autre.id) {
+              <article
+                class="related-card"
+                [class.related-card--memorial]="isPatMemorial(autre)"
+              >
+                <a [routerLink]="['/patrimoines', autre.id]" class="related-card__media">
+                  <app-ui-patrimoine-image
+                    [codePatrimoine]="autre.codePatrimoine"
+                    [nomPatrimoine]="autre.nomPatrimoine"
+                    [sobriete]="isPatMemorial(autre)"
+                  />
+                </a>
+                <div class="related-card__body">
+                  <span class="ui-badge">{{ autre.codePatrimoine }}</span>
+                  <h3 class="related-card__title">
+                    <a [routerLink]="['/patrimoines', autre.id]">
+                      {{ autre.nomPatrimoine }}
+                    </a>
+                  </h3>
+                  <p class="related-card__loc">{{ autre.adressePatrimoine || 'Sénégal' }}</p>
+                  <a [routerLink]="['/patrimoines', autre.id]" class="related-card__link">
+                    <span>Lire la fiche</span>
+                    <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
+                  </a>
+                </div>
+              </article>
+            }
+          </div>
+        </section>
+      }
+    }
+  </div>
+</div>

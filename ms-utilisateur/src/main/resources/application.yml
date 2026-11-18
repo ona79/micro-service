@@ -3,22 +3,13 @@ server:
 
 spring:
   application:
-    name: utilisateur
-  datasource:
-    url: 'jdbc:h2:mem:utilisateurdb'
-  h2:
-    console:
-      enabled: true
+    name: ms-utilisateur
+  profiles:
+    default: dev
   jackson:
     deserialization:
       fail-on-null-for-primitives: false
-  jpa:
-    show-sql: true
-    hibernate:
-      ddl-auto: update
   cloud:
-    config:
-      enabled: false
     discovery:
       enabled: ${DISCOVERY_ENABLED:true}
 
@@ -26,10 +17,88 @@ management:
   endpoints:
     web:
       exposure:
-        include: '*'
-
+        include: 'health,info'
+  endpoint:
+    health:
+      show-details: when_authorized
 
 eureka:
   client:
     service-url:
       defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}
+
+security:
+  session:
+    secret: ${SECURITY_SESSION_SECRET:dev-secret-key-patrimoine-casamance-uasz-32bytes!}
+
+---
+# Profil DEV : H2 en mémoire pour le développement local
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:h2:mem:utilisateurdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ''
+  h2:
+    console:
+      enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+  flyway:
+    enabled: false
+
+---
+# Profil TEST : H2 en mémoire pour les tests unitaires et intégration CI
+spring:
+  config:
+    activate:
+      on-profile: test
+  datasource:
+    url: jdbc:h2:mem:utilisateurdb_test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ''
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  flyway:
+    enabled: false
+
+---
+# Profil PROD : PostgreSQL avec migrations Flyway et validation Hibernate
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:utilisateur_db}
+    username: ${DB_USER:utilisateur_user}
+    password: ${DB_PASSWORD:?Variable obligatoire DB_PASSWORD non definie}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+    locations: classpath:db/migration
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: 'health,info'
+
+security:
+  session:
+    secret: ${SECURITY_SESSION_SECRET:?Variable obligatoire SECURITY_SESSION_SECRET manquante pour la production (min 32 octets)}

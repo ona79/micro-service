@@ -1,0 +1,225 @@
+<div class="page-section">
+  <div class="container">
+    <header class="editorial-header">
+      <p class="editorial-header__eyebrow">Archive culturelle</p>
+      <h1 class="editorial-header__title">Sites &amp; Monuments Patrimoniaux</h1>
+      <p class="editorial-header__subtitle">
+        Explorez les trésors historiques, spirituels et mémoriels du Sénégal, de l'île
+        de Gorée aux rives de la Casamance.
+      </p>
+    </header>
+
+    <section class="controls-bar" aria-label="Filtres et mode d'affichage">
+      <div class="controls-bar__fields">
+        <div class="control-field control-field--search">
+          <label for="pat-search" class="control-field__label">
+            Recherche (nom, ville, code)
+          </label>
+          <div class="search-input-wrap">
+            <svg lucideSearch [size]="16" class="search-input-wrap__icon" aria-hidden="true"></svg>
+            <input
+              id="pat-search"
+              type="search"
+              class="control-input control-input--with-icon"
+              placeholder="Ex: Gorée, Ziguinchor, PAT-DKR..."
+              [ngModel]="urlQuery()"
+              (ngModelChange)="onSearchChange($event)"
+            />
+          </div>
+        </div>
+
+        <div class="control-field">
+          <label for="pat-cap" class="control-field__label">Capacité min. (pers.)</label>
+          <input
+            id="pat-cap"
+            type="number"
+            min="0"
+            step="50"
+            class="control-input"
+            placeholder="Ex: 100"
+            [ngModel]="capaciteMin()"
+            (ngModelChange)="capaciteMin.set($event)"
+          />
+        </div>
+
+        <div class="control-field">
+          <label for="pat-tri" class="control-field__label">Trier par</label>
+          <select
+            id="pat-tri"
+            class="control-input"
+            [ngModel]="tri()"
+            (ngModelChange)="tri.set($event)"
+          >
+            <option value="nom_asc">Nom (A → Z)</option>
+            <option value="capacite_desc">Capacité (plus grande d’abord)</option>
+            <option value="capacite_asc">Capacité (plus petite d’abord)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="controls-bar__footer">
+        <p class="controls-bar__count tabular-nums">
+          <strong>{{ filteredPatrimoines().length }}</strong>
+          résultat{{ filteredPatrimoines().length > 1 ? 's' : '' }}
+          @if (store.items().length !== filteredPatrimoines().length) {
+            <span> sur {{ store.items().length }}</span>
+          }
+        </p>
+
+        <div class="controls-bar__actions">
+          @if (urlQuery() || capaciteMin() || tri() !== 'nom_asc') {
+            <button type="button" class="btn-reset" (click)="resetFilters()">
+              Réinitialiser les filtres
+            </button>
+          }
+
+          <div
+            ngToolbar
+            orientation="horizontal"
+            class="view-switcher"
+            aria-label="Mode d'affichage"
+          >
+            <button
+              type="button"
+              ngToolbarWidget
+              class="view-switcher__btn"
+              [class.view-switcher__btn--active]="viewMode() === 'grid'"
+              [attr.aria-pressed]="viewMode() === 'grid'"
+              (click)="setViewMode('grid')"
+            >
+              <svg lucideGrid [size]="15" aria-hidden="true"></svg>
+              <span>Catalogue</span>
+            </button>
+            <button
+              type="button"
+              ngToolbarWidget
+              class="view-switcher__btn"
+              [class.view-switcher__btn--active]="viewMode() === 'map'"
+              [attr.aria-pressed]="viewMode() === 'map'"
+              (click)="setViewMode('map')"
+            >
+              <svg lucideMap [size]="15" aria-hidden="true"></svg>
+              <span>Carte ({{ mapPoints().length }})</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    @if (store.loading() && store.items().length === 0) {
+      <app-ui-skeleton-grid [count]="3" label="Chargement des sites patrimoniaux..." />
+    } @else if (store.error() && store.items().length === 0) {
+      <app-ui-error-banner
+        title="Erreur lors du chargement des patrimoines"
+        [message]="store.error()"
+        [showRetry]="true"
+        (retry)="store.reload()"
+      />
+    } @else if (filteredPatrimoines().length === 0) {
+      <app-ui-empty-state
+        title="Aucun site patrimonial trouvé"
+        description="Essayez d'élargir vos critères de recherche ou réinitialisez les filtres."
+        actionLabel="Réinitialiser les filtres"
+        [hasAction]="true"
+        (action)="resetFilters()"
+      />
+    } @else if (viewMode() === 'map') {
+      <div class="map-view-layout">
+        <app-ui-heritage-map
+          [points]="mapPoints()"
+          [height]="440"
+          ariaLabel="Carte géographique des sites patrimoniaux filtrés"
+          (pointSelected)="onMapPointSelected($event)"
+        />
+
+        @if (selectedMapPatrimoine(); as pat) {
+          <aside
+            class="map-preview-card"
+            [class.map-preview-card--memorial]="isMemorial(pat)"
+          >
+            <div class="map-preview-card__media">
+              <app-ui-patrimoine-image
+                [codePatrimoine]="pat.codePatrimoine"
+                [nomPatrimoine]="pat.nomPatrimoine"
+                [sobriete]="isMemorial(pat)"
+              />
+            </div>
+            <div class="map-preview-card__body">
+              <div class="heritage-card__badges">
+                <span class="ui-badge">{{ pat.codePatrimoine }}</span>
+                @if (isMemorial(pat)) {
+                  <span class="ui-badge ui-badge--memorial">Lieu de mémoire</span>
+                }
+              </div>
+              <h2 class="map-preview-card__title">{{ pat.nomPatrimoine }}</h2>
+              <p class="map-preview-card__desc">{{ pat.descriptionPatrimoine }}</p>
+              <ul class="map-preview-card__meta">
+                <li>
+                  <svg lucideMapPin [size]="14" aria-hidden="true"></svg>
+                  <span>{{ pat.adressePatrimoine || 'Non renseignée' }}</span>
+                </li>
+                <li class="tabular-nums">
+                  <svg lucideUsers [size]="14" aria-hidden="true"></svg>
+                  <span>{{ pat.capacitePatrimoine }} visiteurs max</span>
+                </li>
+              </ul>
+              <a [routerLink]="['/patrimoines', pat.id]" class="map-preview-card__cta">
+                <span>Ouvrir la fiche complète</span>
+                <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
+              </a>
+            </div>
+          </aside>
+        }
+      </div>
+    } @else {
+      <div class="patrimoines-grid">
+        @for (pat of filteredPatrimoines(); track pat.id) {
+          <article
+            class="pat-card"
+            [class.pat-card--memorial]="isMemorial(pat)"
+          >
+            <a
+              [routerLink]="['/patrimoines', pat.id]"
+              class="pat-card__media"
+              [attr.aria-label]="pat.nomPatrimoine"
+            >
+              <app-ui-patrimoine-image
+                [codePatrimoine]="pat.codePatrimoine"
+                [nomPatrimoine]="pat.nomPatrimoine"
+                [sobriete]="isMemorial(pat)"
+              />
+            </a>
+            <div class="pat-card__body">
+              <div class="pat-card__badges">
+                <span class="ui-badge">{{ pat.codePatrimoine }}</span>
+                @if (isMemorial(pat)) {
+                  <span class="ui-badge ui-badge--memorial">Lieu de mémoire</span>
+                }
+              </div>
+              <h2 class="pat-card__title">
+                <a [routerLink]="['/patrimoines', pat.id]">{{ pat.nomPatrimoine }}</a>
+              </h2>
+              <p class="pat-card__desc">{{ pat.descriptionPatrimoine }}</p>
+              <dl class="pat-card__meta">
+                <div>
+                  <dt>Adresse</dt>
+                  <dd>{{ pat.adressePatrimoine || 'Non renseignée' }}</dd>
+                </div>
+                <div>
+                  <dt>Capacité</dt>
+                  <dd class="tabular-nums">{{ pat.capacitePatrimoine }} visiteurs</dd>
+                </div>
+              </dl>
+              <div class="pat-card__footer">
+                <a [routerLink]="['/patrimoines', pat.id]" class="pat-card__cta">
+                  <span>Voir le détail</span>
+                  <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
+                </a>
+              </div>
+            </div>
+          </article>
+        }
+      </div>
+    }
+  </div>
+</div>

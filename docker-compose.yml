@@ -1,101 +1,211 @@
 services:
-  config-server:
-    build: ./config-server
-    image: fatylamine/config-server:v1
-    container_name: config-server
-    ports:
-      - "8888:8888"
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=postgres
+      - "POSTGRES_PASSWORD=${POSTGRES_ROOT_PASSWORD:?Erreur_POSTGRES_ROOT_PASSWORD_obligatoire}"
+      - "PATRIMOINE_DB_PASSWORD=${PATRIMOINE_DB_PASSWORD:?Erreur_PATRIMOINE_DB_PASSWORD_obligatoire}"
+      - "CIRCUIT_DB_PASSWORD=${CIRCUIT_DB_PASSWORD:?Erreur_CIRCUIT_DB_PASSWORD_obligatoire}"
+      - "EVENEMENT_DB_PASSWORD=${EVENEMENT_DB_PASSWORD:?Erreur_EVENEMENT_DB_PASSWORD_obligatoire}"
+      - "RESERVATION_DB_PASSWORD=${RESERVATION_DB_PASSWORD:?Erreur_RESERVATION_DB_PASSWORD_obligatoire}"
+      - "UTILISATEUR_DB_PASSWORD=${UTILISATEUR_DB_PASSWORD:?Erreur_UTILISATEUR_DB_PASSWORD_obligatoire}"
+      - "PAIEMENT_DB_PASSWORD=${PAIEMENT_DB_PASSWORD:?Erreur_PAIEMENT_DB_PASSWORD_obligatoire}"
+      - "NOTIFICATION_DB_PASSWORD=${NOTIFICATION_DB_PASSWORD:?Erreur_NOTIFICATION_DB_PASSWORD_obligatoire}"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init-multi-postgres.sh:/docker-entrypoint-initdb.d/init-multi-postgres.sh:ro
+    networks:
+      - data-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
 
   discovery-server:
     build: ./discovery-server
     image: fatylamine/discovery-server:v1
     container_name: discovery-server
-    ports:
-      - "8761:8761"
+    networks:
+      - app-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8761/actuator/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   ms-patrimoine:
     build: ./ms-patrimoine
     image: fatylamine/patrimoines:v1
     container_name: ms-patrimoine
-    ports:
-      - "3001:3001"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=patrimoine_db
+      - DB_USER=patrimoine_user
+      - "DB_PASSWORD=${PATRIMOINE_DB_PASSWORD:?Erreur_PATRIMOINE_DB_PASSWORD_obligatoire}"
+      - EUREKA_URI=http://discovery-server:8761/eureka
+    networks:
+      - app-net
+      - data-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
 
   ms-circuit:
     build: ./ms-circuit
     image: fatylamine/circuits:v1
     container_name: ms-circuit
-    ports:
-      - "3002:3002"
     environment:
-      - PATRIMOINE_URL=http://ms-patrimoine:3001
+      - SPRING_PROFILES_ACTIVE=prod
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=circuit_db
+      - DB_USER=circuit_user
+      - "DB_PASSWORD=${CIRCUIT_DB_PASSWORD:?Erreur_CIRCUIT_DB_PASSWORD_obligatoire}"
+      - EUREKA_URI=http://discovery-server:8761/eureka
+    networks:
+      - app-net
+      - data-net
     depends_on:
-      - ms-patrimoine
+      postgres:
+        condition: service_healthy
+      ms-patrimoine:
+        condition: service_started
+      discovery-server:
+        condition: service_started
 
   ms-evenement:
     build: ./ms-evenement
     image: fatylamine/evenements:v1
     container_name: ms-evenement
-    ports:
-      - "3003:3003"
     environment:
-      - PATRIMOINE_URL=http://ms-patrimoine:3001
+      - SPRING_PROFILES_ACTIVE=prod
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=evenement_db
+      - DB_USER=evenement_user
+      - "DB_PASSWORD=${EVENEMENT_DB_PASSWORD:?Erreur_EVENEMENT_DB_PASSWORD_obligatoire}"
+      - EUREKA_URI=http://discovery-server:8761/eureka
+    networks:
+      - app-net
+      - data-net
     depends_on:
-      - ms-patrimoine
+      postgres:
+        condition: service_healthy
+      ms-patrimoine:
+        condition: service_started
+      discovery-server:
+        condition: service_started
 
   ms-reservation:
     build: ./ms-reservation
     image: fatylamine/reservations:v1
     container_name: ms-reservation
-    ports:
-      - "3004:3004"
     environment:
-      - CIRCUIT_URL=http://ms-circuit:3002
-      - EVENEMENT_URL=http://ms-evenement:3003
+      - SPRING_PROFILES_ACTIVE=prod
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=reservation_db
+      - DB_USER=reservation_user
+      - "DB_PASSWORD=${RESERVATION_DB_PASSWORD:?Erreur_RESERVATION_DB_PASSWORD_obligatoire}"
+      - EUREKA_URI=http://discovery-server:8761/eureka
+    networks:
+      - app-net
+      - data-net
     depends_on:
-      - ms-circuit
-      - ms-evenement
+      postgres:
+        condition: service_healthy
+      ms-circuit:
+        condition: service_started
+      ms-evenement:
+        condition: service_started
+      discovery-server:
+        condition: service_started
 
   ms-utilisateur:
     build: ./ms-utilisateur
     image: fatylamine/utilisateurs:v1
     container_name: ms-utilisateur
-    ports:
-      - "3005:3005"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=utilisateur_db
+      - DB_USER=utilisateur_user
+      - "DB_PASSWORD=${UTILISATEUR_DB_PASSWORD:?Erreur_UTILISATEUR_DB_PASSWORD_obligatoire}"
+      - EUREKA_URI=http://discovery-server:8761/eureka
+      - "SECURITY_SESSION_SECRET=${SECURITY_SESSION_SECRET:?Erreur_SECURITY_SESSION_SECRET_obligatoire}"
+    networks:
+      - app-net
+      - data-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
 
   ms-notification:
     build: ./ms-notification
     image: fatylamine/notifications:v1
     container_name: ms-notification
-    ports:
-      - "3007:3007"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=notification_db
+      - DB_USER=notification_user
+      - "DB_PASSWORD=${NOTIFICATION_DB_PASSWORD:?Erreur_NOTIFICATION_DB_PASSWORD_obligatoire}"
+      - EUREKA_URI=http://discovery-server:8761/eureka
+    networks:
+      - app-net
+      - data-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_started
 
   ms-paiement:
     build: ./ms-paiement
     image: fatylamine/paiements:v1
     container_name: ms-paiement
-    ports:
-      - "3006:3006"
     environment:
-      - RESERVATION_URL=http://ms-reservation:3004
-      - NOTIFICATION_URL=http://ms-notification:3007
+      - SPRING_PROFILES_ACTIVE=prod
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=paiement_db
+      - DB_USER=paiement_user
+      - "DB_PASSWORD=${PAIEMENT_DB_PASSWORD:?Erreur_PAIEMENT_DB_PASSWORD_obligatoire}"
+      - EUREKA_URI=http://discovery-server:8761/eureka
+    networks:
+      - app-net
+      - data-net
     depends_on:
-      - ms-reservation
-      - ms-notification
+      postgres:
+        condition: service_healthy
+      ms-reservation:
+        condition: service_started
+      ms-notification:
+        condition: service_started
+      discovery-server:
+        condition: service_started
 
   api-gateway:
     build: ./api-gateway
     image: fatylamine/api-gateway:v1
     container_name: api-gateway
-    ports:
-      - "8080:8080"
     environment:
-      - PATRIMOINE_URL=http://ms-patrimoine:3001
-      - CIRCUIT_URL=http://ms-circuit:3002
-      - EVENEMENT_URL=http://ms-evenement:3003
-      - RESERVATION_URL=http://ms-reservation:3004
-      - UTILISATEUR_URL=http://ms-utilisateur:3005
-      - PAIEMENT_URL=http://ms-paiement:3006
-      - NOTIFICATION_URL=http://ms-notification:3007
+      - PORT=8090
+      - EUREKA_URI=http://discovery-server:8761/eureka
+      - "SECURITY_SESSION_SECRET=${SECURITY_SESSION_SECRET:?Erreur_SECURITY_SESSION_SECRET_obligatoire}"
+    networks:
+      - app-net
     depends_on:
       - ms-patrimoine
       - ms-circuit
@@ -104,3 +214,28 @@ services:
       - ms-utilisateur
       - ms-paiement
       - ms-notification
+
+  frontend-angular:
+    build: ./frontend-angular
+    image: fatylamine/frontend-angular:v1
+    container_name: frontend-angular
+    ports:
+      - "80:80"
+    networks:
+      - edge-net
+      - app-net
+    depends_on:
+      - api-gateway
+
+networks:
+  edge-net:
+    driver: bridge
+  app-net:
+    driver: bridge
+    internal: true
+  data-net:
+    driver: bridge
+    internal: true
+
+volumes:
+  postgres-data:

@@ -50,10 +50,10 @@ class CircuitServiceTest {
     @BeforeEach
     void setUp() {
         circuitService = new CircuitService(circuitRepository, circuitMapper, patrimoineClient);
-        p1 = new PatrimoineDto(1L, "Maison de l'Esclave", "PAT-001", "Desc 1", "Hist 1",
-                "Gorée", 150, 14.6672f, -17.3990f);
-        p2 = new PatrimoineDto(2L, "Monument de la Renaissance", "PAT-002", "Desc 2", "Hist 2",
-                "Ouakam", 500, 14.7222f, -17.4950f);
+        p1 = new PatrimoineDto(1L, "Mémorial du Joola", "PAT-ZIG-001", "Desc 1", "Hist 1",
+                "Ziguinchor", 250, 12.5833f, -16.2719f);
+        p2 = new PatrimoineDto(2L, "Comptoir de Carabane", "PAT-CRB-002", "Desc 2", "Hist 2",
+                "Carabane", 200, 12.5358f, -16.6978f);
     }
 
     @Test
@@ -68,7 +68,7 @@ class CircuitServiceTest {
 
         EtapeDto e1 = new EtapeDto(null, 2, 45, 2L, null);
         EtapeDto e2 = new EtapeDto(null, 1, 60, 1L, null);
-        CircuitDto input = new CircuitDto(null, "Tour de Dakar", "Découverte", Difficulte.FACILE,
+        CircuitDto input = new CircuitDto(null, "Tour de Casamance", "Découverte", Difficulte.FACILE,
                 0, 0.0, 30, 5000.0, List.of(e1, e2));
 
         CircuitDto saved = circuitService.saveCircuit(input);
@@ -78,9 +78,9 @@ class CircuitServiceTest {
         assertThat(saved.getDistanceTotale()).isGreaterThan(10.0);
         assertThat(saved.getEtapes()).hasSize(2);
         assertThat(saved.getEtapes().get(0).getOrdre()).isEqualTo(1);
-        assertThat(saved.getEtapes().get(0).getPatrimoine().getNomPatrimoine()).isEqualTo("Maison de l'Esclave");
+        assertThat(saved.getEtapes().get(0).getPatrimoine().getNomPatrimoine()).isEqualTo("Mémorial du Joola");
         assertThat(saved.getEtapes().get(1).getOrdre()).isEqualTo(2);
-        assertThat(saved.getEtapes().get(1).getPatrimoine().getNomPatrimoine()).isEqualTo("Monument de la Renaissance");
+        assertThat(saved.getEtapes().get(1).getPatrimoine().getNomPatrimoine()).isEqualTo("Comptoir de Carabane");
     }
 
     @Test
@@ -115,7 +115,7 @@ class CircuitServiceTest {
     @Test
     void getByIdCircuit_enrichitDepuisFeign() {
         Etape etape = Etape.builder().id(1L).ordre(1).dureeVisite(60).patrimoineId(1L).build();
-        Circuit circuit = Circuit.builder().id(1L).nomCircuit("Circuit Gorée")
+        Circuit circuit = Circuit.builder().id(1L).nomCircuit("Circuit Casamance")
                 .difficulte(Difficulte.FACILE).dureeEstimee(60).distanceTotale(0.0)
                 .placesMax(25).prix(2500.0).etapes(List.of(etape)).build();
         etape.setCircuit(circuit);
@@ -125,8 +125,8 @@ class CircuitServiceTest {
 
         CircuitDto dto = circuitService.getByIdCircuit(1L);
 
-        assertThat(dto.getNomCircuit()).isEqualTo("Circuit Gorée");
-        assertThat(dto.getEtapes().getFirst().getPatrimoine().getCodePatrimoine()).isEqualTo("PAT-001");
+        assertThat(dto.getNomCircuit()).isEqualTo("Circuit Casamance");
+        assertThat(dto.getEtapes().getFirst().getPatrimoine().getCodePatrimoine()).isEqualTo("PAT-ZIG-001");
     }
 
     @Test

@@ -1,0 +1,308 @@
+<section class="hero-editorial">
+  <div class="container hero-editorial__grid">
+    <div class="hero-editorial__copy">
+      <span class="ui-badge ui-badge--terracotta">Teranga · Mémoire &amp; Territoires</span>
+      <h1 class="hero-editorial__title">
+        Découvrir les hauts lieux du patrimoine sénégalais
+      </h1>
+      <p class="hero-editorial__lead">
+        De l'île de Gorée aux édifices historiques de la Casamance, parcourez les
+        monuments emblématiques, suivez des circuits thématiques et réservez vos visites
+        culturelles.
+      </p>
+
+      <form class="hero-search" role="search" (ngSubmit)="onSearchSubmit()">
+        <label for="hero-search-input" class="sr-only">Rechercher un patrimoine</label>
+        <svg lucideSearch [size]="18" class="hero-search__icon" aria-hidden="true"></svg>
+        <input
+          id="hero-search-input"
+          type="search"
+          name="heroSearch"
+          [(ngModel)]="searchQuery"
+          placeholder="Rechercher un site, une ville (Gorée, Dakar, Ziguinchor...)"
+          class="hero-search__input"
+        />
+        <button type="submit" class="hero-search__submit">Rechercher</button>
+      </form>
+
+      <div class="hero-actions">
+        <a routerLink="/patrimoines" class="btn-primary">
+          <span>Explorer les patrimoines</span>
+          <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
+        </a>
+        <a routerLink="/reserver" class="btn-secondary">Réserver une visite</a>
+      </div>
+    </div>
+
+    <div class="hero-editorial__visual">
+      @if (!heroImageMissing()) {
+        <figure class="hero-photo-frame">
+          <img
+            src="/images/hero.jpg"
+            alt="Paysages et patrimoine culturel du Sénégal"
+            class="hero-photo-frame__img"
+            (error)="heroImageMissing.set(true)"
+          />
+        </figure>
+      } @else if (featuredLead(); as lead) {
+        <article
+          class="hero-spotlight"
+          [class.hero-spotlight--memorial]="isLeadMemorial()"
+        >
+          <div class="hero-spotlight__media">
+            <app-ui-patrimoine-image
+              [codePatrimoine]="lead.codePatrimoine"
+              [nomPatrimoine]="lead.nomPatrimoine"
+              [sobriete]="isLeadMemorial()"
+            />
+          </div>
+          <div class="hero-spotlight__content">
+            <div class="hero-spotlight__tags">
+              <span class="ui-badge">{{ lead.codePatrimoine }}</span>
+              @if (isLeadMemorial()) {
+                <span class="ui-badge ui-badge--memorial">Lieu de mémoire</span>
+              }
+            </div>
+            <h2 class="hero-spotlight__title">{{ lead.nomPatrimoine }}</h2>
+            <p class="hero-spotlight__meta">
+              <svg lucideMapPin [size]="14" aria-hidden="true"></svg>
+              <span>{{ lead.adressePatrimoine || 'Sénégal' }}</span>
+            </p>
+            <a [routerLink]="['/patrimoines', lead.id]" class="hero-spotlight__link">
+              <span>Lire la fiche monographique</span>
+              <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
+            </a>
+          </div>
+        </article>
+      } @else {
+        <div class="hero-arch-card">
+          <p class="hero-arch-card__eyebrow">Plateforme Culturelle UASZ</p>
+          <p class="hero-arch-card__quote">
+            « Préserver les lieux de mémoire et partager les itinéraires du Sénégal. »
+          </p>
+        </div>
+      }
+    </div>
+  </div>
+</section>
+
+<!-- Index éditorial réel (compteurs directement issus des API) -->
+<section class="index-strip" aria-label="Accès direct aux rubriques">
+  <div class="container index-strip__grid">
+    <a routerLink="/patrimoines" class="index-item">
+      <span class="index-item__num">01</span>
+      <div class="index-item__body">
+        <span class="index-item__label">
+          <svg lucideLandmark [size]="16" aria-hidden="true"></svg>
+          Sites patrimoniaux
+        </span>
+        <span class="index-item__meta tabular-nums">
+          {{ patrimoineStore.items().length }} site(s) référencé(s)
+        </span>
+      </div>
+    </a>
+
+    <a routerLink="/circuits" class="index-item">
+      <span class="index-item__num">02</span>
+      <div class="index-item__body">
+        <span class="index-item__label">
+          <svg lucideRoute [size]="16" aria-hidden="true"></svg>
+          Circuits touristiques
+        </span>
+        <span class="index-item__meta tabular-nums">
+          {{ circuitStore.items().length }} parcours disponible(s)
+        </span>
+      </div>
+    </a>
+
+    <a routerLink="/evenements" class="index-item">
+      <span class="index-item__num">03</span>
+      <div class="index-item__body">
+        <span class="index-item__label">
+          <svg lucideCalendar [size]="16" aria-hidden="true"></svg>
+          Agenda culturel
+        </span>
+        <span class="index-item__meta tabular-nums">
+          {{ evenementStore.items().length }} événement(s) programmé(s)
+        </span>
+      </div>
+    </a>
+  </div>
+</section>
+
+<section class="page-section">
+  <div class="container">
+    <div class="section-heading">
+      <div>
+        <p class="section-heading__eyebrow">Sélection du catalogue</p>
+        <h2 class="section-heading__title">Patrimoines emblématiques</h2>
+      </div>
+      <a routerLink="/patrimoines" class="section-heading__link">
+        <span>Tout le catalogue ({{ patrimoineStore.items().length }})</span>
+        <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
+      </a>
+    </div>
+
+    @if (patrimoineStore.loading() && patrimoineStore.items().length === 0) {
+      <app-ui-skeleton-grid [count]="3" label="Chargement des patrimoines..." />
+    } @else if (patrimoineStore.error() && patrimoineStore.items().length === 0) {
+      <app-ui-error-banner
+        title="Impossible de charger les patrimoines"
+        [message]="patrimoineStore.error()"
+        [showRetry]="true"
+        (retry)="retryLoad()"
+      />
+    } @else if (patrimoineStore.items().length === 0) {
+      <app-ui-empty-state
+        title="Aucun patrimoine enregistré"
+        description="La base de données ne contient aucun site patrimonial pour le moment."
+      />
+    } @else {
+      @if (featuredLead(); as lead) {
+        <article
+          class="featured-lead"
+          [class.featured-lead--memorial]="isMemorial(lead)"
+        >
+          <a
+            [routerLink]="['/patrimoines', lead.id]"
+            class="featured-lead__media"
+            [attr.aria-label]="lead.nomPatrimoine"
+          >
+            <app-ui-patrimoine-image
+              [codePatrimoine]="lead.codePatrimoine"
+              [nomPatrimoine]="lead.nomPatrimoine"
+              [sobriete]="isMemorial(lead)"
+            />
+          </a>
+          <div class="featured-lead__body">
+            <div class="featured-lead__badges">
+              <span class="ui-badge">{{ lead.codePatrimoine }}</span>
+              @if (isMemorial(lead)) {
+                <span class="ui-badge ui-badge--memorial">Lieu de mémoire</span>
+              }
+            </div>
+            <h3 class="featured-lead__title">
+              <a [routerLink]="['/patrimoines', lead.id]">{{ lead.nomPatrimoine }}</a>
+            </h3>
+            <p class="featured-lead__desc">
+              {{
+                lead.descriptionPatrimoine ||
+                  'Consultez la fiche complète pour découvrir l’histoire de ce site.'
+              }}
+            </p>
+            <div class="featured-lead__meta">
+              <span>
+                <svg lucideMapPin [size]="15" aria-hidden="true"></svg>
+                {{ lead.adressePatrimoine || 'Sénégal' }}
+              </span>
+              <span class="tabular-nums">
+                <svg lucideUsers [size]="15" aria-hidden="true"></svg>
+                {{ lead.capacitePatrimoine }} visiteurs max
+              </span>
+            </div>
+            <a [routerLink]="['/patrimoines', lead.id]" class="featured-lead__cta">
+              <span>Découvrir la monographie</span>
+              <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
+            </a>
+          </div>
+        </article>
+      }
+
+      @if (featuredSecondary().length > 0) {
+        <div class="featured-secondary-grid">
+          @for (pat of featuredSecondary(); track pat.id) {
+            <article
+              class="heritage-card"
+              [class.heritage-card--memorial]="isMemorial(pat)"
+            >
+              <a
+                [routerLink]="['/patrimoines', pat.id]"
+                class="heritage-card__media"
+                [attr.aria-label]="pat.nomPatrimoine"
+              >
+                <app-ui-patrimoine-image
+                  [codePatrimoine]="pat.codePatrimoine"
+                  [nomPatrimoine]="pat.nomPatrimoine"
+                  [sobriete]="isMemorial(pat)"
+                />
+              </a>
+              <div class="heritage-card__body">
+                <div class="heritage-card__badges">
+                  <span class="ui-badge">{{ pat.codePatrimoine }}</span>
+                  @if (isMemorial(pat)) {
+                    <span class="ui-badge ui-badge--memorial">Lieu de mémoire</span>
+                  }
+                </div>
+                <h3 class="heritage-card__title">
+                  <a [routerLink]="['/patrimoines', pat.id]">{{ pat.nomPatrimoine }}</a>
+                </h3>
+                <p class="heritage-card__desc">{{ pat.descriptionPatrimoine }}</p>
+                <div class="heritage-card__footer">
+                  <span class="heritage-card__loc">
+                    <svg lucideMapPin [size]="14" aria-hidden="true"></svg>
+                    {{ pat.adressePatrimoine || 'Sénégal' }}
+                  </span>
+                  <a [routerLink]="['/patrimoines', pat.id]" class="heritage-card__link">
+                    Lire la fiche
+                    <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
+                  </a>
+                </div>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    }
+  </div>
+</section>
+
+<section class="editorial-banners">
+  <div class="container editorial-banners__grid">
+    <article class="banner-card">
+      <div class="banner-card__media">
+        <img
+          src="/images/circuits-banner.jpg"
+          alt="Pirogues traditionnelles et itinéraires fluviaux du Sénégal"
+          loading="lazy"
+          decoding="async"
+        />
+      </div>
+      <div class="banner-card__body">
+        <span class="ui-badge ui-badge--ochre">Parcours &amp; Géodésie Haversine</span>
+        <h2 class="banner-card__title">Itinéraires Culturels Accompagnés</h2>
+        <p class="banner-card__desc">
+          Reliez les monuments de Dakar, de Saint-Louis et de la Casamance à travers des
+          circuits structurés par étapes avec calcul automatique des distances et durées.
+        </p>
+        <a routerLink="/circuits" class="banner-card__cta">
+          <span>Parcourir les circuits ({{ circuitStore.items().length }})</span>
+          <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
+        </a>
+      </div>
+    </article>
+
+    <article class="banner-card">
+      <div class="banner-card__media">
+        <img
+          src="/images/evenements-banner.jpg"
+          alt="Kora et rencontres culturelles au Sénégal"
+          loading="lazy"
+          decoding="async"
+        />
+      </div>
+      <div class="banner-card__body">
+        <span class="ui-badge ui-badge--terracotta">Patrimoine Vivant</span>
+        <h2 class="banner-card__title">Agenda Culturel &amp; Visites Guidées</h2>
+        <p class="banner-card__desc">
+          Participez aux expositions, conférences et visites guidées organisées au sein
+          des sites historiques et réservez vos places en ligne.
+        </p>
+        <a routerLink="/evenements" class="banner-card__cta">
+          <span>Consulter l’agenda ({{ evenementStore.items().length }})</span>
+          <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
+        </a>
+      </div>
+    </article>
+  </div>
+</section>
+

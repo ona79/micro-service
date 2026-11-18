@@ -1,0 +1,201 @@
+<div class="page-section">
+  <div class="container">
+    @if (loading()) {
+      <app-ui-skeleton-grid [count]="2" label="Chargement de l'itinéraire du circuit..." />
+    } @else if (error() || !circuit()) {
+      <app-ui-breadcrumb [items]="breadcrumbs()" />
+      <app-ui-error-banner
+        title="Impossible d'afficher ce circuit"
+        [message]="error() || 'Circuit introuvable.'"
+        [showRetry]="true"
+        (retry)="reload()"
+      />
+    } @else {
+      @let cir = circuit()!;
+      <app-ui-breadcrumb [items]="breadcrumbs()" />
+
+      <header class="circuit-header">
+        <div class="circuit-header__badges">
+          <span class="ui-badge ui-badge--ochre">
+            Difficulté : {{ cir.difficulte | difficulteLabel }}
+          </span>
+          <span class="ui-badge tabular-nums">
+            {{ orderedStops().length }} étape{{ orderedStops().length > 1 ? 's' : '' }}
+          </span>
+          <span class="ui-badge ui-badge--neutral tabular-nums">
+            {{ cir.dureeEstimee | durationMinutes }} · {{ cir.distanceTotale || 0 }} km
+          </span>
+        </div>
+        <h1 class="circuit-header__title">{{ cir.nomCircuit }}</h1>
+      </header>
+
+      <div class="circuit-layout">
+        <div class="circuit-main">
+          @if (routeMapPoints().length > 0) {
+            <section class="route-map-section" aria-label="Carte de l'itinéraire">
+              <app-ui-heritage-map
+                [points]="routeMapPoints()"
+                [drawRoute]="true"
+                [height]="340"
+                [ariaLabel]="'Itinéraire cartographique de ' + cir.nomCircuit"
+              />
+              <p class="route-map-caption">
+                Tracé reliant les {{ routeMapPoints().length }} étape(s) géolocalisée(s) du
+                parcours.
+              </p>
+            </section>
+          } @else {
+            <figure class="circuit-fallback-media">
+              <app-ui-patrimoine-image
+                [codePatrimoine]="mainPatrimoine()?.codePatrimoine"
+                [nomPatrimoine]="mainPatrimoine()?.nomPatrimoine ?? cir.nomCircuit"
+              />
+            </figure>
+          }
+
+          <section class="circuit-panel">
+            <h2>Présentation du parcours</h2>
+            <p class="circuit-panel__desc">
+              {{
+                cir.descriptionCircuit ||
+                  'Ce circuit vous emmène à la découverte de plusieurs sites patrimoniaux majeurs.'
+              }}
+            </p>
+
+            <h2>Étapes du circuit dans l'ordre de visite</h2>
+            @if (orderedStops().length === 0) {
+              <p class="circuit-empty-stops">
+                Aucune étape n'est renseignée pour ce circuit.
+              </p>
+            } @else {
+              <ol class="timeline">
+                @for (stop of orderedStops(); track stop.id || stop.ordre) {
+                  <li class="timeline-item">
+                    <div class="timeline-item__marker">{{ stop.ordre }}</div>
+                    <div class="timeline-item__card">
+                      <div class="timeline-item__header">
+                        <h3 class="timeline-item__title">
+                          <a [routerLink]="['/patrimoines', stop.patrimoineId]">
+                            {{
+                              stop.resolvedPatrimoine?.nomPatrimoine ??
+                                'Patrimoine #' + stop.patrimoineId
+                            }}
+                          </a>
+                        </h3>
+                        <span class="ui-badge tabular-nums">
+                          <svg lucideClock [size]="12" aria-hidden="true"></svg>
+                          {{ stop.dureeVisite | durationMinutes }}
+                        </span>
+                      </div>
+
+                      @if (stop.resolvedPatrimoine?.adressePatrimoine) {
+                        <p class="timeline-item__loc">
+                          <svg lucideMapPin [size]="13" aria-hidden="true"></svg>
+                          <span>{{ stop.resolvedPatrimoine!.adressePatrimoine }}</span>
+                        </p>
+                      }
+
+                      @if (stop.resolvedPatrimoine?.descriptionPatrimoine) {
+                        <p class="timeline-item__desc">
+                          {{ stop.resolvedPatrimoine!.descriptionPatrimoine }}
+                        </p>
+                      }
+
+                      <a
+                        [routerLink]="['/patrimoines', stop.patrimoineId]"
+                        class="timeline-item__link"
+                      >
+                        <span>Voir la fiche du patrimoine</span>
+                        <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
+                      </a>
+                    </div>
+                  </li>
+                }
+              </ol>
+            }
+          </section>
+        </div>
+
+        <aside class="booking-sidebar">
+          <p class="booking-sidebar__eyebrow">Tarif par personne</p>
+          <p class="booking-sidebar__price tabular-nums">{{ cir.prix | fcfaPrice }}</p>
+
+          <dl class="booking-facts">
+            <div>
+              <dt>Difficulté</dt>
+              <dd>{{ cir.difficulte | difficulteLabel }}</dd>
+            </div>
+            <div>
+              <dt>Durée totale estimée</dt>
+              <dd class="tabular-nums">{{ cir.dureeEstimee | durationMinutes }}</dd>
+            </div>
+            <div>
+              <dt>Distance totale</dt>
+              <dd class="tabular-nums">{{ cir.distanceTotale || 0 }} km</dd>
+            </div>
+            <div>
+              <dt>Capacité du groupe</dt>
+              <dd class="tabular-nums">{{ cir.placesMax }} places maximum</dd>
+            </div>
+          </dl>
+
+          @if (osmStartUrl(); as url) {
+            <a
+              [href]="url"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="osm-link"
+            >
+              <span>Point de départ sur OpenStreetMap</span>
+              <svg lucideExternalLink [size]="14" aria-hidden="true"></svg>
+            </a>
+          }
+
+          <a
+            routerLink="/reserver"
+            [queryParams]="{ type: 'CIRCUIT', circuitId: cir.id }"
+            class="booking-cta"
+          >
+            <svg lucideTicket [size]="16" aria-hidden="true"></svg>
+            <span>Réserver ce circuit</span>
+          </a>
+        </aside>
+      </div>
+
+      @if (autresCircuits().length > 0) {
+        <section class="related-section">
+          <h2 class="related-section__title">À voir aussi</h2>
+          <div class="related-grid">
+            @for (autre of autresCircuits(); track autre.id) {
+              @let patAutre = getFirstPatrimoine(autre);
+              <article class="related-card">
+                <a [routerLink]="['/circuits', autre.id]" class="related-card__media">
+                  <app-ui-patrimoine-image
+                    [codePatrimoine]="patAutre?.codePatrimoine"
+                    [nomPatrimoine]="patAutre?.nomPatrimoine ?? autre.nomCircuit"
+                  />
+                </a>
+                <div class="related-card__body">
+                  <span class="ui-badge ui-badge--ochre">
+                    {{ autre.difficulte | difficulteLabel }}
+                  </span>
+                  <h3 class="related-card__title">
+                    <a [routerLink]="['/circuits', autre.id]">{{ autre.nomCircuit }}</a>
+                  </h3>
+                  <p class="related-card__meta tabular-nums">
+                    {{ autre.dureeEstimee | durationMinutes }} ·
+                    {{ autre.prix | fcfaPrice }}
+                  </p>
+                  <a [routerLink]="['/circuits', autre.id]" class="related-card__link">
+                    <span>Voir l’itinéraire</span>
+                    <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
+                  </a>
+                </div>
+              </article>
+            }
+          </div>
+        </section>
+      }
+    }
+  </div>
+</div>
