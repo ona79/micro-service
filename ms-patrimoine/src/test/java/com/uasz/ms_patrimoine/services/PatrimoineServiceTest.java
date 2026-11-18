@@ -40,14 +40,14 @@ class PatrimoineServiceTest {
         patrimoineService = new PatrimoineService(patrimoineRepository, patrimoineMapper);
         patrimoine = Patrimoine.builder()
                 .id(1L)
-                .nomPatrimoine("Maison de l'Esclave")
-                .codePatrimoine("PAT-001")
-                .descriptionPatrimoine("Monument historique")
-                .historiquePatrimoine("Construite vers 1776")
-                .adressePatrimoine("Île de Gorée, Dakar")
-                .capacitePatrimoine(150)
-                .latitudePatrimoine(14.6672f)
-                .longitudePatrimoine(-17.399f)
+                .nomPatrimoine("Mémorial du Joola")
+                .codePatrimoine("PAT-ZIG-001")
+                .descriptionPatrimoine("Monument historique et mémorial")
+                .historiquePatrimoine("Inauguré en 2024")
+                .adressePatrimoine("Boucotte, Ziguinchor, Casamance")
+                .capacitePatrimoine(250)
+                .latitudePatrimoine(12.5833f)
+                .longitudePatrimoine(-16.2719f)
                 .build();
     }
 
@@ -65,8 +65,8 @@ class PatrimoineServiceTest {
         PatrimoineDto result = patrimoineService.savePatrimoine(dto);
 
         assertThat(result.getId()).isEqualTo(1L);
-        assertThat(result.getNomPatrimoine()).isEqualTo("Maison de l'Esclave");
-        assertThat(result.getCapacitePatrimoine()).isEqualTo(150);
+        assertThat(result.getNomPatrimoine()).isEqualTo("Mémorial du Joola");
+        assertThat(result.getCapacitePatrimoine()).isEqualTo(250);
     }
 
     @Test
@@ -76,14 +76,14 @@ class PatrimoineServiceTest {
         List<PatrimoineDto> result = patrimoineService.getAllPatrimoines();
 
         assertThat(result).hasSize(1);
-        assertThat(result.getFirst().getCodePatrimoine()).isEqualTo("PAT-001");
+        assertThat(result.getFirst().getCodePatrimoine()).isEqualTo("PAT-ZIG-001");
     }
 
     @Test
     void getByIdPatrimoine_existant() {
         when(patrimoineRepository.findById(1L)).thenReturn(Optional.of(patrimoine));
 
-        assertThat(patrimoineService.getByIdPatrimoine(1L).getLatitudePatrimoine()).isEqualTo(14.6672f);
+        assertThat(patrimoineService.getByIdPatrimoine(1L).getLatitudePatrimoine()).isEqualTo(12.5833f);
     }
 
     @Test

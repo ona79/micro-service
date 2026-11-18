@@ -30,8 +30,8 @@ class CircuitControllerTest {
 
     private static final String JSON_VALIDE = """
             {
-              "nomCircuit": "Circuit Historique Dakar",
-              "descriptionCircuit": "Visite de Gorée et Ouakam",
+              "nomCircuit": "Circuit Historique de Ziguinchor",
+              "descriptionCircuit": "Visite du Mémorial du Joola et de Carabane",
               "difficulte": "FACILE",
               "placesMax": 30,
               "prix": 5000.0,
@@ -49,7 +49,7 @@ class CircuitControllerTest {
     private ICircuitService circuitService;
 
     private CircuitDto sampleDto() {
-        return new CircuitDto(1L, "Circuit Historique Dakar", "Visite de Gorée et Ouakam",
+        return new CircuitDto(1L, "Circuit Historique de Ziguinchor", "Visite du Mémorial du Joola et de Carabane",
                 Difficulte.FACILE, 105, 12.01, 30, 5000.0,
                 List.of(new EtapeDto(1L, 1, 60, 1L, null), new EtapeDto(2L, 2, 45, 2L, null)));
     }

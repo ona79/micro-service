@@ -1,0 +1,116 @@
+/* ==========================================================================
+   DESIGN SYSTEM TOKENS — « Terre, Mangrove & Lin »
+   Source unique de vérité pour les couleurs, typographies, espacements,
+   rayons, ombres, dimensions et transitions.
+   ========================================================================== */
+
+:root {
+  /* --- Surfaces papier & lin --- */
+  --surface-canvas: #faf7f2;
+  --surface-elevated: #ffffff;
+  --surface-sand: #f2ede4;
+  --surface-tinted: #ebe4d8;
+  --surface-forest: #163828;
+  --surface-forest-soft: #204a36;
+
+  /* --- Encres & lisibilité (WCAG AA >= 4.5:1) --- */
+  --ink-primary: #1c1b18;
+  --ink-secondary: #4a463f;
+  --ink-muted: #635d53;
+  --ink-on-dark: #faf7f2;
+  --ink-on-dark-muted: #d5ded8;
+
+  /* --- Identitaire Vert Casamance --- */
+  --brand-primary: #1f5138;
+  --brand-primary-hover: #143826;
+  --brand-medium: #2d6a4f;
+  --brand-soft: #e3efe7;
+  --brand-border: #b8d3c1;
+
+  /* --- Accents Latérite & Ocre --- */
+  --accent-terracotta: #b24c29;
+  --accent-terracotta-hover: #8f3b1e;
+  --accent-terracotta-soft: #f9ece7;
+  --accent-terracotta-border: #e5b8a8;
+
+  --accent-ochre: #8a5a10;
+  --accent-ochre-soft: #fdf4e3;
+  --accent-ochre-border: #e9d19f;
+
+  /* --- Registre sobre « Lieu de mémoire » --- */
+  --memorial-surface: #eef0f2;
+  --memorial-surface-alt: #e3e7eb;
+  --memorial-border: #9aa5b1;
+  --memorial-ink: #2d3748;
+
+  /* --- États sémantiques --- */
+  --status-success-bg: #e4f2e8;
+  --status-success-border: #9cc7ab;
+  --status-success-ink: #14452b;
+
+  --status-error-bg: #fcebe9;
+  --status-error-border: #e8b4ae;
+  --status-error-ink: #921f18;
+
+  --status-warning-bg: #fdf4e3;
+  --status-warning-border: #e4c485;
+  --status-warning-ink: #704809;
+
+  /* --- Bordures --- */
+  --border-subtle: #e4ddd0;
+  --border-strong: #cdc3b2;
+
+  /* --- Typographies --- */
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  --text-xs: 0.78rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.125rem;
+  --text-lg: 1.35rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.25rem;
+  --text-3xl: clamp(2.1rem, 4vw, 3rem);
+
+  /* --- Rayons --- */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 9999px;
+
+  /* --- Ombres --- */
+  --shadow-xs: 0 1px 2px rgba(28, 27, 24, 0.05);
+  --shadow-sm: 0 2px 10px rgba(28, 27, 24, 0.06);
+  --shadow-md: 0 8px 24px rgba(28, 27, 24, 0.08);
+  --shadow-lg: 0 16px 40px rgba(22, 56, 40, 0.12);
+  --shadow-focus: 0 0 0 3px rgba(31, 81, 56, 0.28);
+
+  /* --- Espacements --- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-8: 3rem;
+  --space-10: 4rem;
+  --space-12: 5.5rem;
+
+  /* --- Dimensions & Layout --- */
+  --container-max: 1240px;
+  --header-height: 76px;
+  --sidebar-width: 360px;
+
+  /* --- Transitions & Z-index --- */
+  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-fast: 160ms var(--ease-standard);
+  --transition-base: 240ms var(--ease-standard);
+
+  --z-header: 40;
+  --z-dropdown: 60;
+  --z-modal: 100;
+  --z-toast: 120;
+}
