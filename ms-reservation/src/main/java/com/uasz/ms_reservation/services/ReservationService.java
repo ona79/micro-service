@@ -128,7 +128,7 @@ public class ReservationService implements IReservationService {
 
     private static Map<StatutReservation, Set<StatutReservation>> buildTransitions() {
         EnumMap<StatutReservation, Set<StatutReservation>> map = new EnumMap<>(StatutReservation.class);
-        map.put(StatutReservation.BROUILLON, EnumSet.of(StatutReservation.EN_ATTENTE_PAIEMENT, StatutReservation.ANNULEE));
+        map.put(StatutReservation.BROUILLON, EnumSet.of(StatutReservation.EN_ATTENTE_PAIEMENT, StatutReservation.CONFIRMEE, StatutReservation.ANNULEE));
         map.put(StatutReservation.EN_ATTENTE_PAIEMENT, EnumSet.of(
                 StatutReservation.CONFIRMEE, StatutReservation.EXPIREE, StatutReservation.ANNULEE, StatutReservation.ECHEC));
         map.put(StatutReservation.CONFIRMEE, EnumSet.of(StatutReservation.ANNULEE, StatutReservation.REMBOURSEE));
@@ -176,8 +176,11 @@ public class ReservationService implements IReservationService {
         PrestationValidation contextePrestation = validerEtChargerPrestation(dto, now);
 
         BigDecimal montantTotal = calculerEtValiderMontant(contextePrestation.prixUnitaire(), dto.getNombrePlaces(), dto.getMontantTotal());
-        boolean submitImmediately = dto.isSoumettrePourPaiement();
-        StatutReservation targetStatut = submitImmediately ? StatutReservation.EN_ATTENTE_PAIEMENT : StatutReservation.BROUILLON;
+        boolean isGratuit = montantTotal.compareTo(BigDecimal.ZERO) == 0;
+        boolean submitImmediately = dto.isSoumettrePourPaiement() || isGratuit;
+        StatutReservation targetStatut = isGratuit
+                ? StatutReservation.CONFIRMEE
+                : (submitImmediately ? StatutReservation.EN_ATTENTE_PAIEMENT : StatutReservation.BROUILLON);
 
         if (submitImmediately) {
             Reservation replayedAfterLock = acquireCapacityAndExpireStale(
@@ -199,6 +202,12 @@ public class ReservationService implements IReservationService {
         Reservation entity = buildNewReservationEntity(dto, caller, effectiveUserId, normalizedIdempotencyKey,
                 contextePrestation, montantTotal, targetStatut, now);
         Reservation saved = reservationRepository.save(entity);
+        if (isGratuit) {
+            notifierAsyncNonBloquant(saved,
+                    "Confirmation de réservation " + saved.getReferenceReservation(),
+                    "Bonjour " + saved.getNomClient() + ", votre réservation " + saved.getReferenceReservation()
+                            + " est confirmée pour la prestation gratuite (0 XOF).");
+        }
         return enrichirDto(saved, contextePrestation.circuit(), contextePrestation.evenement(), false);
     }
 
@@ -242,6 +251,22 @@ public class ReservationService implements IReservationService {
 
         reservation.setPrixUnitaire(prestation.prixUnitaire());
         reservation.setMontantTotal(total);
+
+        boolean isGratuit = total.compareTo(BigDecimal.ZERO) == 0;
+        if (isGratuit) {
+            reservation.setDateConfirmation(now);
+            reservation.setReferencePaiement("GRATUIT-" + reservation.getReferenceReservation());
+            reservation.setExpiresAt(null);
+            appliquerTransition(reservation, StatutReservation.CONFIRMEE, caller.userId(), caller.role(), "USER",
+                    reservation.getCorrelationId(), reservation.getReferencePaiement(), "Validation automatique réservation gratuite");
+            Reservation saved = reservationRepository.save(reservation);
+            notifierAsyncNonBloquant(saved,
+                    "Confirmation de réservation " + saved.getReferenceReservation(),
+                    "Bonjour " + saved.getNomClient() + ", votre réservation " + saved.getReferenceReservation()
+                            + " est confirmée pour la prestation gratuite (0 XOF).");
+            return enrichirDto(saved, prestation.circuit(), prestation.evenement(), false);
+        }
+
         reservation.setExpiresAt(now.plusMinutes(Math.max(1, expirationMinutes)));
         appliquerTransition(reservation, StatutReservation.EN_ATTENTE_PAIEMENT, caller.userId(), caller.role(), "USER",
                 reservation.getCorrelationId(), null, "Soumission de la réservation en attente de paiement");
@@ -963,6 +988,8 @@ public class ReservationService implements IReservationService {
                 .circuitId(dto.getTypeReservation() == TypeReservation.CIRCUIT ? ctx.prestationId() : null)
                 .evenementId(dto.getTypeReservation() == TypeReservation.EVENEMENT ? ctx.prestationId() : null)
                 .expiresAt(targetStatut == StatutReservation.EN_ATTENTE_PAIEMENT ? now.plusMinutes(Math.max(1, expirationMinutes)) : null)
+                .referencePaiement(targetStatut == StatutReservation.CONFIRMEE ? "GRATUIT-" + ref : null)
+                .dateConfirmation(targetStatut == StatutReservation.CONFIRMEE ? now : null)
                 .dateCreation(now)
                 .dateModification(now)
                 .correlationId(correlationId)
@@ -991,7 +1018,9 @@ public class ReservationService implements IReservationService {
                 .correlationId(correlationId)
                 .motif(targetStatut == StatutReservation.BROUILLON
                         ? "Création du brouillon de réservation"
-                        : "Création en attente de paiement simulé")
+                        : (targetStatut == StatutReservation.CONFIRMEE
+                                ? "Création et confirmation automatique (offre gratuite)"
+                                : "Création en attente de paiement simulé"))
                 .dateTransition(now)
                 .build());
 

@@ -73,7 +73,7 @@ describe('ProLayoutComponent (Role-Scoped Sidebar Navigation)', () => {
     expect(text).not.toContain('Mon profil guide');
   });
 
-  it('restricts CONSERVATEUR strictly to dashboard, stats, patrimoines and notifications', () => {
+  it('allows CONSERVATEUR to access dashboard, stats, patrimoines, guides and notifications', () => {
     userSig.set(buildUser('CONSERVATEUR'));
     roleLabelSig.set('Conservateur du patrimoine');
     const fixture = TestBed.createComponent(ProLayoutComponent);
@@ -82,6 +82,7 @@ describe('ProLayoutComponent (Role-Scoped Sidebar Navigation)', () => {
     const text = navTexts(fixture);
     expect(text).toContain('Tableau de bord');
     expect(text).toContain('Patrimoines');
+    expect(text).toContain('Guides touristiques');
     expect(text).toContain('Notifications');
     expect(text).not.toContain('Paiements simulés');
     expect(text).not.toContain('Utilisateurs & Audit');

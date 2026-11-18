@@ -173,4 +173,50 @@ describe('ReserverPageComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('RES-P04-0088');
     expect(fixture.nativeElement.textContent).toContain('Régler maintenant (Wave / Orange Money simulé)');
   });
+
+  it('confirms free reservation immediately with CONFIRMEE status without payment CTA', async () => {
+    const fixture = TestBed.createComponent(ReserverPageComponent);
+    fixture.detectChanges();
+    flushInitialLoads();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const comp = fixture.componentInstance as unknown as {
+      form: ReserverPageComponent['form'];
+      onSubmit: () => Promise<void>;
+    };
+    comp.form.patchValue({
+      nomClient: 'Fatou Binetou',
+      emailClient: 'fatou@uasz.sn',
+      nombrePlaces: 1,
+      circuitId: '1',
+    });
+
+    const submitPromise = comp.onSubmit();
+    const postReq = httpMock.expectOne('/api/reservations');
+    postReq.flush({
+      id: 99,
+      referenceReservation: 'RES-FREE-0099',
+      nomClient: 'Fatou Binetou',
+      emailClient: 'fatou@uasz.sn',
+      nombrePlaces: 1,
+      dateReservation: '2026-11-18T12:00:00',
+      typeReservation: 'CIRCUIT',
+      statut: 'CONFIRMEE',
+      montantTotal: 0,
+      circuitId: 1,
+      evenementId: null,
+      circuit: null,
+      evenement: null,
+    });
+
+    await Promise.resolve();
+    httpMock.expectOne('/api/reservations').flush([]);
+    await submitPromise;
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).toContain('RES-FREE-0099');
+    expect(fixture.nativeElement.textContent).toContain('Réservation confirmée (Gratuit)');
+    expect(fixture.nativeElement.textContent).not.toContain('Régler maintenant');
+  });
 });

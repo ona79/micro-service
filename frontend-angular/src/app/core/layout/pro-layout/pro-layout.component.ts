@@ -128,7 +128,7 @@ export const PRO_NAV_ITEMS: readonly ProNavItem[] = [
     label: 'Guides touristiques',
     to: '/pro/guides',
     icon: 'guides',
-    roles: ['ADMINISTRATEUR', 'GESTIONNAIRE_SITE'],
+    roles: ['ADMINISTRATEUR', 'GESTIONNAIRE_SITE', 'CONSERVATEUR'],
     section: 'Guides & Voyageurs',
   },
   {

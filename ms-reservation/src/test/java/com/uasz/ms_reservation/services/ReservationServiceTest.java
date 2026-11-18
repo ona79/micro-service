@@ -338,4 +338,76 @@ class ReservationServiceTest {
         assertThatThrownBy(() -> reservationService.soumettreReservation(44L))
                 .isInstanceOf(ConflictException.class);
     }
+
+    @Test
+    void saveReservation_evenementGratuit_confirmeDirectementSansPaiement() {
+        LocalDateTime debut = LocalDateTime.now(Reservation.CASAMANCE_ZONE).plusDays(3);
+        EvenementDto evGratuit = new EvenementDto(3L, "Cérémonie du Bukut", "Cérémonie initiatique", "FESTIVAL",
+                debut, debut.plusDays(1), "Oussouye", 50, 0.0, 1L);
+        evGratuit.setOuvertReservation(true);
+        evGratuit.setStatutEvenement("PUBLIE");
+        when(evenementClient.getEvenementById(3L)).thenReturn(evGratuit);
+        when(reservationRepository.save(any(Reservation.class))).thenAnswer(inv -> {
+            Reservation r = inv.getArgument(0);
+            if (r.getId() == null) r.setId(99L);
+            return r;
+        });
+
+        ReservationDto dto = ReservationDto.builder()
+                .nomClient("Awa Sané")
+                .emailClient("awa.sane@uasz.sn")
+                .telephoneClient("770001122")
+                .nombrePlaces(2)
+                .typeReservation(TypeReservation.EVENEMENT)
+                .evenementId(3L)
+                .datePrestation(debut.toLocalDate())
+                .soumettrePourPaiement(true)
+                .build();
+
+        ReservationDto saved = reservationService.saveReservation(dto, "idem-free-1");
+
+        assertThat(saved.getId()).isEqualTo(99L);
+        assertThat(saved.getStatut()).isEqualTo(StatutReservation.CONFIRMEE);
+        assertThat(saved.getMontantTotal()).isEqualByComparingTo("0.00");
+        assertThat(saved.getReferencePaiement()).startsWith("GRATUIT-");
+        assertThat(saved.getDateConfirmation()).isNotNull();
+        assertThat(saved.getExpiresAt()).isNull();
+    }
+
+    @Test
+    void soumettreReservation_offreGratuite_confirmeDirectementSansPaiement() {
+        LocalDateTime debut = LocalDateTime.now(Reservation.CASAMANCE_ZONE).plusDays(4);
+        EvenementDto evGratuit = new EvenementDto(4L, "Visite guidée libre", "Visite découverte", "VISITE_SPECIALISEE",
+                debut, debut.plusDays(1), "Ziguinchor", 30, 0.0, 2L);
+        evGratuit.setOuvertReservation(true);
+        evGratuit.setStatutEvenement("PUBLIE");
+        when(evenementClient.getEvenementById(4L)).thenReturn(evGratuit);
+
+        Reservation draft = Reservation.builder()
+                .id(101L)
+                .referenceReservation("RES-20261118-FREE")
+                .utilisateurId(2L)
+                .nomClient("Ousmane Diallo")
+                .emailClient("ousmane@uasz.sn")
+                .nombrePlaces(1)
+                .datePrestation(debut.toLocalDate())
+                .typeReservation(TypeReservation.EVENEMENT)
+                .evenementId(4L)
+                .statut(StatutReservation.BROUILLON)
+                .prixUnitaire(BigDecimal.ZERO)
+                .montantTotal(BigDecimal.ZERO)
+                .devise("XOF")
+                .build();
+        when(reservationRepository.findByIdForUpdate(101L)).thenReturn(Optional.of(draft));
+        when(reservationRepository.save(any(Reservation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ReservationDto confirmed = reservationService.soumettreReservation(101L);
+
+        assertThat(confirmed.getId()).isEqualTo(101L);
+        assertThat(confirmed.getStatut()).isEqualTo(StatutReservation.CONFIRMEE);
+        assertThat(confirmed.getMontantTotal()).isEqualByComparingTo("0.00");
+        assertThat(confirmed.getReferencePaiement()).isEqualTo("GRATUIT-RES-20261118-FREE");
+        assertThat(confirmed.getDateConfirmation()).isNotNull();
+        assertThat(confirmed.getExpiresAt()).isNull();
+    }
 }

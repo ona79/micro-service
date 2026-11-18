@@ -431,6 +431,14 @@ class GatewayAuthorizationFilterTest {
         assertThat(resManagerValidate.getStatus()).isEqualTo(200);
         assertThat(chainManager.getRequest()).isNotNull();
 
+        MockHttpServletRequest conservateurValidate = new MockHttpServletRequest("POST", "/api/guides/1/valider");
+        attachCookieAuthWithCsrf(conservateurValidate, 4L, "fatou@uasz.sn", "CONSERVATEUR", 300);
+        MockHttpServletResponse resConsValidate = new MockHttpServletResponse();
+        MockFilterChain chainCons = new MockFilterChain();
+        filter.doFilter(conservateurValidate, resConsValidate, chainCons);
+        assertThat(resConsValidate.getStatus()).isEqualTo(200);
+        assertThat(chainCons.getRequest()).isNotNull();
+
         // 2. Modération strictement protégée contre TOURISTE, GUIDE, CONSERVATEUR ; ouverte à GESTIONNAIRE_SITE
         MockHttpServletRequest conservateurModeration = new MockHttpServletRequest("POST", "/api/moderation/avis/1/decision");
         attachCookieAuthWithCsrf(conservateurModeration, 4L, "fatou@uasz.sn", "CONSERVATEUR", 300);
