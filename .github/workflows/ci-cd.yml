@@ -72,13 +72,42 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      - name: Cache du wrapper Maven (~/.m2/wrapper)
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/wrapper
+          key: ${{ runner.os }}-mvnw-${{ hashFiles('*/.mvn/wrapper/maven-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-mvnw-
+
       - name: Compilation, MapStruct et Tests unitaires (${{ matrix.service }})
         working-directory: ./${{ matrix.service }}
         run: |
           export SECURITY_SESSION_SECRET="$(openssl rand -base64 48 | tr -d '\n')"
           export SECURITY_INTERSERVICE_SECRET="$(openssl rand -base64 48 | tr -d '\n')"
           chmod +x ./mvnw
-          ./mvnw -B clean test package
+          wrapper_ready=0
+          SELECTED_REPO=""
+          for attempt in 1 2; do
+            for repo in "" "https://maven-central.storage-download.googleapis.com/maven2" "https://repo1.maven.org/maven2"; do
+              if MVNW_REPOURL="$repo" ./mvnw --version >/dev/null 2>&1; then
+                SELECTED_REPO="$repo"
+                wrapper_ready=1
+                break 2
+              fi
+              sleep 2
+            done
+            sleep 3
+          done
+          if [ "$wrapper_ready" -eq 1 ]; then
+            MVNW_REPOURL="$SELECTED_REPO" ./mvnw -B clean test package
+          elif command -v mvn >/dev/null 2>&1; then
+            echo "::warning::Echec du telechargement de maven-wrapper; repli sur mvn systeme"
+            mvn -B clean test package
+          else
+            echo "::error::Impossible d'initialiser ./mvnw et aucun binaire mvn systeme disponible"
+            exit 1
+          fi
 
       - name: Conservation de l'artefact JAR (${{ matrix.service }})
         uses: actions/upload-artifact@v4
