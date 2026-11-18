@@ -411,7 +411,8 @@ jobs:
             mkdir -p "$s/target"
             cp artifacts/jar-$s/*.jar "$s/target/"
           done
-          docker compose config -q
+          cp .env.example .env
+          docker compose --env-file .env config -q
           docker build -t fatylamine/patrimoines:v1 ./ms-patrimoine
           docker build -t fatylamine/circuits:v1 ./ms-circuit
           docker build -t fatylamine/evenements:v1 ./ms-evenement
