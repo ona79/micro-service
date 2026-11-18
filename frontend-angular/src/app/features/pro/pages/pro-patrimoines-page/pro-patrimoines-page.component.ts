@@ -192,9 +192,24 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
             <input id="pat-tarif" type="number" min="0" step="100" class="bo-input" formControlName="tarifEntree" />
           </div>
 
-          <div class="bo-field">
-            <label for="pat-horaires" class="bo-label">Horaires d'ouverture</label>
-            <input id="pat-horaires" type="text" class="bo-input" formControlName="horairesOuverture" placeholder="09h00 - 18h00" />
+          <div class="bo-field bo-form-span2">
+            <label for="pat-horaires" class="bo-label">Horaires d'ouverture structurés</label>
+            <input id="pat-horaires" type="text" class="bo-input" formControlName="horairesOuverture" placeholder="Mardi au Dimanche : 09h00 - 18h00 (Fermé Lundi)" />
+            <div class="schedule-presets" style="display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.3rem;">
+              <span class="bo-cell-sub" style="align-self: center; margin-right: 0.2rem;">Modèles :</span>
+              <button type="button" class="bo-btn bo-btn--sm" (click)="setPresetHoraire('Mardi au Dimanche : 09h00 - 18h00 (Fermé Lundi)')">
+                Mar-Dim 9h-18h
+              </button>
+              <button type="button" class="bo-btn bo-btn--sm" (click)="setPresetHoraire('Tous les jours : 08h30 - 19h00')">
+                7j/7 8h30-19h
+              </button>
+              <button type="button" class="bo-btn bo-btn--sm" (click)="setPresetHoraire('Lundi au Samedi : 09h00 - 17h30 (Fermé Dimanche)')">
+                Lun-Sam 9h-17h30
+              </button>
+              <button type="button" class="bo-btn bo-btn--sm" (click)="setPresetHoraire('Sur réservation uniquement (09h00 - 16h00)')">
+                Sur réservation
+              </button>
+            </div>
           </div>
 
           <div class="bo-field">
@@ -530,6 +545,10 @@ export class ProPatrimoinesPageComponent implements OnInit {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  setPresetHoraire(preset: string): void {
+    this.form.controls.horairesOuverture.setValue(preset);
   }
 
   openCreateForm(): void {
