@@ -28,7 +28,7 @@ import {
   reservationStatusBadgeClass,
 } from '../../../../core/models/reservation.model';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
-import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skeleton-grid/ui-skeleton-grid.component';
+import { UiLoadingStateComponent } from '../../../../shared/components/ui-loading-state/ui-loading-state.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
 import { ReservationApiService } from '../../../reservations/data-access/reservation-api.service';
@@ -50,7 +50,7 @@ import { PaiementStore } from '../../data-access/paiement.store';
     LucideShieldCheck,
     LucideTicket,
     LucideUsers,
-    UiSkeletonGridComponent,
+    UiLoadingStateComponent,
     UiErrorBannerComponent,
     DateFrPipe,
     FcfaPricePipe,

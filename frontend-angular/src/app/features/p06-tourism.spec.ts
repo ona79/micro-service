@@ -94,7 +94,7 @@ describe('P06 PatrimoinesListPage Server Filtering & Draft Isolation', () => {
     const text = fixture.nativeElement.textContent as string;
     expect(text).toContain('Île de Carabane');
     expect(text).not.toContain('Site confidentiel non publié');
-    expect(text).toContain('Page 1 sur 2');
+    expect(text).toContain('Page 1 / 2');
   });
 });
 

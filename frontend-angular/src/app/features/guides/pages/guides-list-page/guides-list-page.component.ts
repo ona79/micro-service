@@ -16,9 +16,10 @@ import { extractErrorMessage } from '../../../../core/models/api-error.model';
 import { AvisResume } from '../../../../core/models/avis.model';
 import { GuideProfil } from '../../../../core/models/guide.model';
 import { SeoService } from '../../../../core/services/seo.service';
+import { UiCardComponent } from '../../../../shared/components/ui-card/ui-card.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
-import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skeleton-grid/ui-skeleton-grid.component';
+import { UiLoadingStateComponent } from '../../../../shared/components/ui-loading-state/ui-loading-state.component';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
 import { AvisApiService } from '../../../avis/data-access/avis-api.service';
 import { GuideApiService } from '../../data-access/guide-api.service';
@@ -34,7 +35,8 @@ import { GuideApiService } from '../../data-access/guide-api.service';
     FcfaPricePipe,
     UiEmptyStateComponent,
     UiErrorBannerComponent,
-    UiSkeletonGridComponent,
+    UiLoadingStateComponent,
+    UiCardComponent,
     LucideCompass,
     LucideSearch,
     LucideMapPin,
@@ -107,7 +109,7 @@ import { GuideApiService } from '../../data-access/guide-api.service';
         @if (error()) {
           <app-ui-error-banner [message]="error()!" (retry)="loadGuides()" />
         } @else if (loading()) {
-          <app-ui-skeleton-grid [count]="4" />
+          <app-ui-loading-state label="Recherche des guides locaux certifiés en cours..." />
         } @else if (guides().length === 0) {
           <app-ui-empty-state
             title="Aucun guide public correspondant"
@@ -116,7 +118,7 @@ import { GuideApiService } from '../../data-access/guide-api.service';
         } @else {
           <div class="guides-grid">
             @for (guide of guides(); track guide.id) {
-              <article class="guide-card">
+              <app-ui-card [interactive]="true" class="guide-card">
                 <div class="guide-card__top">
                   <div class="guide-avatar" aria-hidden="true">
                     {{ guide.prenom.slice(0, 1) }}{{ guide.nom.slice(0, 1) }}
@@ -176,7 +178,7 @@ import { GuideApiService } from '../../data-access/guide-api.service';
                     <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
                   </a>
                 </div>
-              </article>
+              </app-ui-card>
             }
           </div>
         }

@@ -1,7 +1,7 @@
 <div class="page-section">
   <div class="container">
     @if (loading()) {
-      <app-ui-skeleton-grid [count]="2" label="Chargement des détails de l'événement..." />
+      <app-ui-loading-state label="Chargement des détails de l'événement en cours..." />
     } @else if (error() || !evenement()) {
       <app-ui-breadcrumb [items]="breadcrumbs()" />
       <app-ui-error-banner
@@ -245,7 +245,7 @@
           <div class="related-grid">
             @for (autre of autresEvenements(); track autre.id) {
               @let patAutre = resolvePat(autre);
-              <article class="related-card">
+              <app-ui-card [interactive]="true" class="related-card">
                 <a [routerLink]="['/evenements', autre.id]" class="related-card__media">
                   <app-ui-patrimoine-image
                     [codePatrimoine]="patAutre?.codePatrimoine"
@@ -270,7 +270,7 @@
                     <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
                   </a>
                 </div>
-              </article>
+              </app-ui-card>
             }
           </div>
         </section>

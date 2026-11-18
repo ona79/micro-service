@@ -1,7 +1,7 @@
 <div class="page-section">
   <div class="container">
     @if (loading()) {
-      <app-ui-skeleton-grid [count]="2" label="Chargement de l'itinéraire du circuit..." />
+      <app-ui-loading-state label="Chargement de l'itinéraire du circuit de Casamance..." />
     } @else if (error() || !circuit()) {
       <app-ui-breadcrumb [items]="breadcrumbs()" />
       <app-ui-error-banner
@@ -236,34 +236,38 @@
 
       @if (autresCircuits().length > 0) {
         <section class="related-section">
-          <h2 class="related-section__title">À voir aussi</h2>
+          <h2 class="related-section__title">Autres itinéraires en Casamance</h2>
           <div class="related-grid">
             @for (autre of autresCircuits(); track autre.id) {
               @let patAutre = getFirstPatrimoine(autre);
-              <article class="related-card">
-                <a [routerLink]="['/circuits', autre.id]" class="related-card__media">
-                  <app-ui-patrimoine-image
-                    [codePatrimoine]="patAutre?.codePatrimoine"
-                    [nomPatrimoine]="patAutre?.nomPatrimoine ?? autre.nomCircuit"
-                  />
-                </a>
-                <div class="related-card__body">
+              <app-ui-card [interactive]="true" class="related-card">
+                <div slot="media">
+                  <a [routerLink]="['/circuits', autre.id]" class="related-card__media">
+                    <app-ui-patrimoine-image
+                      [codePatrimoine]="patAutre?.codePatrimoine"
+                      [nomPatrimoine]="patAutre?.nomPatrimoine ?? autre.nomCircuit"
+                    />
+                  </a>
+                </div>
+                <div slot="header">
                   <span class="ui-badge ui-badge--ochre">
                     {{ autre.difficulte | difficulteLabel }}
                   </span>
-                  <h3 class="related-card__title">
-                    <a [routerLink]="['/circuits', autre.id]">{{ autre.nomCircuit }}</a>
-                  </h3>
-                  <p class="related-card__meta tabular-nums">
-                    {{ autre.dureeEstimee | durationMinutes }} ·
-                    {{ autre.prix | fcfaPrice }}
-                  </p>
+                </div>
+                <h3 class="related-card__title">
+                  <a [routerLink]="['/circuits', autre.id]">{{ autre.nomCircuit }}</a>
+                </h3>
+                <p class="related-card__meta tabular-nums">
+                  {{ autre.dureeEstimee | durationMinutes }} ·
+                  {{ autre.prix | fcfaPrice }}
+                </p>
+                <div slot="footer">
                   <a [routerLink]="['/circuits', autre.id]" class="related-card__link">
                     <span>Voir l’itinéraire</span>
                     <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
                   </a>
                 </div>
-              </article>
+              </app-ui-card>
             }
           </div>
         </section>

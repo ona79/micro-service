@@ -24,13 +24,14 @@ import {
   BreadcrumbItem,
   UiBreadcrumbComponent,
 } from '../../../../shared/components/ui-breadcrumb/ui-breadcrumb.component';
+import { UiCardComponent } from '../../../../shared/components/ui-card/ui-card.component';
+import { UiLoadingStateComponent } from '../../../../shared/components/ui-loading-state/ui-loading-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
 import {
   HeritageMapPoint,
   UiHeritageMapComponent,
 } from '../../../../shared/components/ui-heritage-map/ui-heritage-map.component';
 import { UiPatrimoineImageComponent } from '../../../../shared/components/ui-patrimoine-image/ui-patrimoine-image.component';
-import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skeleton-grid/ui-skeleton-grid.component';
 import { UiAvisSectionComponent } from '../../../../shared/components/ui-avis-section/ui-avis-section.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { EvenementTypePipe } from '../../../../shared/pipes/evenement-type.pipe';
@@ -58,9 +59,10 @@ import { EvenementStore } from '../../data-access/evenement.store';
     LucideMapPin,
     LucideTicket,
     UiBreadcrumbComponent,
+    UiCardComponent,
+    UiLoadingStateComponent,
     UiPatrimoineImageComponent,
     UiHeritageMapComponent,
-    UiSkeletonGridComponent,
     UiErrorBannerComponent,
     UiAvisSectionComponent,
     DateFrPipe,

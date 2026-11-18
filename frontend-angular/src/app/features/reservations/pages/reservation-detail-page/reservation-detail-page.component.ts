@@ -44,7 +44,7 @@ import {
 } from '../../../../shared/components/ui-breadcrumb/ui-breadcrumb.component';
 import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confirm-dialog/ui-confirm-dialog.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
-import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skeleton-grid/ui-skeleton-grid.component';
+import { UiLoadingStateComponent } from '../../../../shared/components/ui-loading-state/ui-loading-state.component';
 import { UiTicketViewComponent } from '../../../../shared/components/ui-ticket-view/ui-ticket-view.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
@@ -61,7 +61,7 @@ import { ReservationApiService } from '../../data-access/reservation-api.service
     DateFrPipe,
     FcfaPricePipe,
     UiBreadcrumbComponent,
-    UiSkeletonGridComponent,
+    UiLoadingStateComponent,
     UiErrorBannerComponent,
     UiTicketViewComponent,
     LucideArrowLeft,
@@ -81,7 +81,7 @@ import { ReservationApiService } from '../../data-access/reservation-api.service
         <app-ui-breadcrumb [items]="breadcrumbs()" />
 
         @if (loading()) {
-          <app-ui-skeleton-grid [count]="2" variant="rows" label="Chargement de la réservation..." />
+          <app-ui-loading-state label="Chargement des détails de la réservation..." />
         } @else if (error() || !reservation()) {
           <app-ui-error-banner
             title="Réservation inaccessible"

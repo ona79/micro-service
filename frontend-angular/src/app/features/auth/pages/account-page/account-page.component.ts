@@ -38,17 +38,20 @@ import {
   reservationStatusBadgeClass,
 } from '../../../../core/models/reservation.model';
 import { SeoService } from '../../../../core/services/seo.service';
+import { Billet } from '../../../../core/models/billet.model';
 import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confirm-dialog/ui-confirm-dialog.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import { UiTicketViewComponent } from '../../../../shared/components/ui-ticket-view/ui-ticket-view.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
 import { AvisApiService } from '../../../avis/data-access/avis-api.service';
 import { NotificationApiService } from '../../../notifications/data-access/notification-api.service';
 import { NotificationStore } from '../../../notifications/data-access/notification.store';
 import { PaiementStore } from '../../../paiements/data-access/paiement.store';
+import { BilletApiService } from '../../../reservations/data-access/billet-api.service';
 import { ReservationStore } from '../../../reservations/data-access/reservation.store';
 
-type AccountTab = 'reservations' | 'paiements' | 'avis' | 'notifications' | 'profil';
+type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notifications' | 'profil';
 
 @Component({
   selector: 'app-account-page',
@@ -61,6 +64,7 @@ type AccountTab = 'reservations' | 'paiements' | 'avis' | 'notifications' | 'pro
     FcfaPricePipe,
     DateFrPipe,
     UiErrorBannerComponent,
+    UiTicketViewComponent,
     LucideShieldCheck,
     LucideTicket,
     LucideCreditCard,
@@ -118,6 +122,37 @@ type AccountTab = 'reservations' | 'paiements' | 'avis' | 'notifications' | 'pro
             </div>
           </header>
 
+          @if (nextVisit(); as next) {
+            <div class="next-visit-card" style="display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;background:linear-gradient(135deg, var(--surface-forest) 0%, var(--brand-primary) 100%);color:#ffffff;border-radius:var(--radius-xl);margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+              <div>
+                <span class="ui-badge ui-badge--ochre" style="margin-bottom:0.4rem;display:inline-block;">Prochaine visite confirmée</span>
+                <h2 style="margin:0 0 0.35rem;font-size:var(--text-xl);color:#ffffff;">
+                  {{ next.circuit?.nomCircuit || next.evenement?.nomEvenement || ('Réservation #' + next.id) }}
+                </h2>
+                <p style="margin:0;font-size:var(--text-sm);opacity:0.9;">
+                  @if (next.datePrestation) {
+                    {{ next.datePrestation | dateFr: 'date' }}
+                    @if (next.creneauPrestation) { · {{ next.creneauPrestation }} }
+                  } @else {
+                    {{ next.dateReservation | dateFr }}
+                  }
+                  · {{ next.nombrePlaces }} place(s) réservée(s)
+                </p>
+              </div>
+              <div style="display:flex;gap:0.75rem;align-items:center;">
+                <button
+                  type="button"
+                  class="ui-btn ui-btn--primary"
+                  style="background:#ffffff;color:var(--brand-primary);font-weight:700;border:none;cursor:pointer;"
+                  (click)="openBilletsTab()"
+                >
+                  <svg lucideTicket [size]="16" aria-hidden="true"></svg>
+                  <span>Afficher mes billets QR</span>
+                </button>
+              </div>
+            </div>
+          }
+
           <nav class="account-tabs" role="tablist" aria-label="Sections de mon espace personnel">
             <button
               type="button"
@@ -129,6 +164,17 @@ type AccountTab = 'reservations' | 'paiements' | 'avis' | 'notifications' | 'pro
             >
               <svg lucideTicket [size]="15" aria-hidden="true"></svg>
               <span>Réservations ({{ myReservations().length }})</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              class="account-tab"
+              [class.account-tab--active]="activeTab() === 'billets'"
+              [attr.aria-selected]="activeTab() === 'billets'"
+              (click)="openBilletsTab()"
+            >
+              <svg lucideTicket [size]="15" aria-hidden="true"></svg>
+              <span>Mes billets QR ({{ confirmedReservations().length }})</span>
             </button>
             <button
               type="button"
@@ -294,6 +340,48 @@ type AccountTab = 'reservations' | 'paiements' | 'avis' | 'notifications' | 'pro
                           </button>
                         }
                       </div>
+                    </article>
+                  }
+                </div>
+              }
+            </section>
+          }
+
+          @if (activeTab() === 'billets') {
+            <section class="account-card" aria-labelledby="billets-heading">
+              <div class="account-card__header">
+                <h2 id="billets-heading" class="account-card__title">
+                  <svg lucideTicket [size]="18" aria-hidden="true"></svg>
+                  <span>Mes billets électroniques &amp; QR Codes ({{ confirmedReservations().length }})</span>
+                </h2>
+              </div>
+
+              @if (confirmedReservations().length === 0) {
+                <div class="empty-box">
+                  <p>Aucun billet électronique actif. Vos billets et QR codes d'accès apparaîtront ici dès confirmation de votre réservation.</p>
+                  <a routerLink="/reserver" class="btn-primary">Réserver un circuit ou événement</a>
+                </div>
+              } @else {
+                <div class="tickets-container" style="display:grid;gap:1.5rem;">
+                  @for (res of confirmedReservations(); track res.id) {
+                    <article class="ticket-group-card" style="border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:1.25rem;background:var(--surface-elevated);">
+                      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+                        <div>
+                          <span class="ui-badge ui-badge--success">Accès confirmé</span>
+                          <span class="ui-badge ui-badge--neutral" style="margin-left:0.5rem;">Réf: {{ res.referenceReservation || ('#' + res.id) }}</span>
+                          <h3 style="margin:0.35rem 0 0;font-size:var(--text-lg);color:var(--ink-primary);">
+                            {{ res.circuit?.nomCircuit || res.evenement?.nomEvenement || ('Réservation #' + res.id) }}
+                          </h3>
+                        </div>
+                        <a [routerLink]="['/reservations', res.id]" class="btn-detail-sm">
+                          Consulter la fiche complète
+                        </a>
+                      </div>
+
+                      <app-ui-ticket-view
+                        [billets]="ticketsByReservation()[res.id] || []"
+                        [loading]="loadingBillets()"
+                      />
                     </article>
                   }
                 </div>
@@ -891,6 +979,7 @@ export class AccountPageComponent implements OnInit {
   private readonly notifApi = inject(NotificationApiService);
   private readonly notifStore = inject(NotificationStore);
   private readonly avisApi = inject(AvisApiService);
+  private readonly billetApi = inject(BilletApiService);
 
   protected readonly activeTab = signal<AccountTab>('reservations');
   protected readonly paiements = computed(() => this.paiementStore.items());
@@ -900,6 +989,8 @@ export class AccountPageComponent implements OnInit {
   protected readonly savingProfile = signal<boolean>(false);
   protected readonly profileError = signal<string | null>(null);
   protected readonly selectedModes = signal<Record<number, ModePaiement>>({});
+  protected readonly ticketsByReservation = signal<Record<number, Billet[]>>({});
+  protected readonly loadingBillets = signal(false);
 
   protected readonly formatReservationStatusLabel = formatReservationStatusLabel;
   protected readonly reservationStatusBadgeClass = reservationStatusBadgeClass;
@@ -929,6 +1020,15 @@ export class AccountPageComponent implements OnInit {
     );
   });
 
+  protected readonly confirmedReservations = computed(() => {
+    return this.myReservations().filter((r) => r.statut === 'CONFIRMEE');
+  });
+
+  protected readonly nextVisit = computed<Reservation | null>(() => {
+    const list = this.confirmedReservations();
+    return list.length > 0 ? list[0] : null;
+  });
+
   protected readonly myNotifications = computed(() => this.notifications());
 
   ngOnInit(): void {
@@ -940,6 +1040,36 @@ export class AccountPageComponent implements OnInit {
     this.syncProfileForm();
     void this.reservationStore.reload();
     void this.loadTransactionsAndNotifications();
+  }
+
+  protected openBilletsTab(): void {
+    this.activeTab.set('billets');
+    void this.loadConfirmedTickets();
+  }
+
+  protected async loadConfirmedTickets(): Promise<void> {
+    const list = this.confirmedReservations();
+    if (list.length === 0) return;
+    this.loadingBillets.set(true);
+    try {
+      const results = await Promise.all(
+        list.map(async (r) => {
+          try {
+            const b = await firstValueFrom(this.billetApi.getBillets(r.id));
+            return { id: r.id, billets: b };
+          } catch {
+            return { id: r.id, billets: [] as Billet[] };
+          }
+        })
+      );
+      const map: Record<number, Billet[]> = {};
+      for (const res of results) {
+        map[res.id] = res.billets;
+      }
+      this.ticketsByReservation.set(map);
+    } finally {
+      this.loadingBillets.set(false);
+    }
   }
 
   protected openProfileTab(): void {

@@ -28,7 +28,7 @@ import {
   UiBreadcrumbComponent,
 } from '../../../../shared/components/ui-breadcrumb/ui-breadcrumb.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
-import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skeleton-grid/ui-skeleton-grid.component';
+import { UiLoadingStateComponent } from '../../../../shared/components/ui-loading-state/ui-loading-state.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { DurationMinutesPipe } from '../../../../shared/pipes/duration-minutes.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
@@ -46,7 +46,7 @@ import { GuideApiService } from '../../data-access/guide-api.service';
     FcfaPricePipe,
     UiBreadcrumbComponent,
     UiErrorBannerComponent,
-    UiSkeletonGridComponent,
+    UiLoadingStateComponent,
     UiAvisSectionComponent,
     LucideAward,
     LucideGlobe,
@@ -61,7 +61,7 @@ import { GuideApiService } from '../../data-access/guide-api.service';
         <app-ui-breadcrumb [items]="breadcrumbs()" />
 
         @if (loading()) {
-          <app-ui-skeleton-grid [count]="2" />
+          <app-ui-loading-state label="Chargement du profil du guide agréé..." />
         } @else if (error()) {
           <app-ui-error-banner [message]="error()!" />
         } @else if (guide(); as g) {
@@ -379,7 +379,14 @@ export class GuideDetailPageComponent {
     this.loading.set(true);
     this.error.set(null);
     try {
-      const g = await firstValueFrom(this.guideApi.getById(id));
+      let g: GuideProfil;
+      try {
+        g = await firstValueFrom(this.guideApi.getById(id));
+      } catch {
+        // Tolérance d'identifiant : si l'identifiant fourni est un utilisateurId plutôt qu'un guideId
+        g = await firstValueFrom(this.guideApi.getByUtilisateurId(id));
+      }
+
       if (g.statutValidation !== 'VALIDE' || !g.visibilitePublique) {
         this.guide.set(null);
         this.error.set('Ce profil de guide n’est pas accessible publiquement.');
