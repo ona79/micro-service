@@ -114,20 +114,14 @@ class GuideServiceTest {
     }
 
     @Test
-    void validerProfil_parTouristeOuConservateurOuGuideSoiMeme_estRefusee403() {
+    void validerProfil_parTouristeOuGuideSoiMeme_estRefusee403() {
         // 1. Touriste refuse
         SecurityUserContextHolder.setContext(new SecurityUserContext(
                 2L, "TOURISTE", "moussa@uasz.sn", false, null));
         assertThatThrownBy(() -> guideService.validerProfil(1L, "Ok"))
                 .isInstanceOf(ForbiddenException.class);
 
-        // 2. Conservateur refuse
-        SecurityUserContextHolder.setContext(new SecurityUserContext(
-                4L, "CONSERVATEUR", "fatou@uasz.sn", false, null));
-        assertThatThrownBy(() -> guideService.validerProfil(1L, "Ok"))
-                .isInstanceOf(ForbiddenException.class);
-
-        // 3. Auto-validation même avec permission GUIDE:VALIDER refusée
+        // 2. Auto-validation même avec permission GUIDE:VALIDER refusée
         GuideProfil profil = GuideProfil.builder()
                 .id(1L)
                 .utilisateur(guideUser)
@@ -302,5 +296,30 @@ class GuideServiceTest {
         assertThat(stats.getEnAttenteValidation()).isEqualTo(1L);
         assertThat(stats.getParZone()).containsEntry("Ziguinchor", 1L).containsEntry("Cap Skirring", 1L);
         assertThat(stats.getParLangue()).containsEntry("Français", 1L).containsEntry("Diola", 1L);
+    }
+
+    @Test
+    void validerProfil_autoriseConservateurAvecPermissionGuideValider() {
+        GuideProfil enAttente = GuideProfil.builder()
+                .id(20L)
+                .utilisateur(guideUser)
+                .presentationCourte("Guide culturel")
+                .biographie("Spécialiste de Basse-Casamance.")
+                .languesParlees("Français, Mandingue")
+                .specialites("Patrimoine royal")
+                .zonesIntervention("Oussouye")
+                .statutValidation(StatutValidationGuide.EN_ATTENTE_VALIDATION)
+                .build();
+        when(guideProfilRepository.findById(20L)).thenReturn(Optional.of(enAttente));
+        when(guideProfilRepository.save(any(GuideProfil.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(outboxRepository.save(any(UtilisateurNotificationOutbox.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        SecurityUserContextHolder.setContext(new SecurityUserContext(
+                4L, "CONSERVATEUR", "fatou.conservateur@patrimoine-casamance.sn", false, null));
+
+        GuideProfilDto validated = guideService.validerProfil(20L, "Validation formelle par le conservateur");
+
+        assertThat(validated.getStatutValidation()).isEqualTo(StatutValidationGuide.VALIDE);
+        assertThat(validated.isVisibilitePublique()).isTrue();
     }
 }

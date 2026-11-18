@@ -358,7 +358,8 @@ public class AuthSessionManager {
                     "PATRIMOINE:LIRE", "PATRIMOINE:CREER", "PATRIMOINE:MODIFIER", "PATRIMOINE:SUPPRIMER",
                     "PATRIMOINE:PUBLIER", "PATRIMOINE:ARCHIVER",
                     "CIRCUIT:LIRE", "EVENEMENT:LIRE", "UTILISATEUR:LIRE_PROFIL",
-                    "GUIDE:LIRE", "AVIS:LIRE", "AVIS:SIGNALER",
+                    "GUIDE:LIRE", "GUIDE:VALIDER", "GUIDE:SUSPENDRE",
+                    "AVIS:LIRE", "AVIS:SIGNALER",
                     "NOTIFICATION:LIRE_PROPRE", "NOTIFICATION:GERER_PROPRE"
             );
             case GESTIONNAIRE_SITE -> List.of(

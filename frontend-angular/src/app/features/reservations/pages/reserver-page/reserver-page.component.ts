@@ -362,7 +362,11 @@ export class ReserverPageComponent implements OnInit {
         soumettrePourPaiement: true,
       });
 
-      if (created.statut === 'EN_ATTENTE_PAIEMENT') {
+      if (created.statut === 'CONFIRMEE') {
+        toast.success(
+          `Réservation ${created.referenceReservation || '#' + created.id} confirmée avec succès (offre gratuite).`
+        );
+      } else if (created.statut === 'EN_ATTENTE_PAIEMENT') {
         toast.success(
           `Réservation ${created.referenceReservation || '#' + created.id} créée : passez au paiement simulé.`
         );

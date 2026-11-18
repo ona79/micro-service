@@ -51,6 +51,12 @@
                     <span>Régler maintenant (Wave / Orange Money simulé)</span>
                     <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
                   </a>
+                } @else if (created.statut === 'CONFIRMEE') {
+                  <span class="ui-badge ui-badge--success">Réservation confirmée (Gratuit)</span>
+                  <a [routerLink]="['/reservations', created.id]" class="ui-btn ui-btn--primary">
+                    <span>Voir ma réservation confirmée</span>
+                    <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
+                  </a>
                 } @else {
                   <span class="ui-badge ui-badge--neutral">{{ formatReservationStatusLabel(created.statut) }}</span>
                 }

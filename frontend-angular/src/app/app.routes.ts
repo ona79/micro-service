@@ -287,7 +287,7 @@ export const routes: Routes = [
       {
         path: 'guides',
         title: 'Validation des Guides',
-        canActivate: [roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE']), permissionGuard(['GUIDE:VALIDER'])],
+        canActivate: [roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE', 'CONSERVATEUR']), permissionGuard(['GUIDE:VALIDER'])],
         loadComponent: () =>
           import('./features/pro/pages/pro-guides-admin-page/pro-guides-admin-page.component').then(
             (m) => m.ProGuidesAdminPageComponent
