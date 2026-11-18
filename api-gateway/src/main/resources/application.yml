@@ -27,10 +27,22 @@ spring:
               uri: ${RESERVATION_URL:lb://ms-reservation}
               predicates:
                 - Path=/api/reservations/**
+            - id: ms-avis
+              uri: ${RESERVATION_URL:lb://ms-reservation}
+              predicates:
+                - Path=/api/avis/**
+            - id: ms-moderation
+              uri: ${RESERVATION_URL:lb://ms-reservation}
+              predicates:
+                - Path=/api/moderation/**
             - id: ms-utilisateur
               uri: ${UTILISATEUR_URL:lb://ms-utilisateur}
               predicates:
                 - Path=/api/utilisateurs/**
+            - id: ms-guides
+              uri: ${UTILISATEUR_URL:lb://ms-utilisateur}
+              predicates:
+                - Path=/api/guides/**
             - id: ms-paiement
               uri: ${PAIEMENT_URL:lb://ms-paiement}
               predicates:

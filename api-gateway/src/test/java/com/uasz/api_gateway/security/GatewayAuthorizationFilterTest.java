@@ -401,4 +401,60 @@ class GatewayAuthorizationFilterTest {
         filter.doFilter(reqPutPay, resPutPay, new MockFilterChain());
         assertThat(resPutPay.getStatus()).isEqualTo(403);
     }
+
+    @Test
+    @DisplayName("P05 : RBAC Guides, Avis, Modération et Ouverture Notifications Propriétaires")
+    void shouldEnforceP05RbacForGuidesReviewsModerationAndNotifications() throws Exception {
+        // 1. Guides publics ouverts anonymement, /mon-profil réservé à GUIDE, /valider réservé à GESTIONNAIRE/ADMIN
+        MockHttpServletRequest pubGuides = new MockHttpServletRequest("GET", "/api/guides");
+        MockHttpServletResponse resPubGuides = new MockHttpServletResponse();
+        filter.doFilter(pubGuides, resPubGuides, new MockFilterChain());
+        assertThat(resPubGuides.getStatus()).isEqualTo(200);
+
+        MockHttpServletRequest touristeMonProfil = new MockHttpServletRequest("GET", "/api/guides/mon-profil");
+        touristeMonProfil.addHeader("Authorization", "Bearer " + generateToken(2L, "moussa@uasz.sn", "TOURISTE", 300));
+        MockHttpServletResponse resTouristeMonProfil = new MockHttpServletResponse();
+        filter.doFilter(touristeMonProfil, resTouristeMonProfil, new MockFilterChain());
+        assertThat(resTouristeMonProfil.getStatus()).isEqualTo(403);
+
+        MockHttpServletRequest guideSelfValidate = new MockHttpServletRequest("POST", "/api/guides/1/valider");
+        attachCookieAuthWithCsrf(guideSelfValidate, 5L, "guide@uasz.sn", "GUIDE", 300);
+        MockHttpServletResponse resGuideSelfValidate = new MockHttpServletResponse();
+        filter.doFilter(guideSelfValidate, resGuideSelfValidate, new MockFilterChain());
+        assertThat(resGuideSelfValidate.getStatus()).isEqualTo(403);
+
+        MockHttpServletRequest managerValidate = new MockHttpServletRequest("POST", "/api/guides/1/valider");
+        attachCookieAuthWithCsrf(managerValidate, 3L, "awa@uasz.sn", "GESTIONNAIRE_SITE", 300);
+        MockHttpServletResponse resManagerValidate = new MockHttpServletResponse();
+        MockFilterChain chainManager = new MockFilterChain();
+        filter.doFilter(managerValidate, resManagerValidate, chainManager);
+        assertThat(resManagerValidate.getStatus()).isEqualTo(200);
+        assertThat(chainManager.getRequest()).isNotNull();
+
+        // 2. Modération strictement protégée contre TOURISTE, GUIDE, CONSERVATEUR ; ouverte à GESTIONNAIRE_SITE
+        MockHttpServletRequest conservateurModeration = new MockHttpServletRequest("POST", "/api/moderation/avis/1/decision");
+        attachCookieAuthWithCsrf(conservateurModeration, 4L, "fatou@uasz.sn", "CONSERVATEUR", 300);
+        MockHttpServletResponse resConsMod = new MockHttpServletResponse();
+        filter.doFilter(conservateurModeration, resConsMod, new MockFilterChain());
+        assertThat(resConsMod.getStatus()).isEqualTo(403);
+
+        MockHttpServletRequest adminModeration = new MockHttpServletRequest("GET", "/api/moderation/signalements");
+        adminModeration.addHeader("Authorization", "Bearer " + generateToken(1L, "admin@uasz.sn", "ADMINISTRATEUR", 300));
+        MockHttpServletResponse resAdminMod = new MockHttpServletResponse();
+        filter.doFilter(adminModeration, resAdminMod, new MockFilterChain());
+        assertThat(resAdminMod.getStatus()).isEqualTo(200);
+
+        // 3. Notifications : /mes-notifications et /{id}/lire ouverts aux utilisateurs authentifiés, console globale bloquée aux non-admins
+        MockHttpServletRequest touristeMesNotifs = new MockHttpServletRequest("GET", "/api/notifications/mes-notifications");
+        touristeMesNotifs.addHeader("Authorization", "Bearer " + generateToken(2L, "moussa@uasz.sn", "TOURISTE", 300));
+        MockHttpServletResponse resTouristeMesNotifs = new MockHttpServletResponse();
+        filter.doFilter(touristeMesNotifs, resTouristeMesNotifs, new MockFilterChain());
+        assertThat(resTouristeMesNotifs.getStatus()).isEqualTo(200);
+
+        MockHttpServletRequest touristeAllNotifs = new MockHttpServletRequest("GET", "/api/notifications");
+        touristeAllNotifs.addHeader("Authorization", "Bearer " + generateToken(2L, "moussa@uasz.sn", "TOURISTE", 300));
+        MockHttpServletResponse resTouristeAllNotifs = new MockHttpServletResponse();
+        filter.doFilter(touristeAllNotifs, resTouristeAllNotifs, new MockFilterChain());
+        assertThat(resTouristeAllNotifs.getStatus()).isEqualTo(403);
+    }
 }
