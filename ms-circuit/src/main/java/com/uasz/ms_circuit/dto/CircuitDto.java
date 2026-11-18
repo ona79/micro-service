@@ -71,6 +71,10 @@ public class CircuitDto {
     @PositiveOrZero(message = "Le prix doit être positif ou nul")
     private double prix;
 
+    @Size(max = 10, message = "La devise ne doit pas dépasser 10 caractères")
+    @Builder.Default
+    private String devise = "XOF";
+
     @Builder.Default
     private StatutCircuit statutCircuit = StatutCircuit.PUBLIE;
 
@@ -120,6 +124,7 @@ public class CircuitDto {
         this.zoneGeographique = "BASSE_CASAMANCE";
         this.modeCalculDistance = "ESTIMATION_ORTHODROMIQUE_INDICATIVE";
         this.statutCircuit = StatutCircuit.PUBLIE;
+        this.devise = "XOF";
         this.donneeDemonstration = true;
     }
 }

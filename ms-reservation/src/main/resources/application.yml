@@ -32,6 +32,13 @@ circuit:
   url: ${CIRCUIT_URL:http://localhost:3002}
 evenement:
   url: ${EVENEMENT_URL:http://localhost:3003}
+paiement:
+  url: ${PAIEMENT_URL:http://localhost:3006}
+notification:
+  url: ${NOTIFICATION_URL:http://localhost:3007}
+
+reservation:
+  expiration-minutes: ${RESERVATION_EXPIRATION_MINUTES:30}
 
 eureka:
   client:

@@ -57,6 +57,7 @@ public class UtilisateurDataInitializer implements CommandLineRunner {
                     Permission.builder().code("PAIEMENT:INITIER").module("PAIEMENT").description("Initiation d'un paiement de réservation").build(),
                     Permission.builder().code("PAIEMENT:LIRE_PROPRE").module("PAIEMENT").description("Consultation de ses propres reçus de paiement").build(),
                     Permission.builder().code("PAIEMENT:LIRE_TOUT").module("PAIEMENT").description("Consultation globale des transactions financières").build(),
+                    Permission.builder().code("PAIEMENT:REMBOURSER").module("PAIEMENT").description("Simulation d'un remboursement intégral par un administrateur").build(),
                     Permission.builder().code("UTILISATEUR:LIRE_PROFIL").module("UTILISATEUR").description("Consultation et modification de son propre profil").build(),
                     Permission.builder().code("UTILISATEUR:LIRE_TOUT").module("UTILISATEUR").description("Consultation de l'annuaire des utilisateurs").build(),
                     Permission.builder().code("UTILISATEUR:CREER_STAFF").module("UTILISATEUR").description("Création de comptes personnel et administrateur").build(),

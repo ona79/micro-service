@@ -6,6 +6,7 @@ import { apiPrefixInterceptor } from '../core/interceptors/api-prefix.intercepto
 import { httpErrorInterceptor } from '../core/interceptors/http-error.interceptor';
 import { CircuitApiService } from './circuits/data-access/circuit-api.service';
 import { EvenementApiService } from './evenements/data-access/evenement-api.service';
+import { PaiementApiService } from './paiements/data-access/paiement-api.service';
 import { PatrimoineApiService } from './patrimoines/data-access/patrimoine-api.service';
 import { ReservationApiService } from './reservations/data-access/reservation-api.service';
 
@@ -15,6 +16,7 @@ describe('Domain API Services', () => {
   let circuitApi: CircuitApiService;
   let evenementApi: EvenementApiService;
   let reservationApi: ReservationApiService;
+  let paiementApi: PaiementApiService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -28,6 +30,7 @@ describe('Domain API Services', () => {
     circuitApi = TestBed.inject(CircuitApiService);
     evenementApi = TestBed.inject(EvenementApiService);
     reservationApi = TestBed.inject(ReservationApiService);
+    paiementApi = TestBed.inject(PaiementApiService);
   });
 
   afterEach(() => {
@@ -119,5 +122,47 @@ describe('Domain API Services', () => {
     expect(putReq.request.method).toBe('PUT');
     putReq.flush({ id: 7, statut: 'ANNULEE' });
     expect((await cancelPromise).statut).toBe('ANNULEE');
+  });
+
+  it('calls P04 reservation disponibilite, evenement reservables, and simulated mobile-money payment endpoints', async () => {
+    const evResPromise = firstValueFrom(evenementApi.getReservables());
+    httpMock.expectOne('/api/evenements/reservables').flush([]);
+    expect(await evResPromise).toEqual([]);
+
+    const dispoPromise = firstValueFrom(reservationApi.getDisponibilite('CIRCUIT', 1, '2026-12-01'));
+    const dispoReq = httpMock.expectOne(
+      (req) =>
+        req.url === '/api/reservations/disponibilite' &&
+        req.params.get('type') === 'CIRCUIT' &&
+        req.params.get('prestationId') === '1'
+    );
+    dispoReq.flush({ reservable: true, placesDisponibles: 18 });
+    expect((await dispoPromise).reservable).toBe(true);
+
+    const initPayPromise = firstValueFrom(
+      paiementApi.initier({ reservationId: 7, modePaiement: 'ORANGE_MONEY' }, 'idem-om-7')
+    );
+    const payPost = httpMock.expectOne('/api/paiements');
+    expect(payPost.request.headers.get('Idempotency-Key')).toBe('idem-om-7');
+    payPost.flush({ id: 12, statut: 'EN_COURS', estSimule: true });
+    expect((await initPayPromise).id).toBe(12);
+
+    const simPromise = firstValueFrom(
+      paiementApi.simuler(12, { decision: 'ACCEPTER', motif: 'OK' })
+    );
+    const simReq = httpMock.expectOne('/api/paiements/12/simuler');
+    expect(simReq.request.method).toBe('POST');
+    simReq.flush({ id: 12, statut: 'ACCEPTE', estSimule: true });
+    expect((await simPromise).statut).toBe('ACCEPTE');
+
+    const refundPromise = firstValueFrom(paiementApi.rembourser(12, 'Annulation admin'));
+    const refundReq = httpMock.expectOne('/api/paiements/12/rembourser');
+    expect(refundReq.request.method).toBe('POST');
+    refundReq.flush({ id: 12, statut: 'REMBOURSE' });
+    expect((await refundPromise).statut).toBe('REMBOURSE');
+
+    const replayPromise = firstValueFrom(paiementApi.rejouerOutbox());
+    httpMock.expectOne('/api/paiements/outbox/rejouer').flush({ evenementsSynchronises: 1 });
+    expect((await replayPromise).evenementsSynchronises).toBe(1);
   });
 });

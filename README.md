@@ -7,7 +7,7 @@
 - **Front-End (`frontend-angular/`)** : Angular 22 (Standalone Components, Signals, Router, Nginx SPA fallback + reverse proxy `/api`).
 - **Back-End (9 services)** : Java 21, Spring Boot `4.1.0`, Spring Cloud `2025.1.4`, Spring Data JPA, PostgreSQL 16 (Database-per-Service), Flyway 10, MapStruct `1.6.3`, Lombok, OpenFeign, RestTemplate, WebClient, Netflix Eureka, Spring Cloud Gateway.
 - **Base de données** : PostgreSQL 16 (7 bases indépendantes : `patrimoine_db`, `circuit_db`, `evenement_db`, `reservation_db`, `utilisateur_db`, `paiement_db`, `notification_db`).
-- **Déploiement** : Docker Compose avec isolation réseau (seuls Nginx `:80` et API Gateway `:8090` sont exposés).
+- **Déploiement** : Docker Compose avec isolation réseau (`edge-net`, `app-net`, `data-net`, seul `frontend-angular` Nginx `:80` est exposé sur l'hôte en configuration Compose standard).
 
 ---
 
@@ -36,10 +36,10 @@ docker compose up -d --build
 ```
 
 Services démarrés :
-- `postgres` (port interne `5432` - 7 bases initialisées)
-- `discovery-server` (Eureka sur `http://localhost:8761`)
-- `ms-patrimoine`, `ms-circuit`, `ms-evenement`, `ms-reservation`, `ms-utilisateur`, `ms-notification`, `ms-paiement` (réseau privé `internal-net`)
-- `api-gateway` (port `8090` sur `http://localhost:8090`)
+- `postgres` (port interne `5432` - 7 bases initialisées sur `data-net`)
+- `discovery-server` (Eureka interne sur `app-net:8761`)
+- `ms-patrimoine`, `ms-circuit`, `ms-evenement`, `ms-reservation`, `ms-utilisateur`, `ms-notification`, `ms-paiement` (réseaux internes `app-net` / `data-net`)
+- `api-gateway` (interne `app-net:8090`, desservi par `/api` via Nginx)
 - `frontend-angular` (port `80` sur `http://localhost`)
 
 ---
@@ -92,18 +92,20 @@ Chaque microservice dispose de profils Spring Boot indépendants de Config Serve
 ## 🧪 EXÉCUTION DES TESTS AUTOMATISÉS
 
 ```bash
-# 1. Tests unitaires et d'intégration de l'ensemble des 9 services backend Java (140 tests exécutés en mode H2/MockMvc)
+# 1. Tests unitaires, sécurité et Testcontainers PG16 des 9 services backend Java
 ./verify-integration.sh
 
-# 2. Tests d'intégration et de concurrence sur PostgreSQL 16 réel avec migrations Flyway V1..V4 (8 tests sur les 7 bases isolées)
+# 2. Tests d'intégration sur le conteneur PostgreSQL 16 multi-bases (Flyway V1..V4/V6 + Hibernate validate sur les 7 bases)
 eval "$(docker inspect postgres --format '{{range .Config.Env}}{{println "export " .}}{{end}}' | grep '_PASSWORD=')" && ./verify-postgres.sh
 
-# 3. Build de production et tests Vitest du frontend Angular 22 (34 tests sur 13 suites)
+# 3. Build de production et tests Vitest du frontend Angular 22 (39 tests sur 15 suites)
 npm --prefix frontend-angular run build
-npm --prefix frontend-angular run test -- --watch=false
+npm --prefix frontend-angular exec ng test -- --no-watch
 ```
 
 Documentation technique détaillée :
+- **Réservation & Paiement Simulé P04** : [docs/P04_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md](docs/P04_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md)
+- **Spécification OpenAPI P04** : [docs/api/OPENAPI_P04_RESERVATION_PAIEMENT.yaml](docs/api/OPENAPI_P04_RESERVATION_PAIEMENT.yaml)
 - **Cœur métier touristique P03** : [docs/P03_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md](docs/P03_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md)
 - **Spécification OpenAPI P03** : [docs/api/OPENAPI_P03_CATALOGUE.yaml](docs/api/OPENAPI_P03_CATALOGUE.yaml)
 - **Sécurité Zero-Trust & RBAC P02** : [docs/security/P02_RAPPORT_FINAL.md](docs/security/P02_RAPPORT_FINAL.md)

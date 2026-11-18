@@ -32,6 +32,8 @@ export interface Evenement {
   contactOrganisateur?: string | null;
   capaciteMax: number;
   prix: number;
+  devise?: string;
+  ouvertReservation?: boolean;
   conditionsAcces?: string | null;
   imageUrl?: string | null;
   supportCommunication?: string | null;

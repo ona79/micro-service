@@ -280,10 +280,15 @@ public class MicroserviceSecurityFilter extends OncePerRequestFilter {
     }
 
     private boolean isCallerServiceAuthorized(String callerService, String method, String normalizedPath) {
-        // Seul ms-paiement peut interroger une réservation en lecture (GET /api/reservations/{id})
-        return "ms-paiement".equals(callerService)
-                && "GET".equalsIgnoreCase(method)
-                && normalizedPath.startsWith("/api/reservations/");
+        if (!"ms-paiement".equals(callerService)) {
+            return false;
+        }
+        if ("GET".equalsIgnoreCase(method) && normalizedPath.startsWith("/api/reservations/")) {
+            return true;
+        }
+        return "POST".equalsIgnoreCase(method)
+                && normalizedPath.startsWith("/api/reservations/internal/")
+                && normalizedPath.endsWith("/evenement-paiement");
     }
 
     private Long parseUserId(String userIdStr) {

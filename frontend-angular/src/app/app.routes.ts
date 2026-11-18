@@ -66,10 +66,29 @@ export const routes: Routes = [
       {
         path: 'reserver',
         title: 'Réserver une Visite',
+        canActivate: [authGuard],
         loadComponent: () =>
           import(
             './features/reservations/pages/reserver-page/reserver-page.component'
           ).then((m) => m.ReserverPageComponent),
+      },
+      {
+        path: 'paiements',
+        title: 'Paiement simulé Wave / Orange Money',
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import(
+            './features/paiements/pages/paiement-checkout-page/paiement-checkout-page.component'
+          ).then((m) => m.PaiementCheckoutPageComponent),
+      },
+      {
+        path: 'paiements/:reservationId',
+        title: 'Paiement simulé Wave / Orange Money',
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import(
+            './features/paiements/pages/paiement-checkout-page/paiement-checkout-page.component'
+          ).then((m) => m.PaiementCheckoutPageComponent),
       },
       {
         path: 'connexion',

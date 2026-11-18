@@ -83,6 +83,10 @@ public class Circuit {
 
     private double prix;
 
+    @Column(name = "devise", nullable = false, length = 10)
+    @Builder.Default
+    private String devise = "XOF";
+
     @Enumerated(EnumType.STRING)
     @Column(name = "statut_circuit", nullable = false, length = 30)
     @Builder.Default
@@ -140,6 +144,9 @@ public class Circuit {
         }
         if (this.statutCircuit == null) {
             this.statutCircuit = StatutCircuit.PUBLIE;
+        }
+        if (this.devise == null || this.devise.isBlank()) {
+            this.devise = "XOF";
         }
         if (this.dateCreation == null) {
             this.dateCreation = now;

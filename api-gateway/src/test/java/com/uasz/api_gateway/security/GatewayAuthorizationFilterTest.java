@@ -354,4 +354,51 @@ class GatewayAuthorizationFilterTest {
         assertThat(res.getStatus()).isEqualTo(429);
         assertThat(res.getContentAsString()).contains("Trop de tentatives de connexion");
     }
+
+    @Test
+    @DisplayName("P04 : Disponibilité publique en GET, endpoints internes bloqués 403, remboursement réservé à ADMINISTRATEUR")
+    void shouldEnforceP04ReservationAndPaiementRbac() throws Exception {
+        // 1. GET /api/reservations/disponibilite est autorisé anonymement
+        MockHttpServletRequest reqDispo = new MockHttpServletRequest("GET", "/api/reservations/disponibilite");
+        MockHttpServletResponse resDispo = new MockHttpServletResponse();
+        MockFilterChain chainDispo = new MockFilterChain();
+        filter.doFilter(reqDispo, resDispo, chainDispo);
+        assertThat(resDispo.getStatus()).isEqualTo(200);
+        assertThat(chainDispo.getRequest()).isNotNull();
+
+        // 2. Les routes internes /internal/** sont bloquées 403 même pour un ADMINISTRATEUR
+        MockHttpServletRequest reqInternalResa = new MockHttpServletRequest("POST", "/api/reservations/internal/1/evenement-paiement");
+        attachCookieAuthWithCsrf(reqInternalResa, 1L, "admin@uasz.sn", "ADMINISTRATEUR", 300);
+        MockHttpServletResponse resInternalResa = new MockHttpServletResponse();
+        filter.doFilter(reqInternalResa, resInternalResa, new MockFilterChain());
+        assertThat(resInternalResa.getStatus()).isEqualTo(403);
+
+        MockHttpServletRequest reqInternalPay = new MockHttpServletRequest("GET", "/api/paiements/internal/reservation/1");
+        attachCookieAuthWithCsrf(reqInternalPay, 1L, "admin@uasz.sn", "ADMINISTRATEUR", 300);
+        MockHttpServletResponse resInternalPay = new MockHttpServletResponse();
+        filter.doFilter(reqInternalPay, resInternalPay, new MockFilterChain());
+        assertThat(resInternalPay.getStatus()).isEqualTo(403);
+
+        // 3. Remboursement simulé : TOURISTE -> 403, ADMINISTRATEUR -> 200
+        MockHttpServletRequest reqRefundTouriste = new MockHttpServletRequest("POST", "/api/paiements/10/rembourser");
+        attachCookieAuthWithCsrf(reqRefundTouriste, 2L, "touriste@uasz.sn", "TOURISTE", 300);
+        MockHttpServletResponse resRefundTouriste = new MockHttpServletResponse();
+        filter.doFilter(reqRefundTouriste, resRefundTouriste, new MockFilterChain());
+        assertThat(resRefundTouriste.getStatus()).isEqualTo(403);
+
+        MockHttpServletRequest reqRefundAdmin = new MockHttpServletRequest("POST", "/api/paiements/10/rembourser");
+        attachCookieAuthWithCsrf(reqRefundAdmin, 1L, "admin@uasz.sn", "ADMINISTRATEUR", 300);
+        MockHttpServletResponse resRefundAdmin = new MockHttpServletResponse();
+        MockFilterChain chainRefundAdmin = new MockFilterChain();
+        filter.doFilter(reqRefundAdmin, resRefundAdmin, chainRefundAdmin);
+        assertThat(resRefundAdmin.getStatus()).isEqualTo(200);
+        assertThat(chainRefundAdmin.getRequest()).isNotNull();
+
+        // 4. PUT / DELETE sur /api/paiements interdit -> 403
+        MockHttpServletRequest reqPutPay = new MockHttpServletRequest("PUT", "/api/paiements/10");
+        attachCookieAuthWithCsrf(reqPutPay, 1L, "admin@uasz.sn", "ADMINISTRATEUR", 300);
+        MockHttpServletResponse resPutPay = new MockHttpServletResponse();
+        filter.doFilter(reqPutPay, resPutPay, new MockFilterChain());
+        assertThat(resPutPay.getStatus()).isEqualTo(403);
+    }
 }

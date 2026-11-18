@@ -63,6 +63,13 @@ public class EvenementDto {
     @PositiveOrZero(message = "Le prix doit être positif ou nul")
     private double prix;
 
+    @Size(max = 10, message = "La devise ne doit pas dépasser 10 caractères")
+    @Builder.Default
+    private String devise = "XOF";
+
+    @Builder.Default
+    private boolean ouvertReservation = false;
+
     @Size(max = 1000, message = "Les conditions d'accès ne doivent pas dépasser 1000 caractères")
     private String conditionsAcces;
 
@@ -124,6 +131,8 @@ public class EvenementDto {
         this.patrimoine = patrimoine;
         this.zoneGeographique = "BASSE_CASAMANCE";
         this.statutEvenement = StatutEvenement.PUBLIE;
+        this.devise = "XOF";
+        this.ouvertReservation = false;
         this.fuseauHoraire = "Africa/Dakar";
         this.donneeDemonstration = true;
     }

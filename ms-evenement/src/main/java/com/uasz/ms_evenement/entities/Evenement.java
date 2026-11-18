@@ -67,6 +67,14 @@ public class Evenement {
 
     private double prix;
 
+    @Column(name = "devise", nullable = false, length = 10)
+    @Builder.Default
+    private String devise = "XOF";
+
+    @Column(name = "ouvert_reservation", nullable = false)
+    @Builder.Default
+    private boolean ouvertReservation = false;
+
     @Column(name = "conditions_acces", length = 1000)
     private String conditionsAcces;
 
@@ -124,6 +132,9 @@ public class Evenement {
         }
         if (this.fuseauHoraire == null || this.fuseauHoraire.isBlank()) {
             this.fuseauHoraire = "Africa/Dakar";
+        }
+        if (this.devise == null || this.devise.isBlank()) {
+            this.devise = "XOF";
         }
         if (this.dateCreation == null) {
             this.dateCreation = now;

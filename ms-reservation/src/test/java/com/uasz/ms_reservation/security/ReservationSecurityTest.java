@@ -3,6 +3,10 @@ package com.uasz.ms_reservation.security;
 import com.uasz.ms_reservation.TestEphemeralSecretsPostProcessor;
 import com.uasz.ms_reservation.clients.CircuitClient;
 import com.uasz.ms_reservation.clients.EvenementClient;
+import com.uasz.ms_reservation.clients.NotificationClient;
+import com.uasz.ms_reservation.clients.PaiementClient;
+import com.uasz.ms_reservation.dto.CircuitDto;
+import com.uasz.ms_reservation.dto.EvenementPaiementNotificationRequest;
 import com.uasz.ms_reservation.dto.ReservationDto;
 import com.uasz.ms_reservation.entities.Reservation;
 import com.uasz.ms_reservation.entities.StatutReservation;
@@ -10,7 +14,10 @@ import com.uasz.ms_reservation.entities.TypeReservation;
 import com.uasz.ms_reservation.exceptions.ForbiddenException;
 import com.uasz.ms_reservation.exceptions.UnauthorizedException;
 import com.uasz.ms_reservation.mappers.ReservationMapper;
+import com.uasz.ms_reservation.repositories.DisponibilitePrestationRepository;
+import com.uasz.ms_reservation.repositories.ReservationEvenementRecuRepository;
 import com.uasz.ms_reservation.repositories.ReservationRepository;
+import com.uasz.ms_reservation.services.DisponibiliteLockService;
 import com.uasz.ms_reservation.services.ReservationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,9 +33,11 @@ import org.springframework.mock.web.MockHttpServletResponse;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -44,12 +53,20 @@ class ReservationSecurityTest {
 
     @Mock
     private ReservationRepository reservationRepository;
-
+    @Mock
+    private DisponibilitePrestationRepository disponibiliteRepository;
+    @Mock
+    private ReservationEvenementRecuRepository evenementRecuRepository;
+    @Mock
+    private DisponibiliteLockService disponibiliteLockService;
     @Mock
     private CircuitClient circuitClient;
-
     @Mock
     private EvenementClient evenementClient;
+    @Mock
+    private PaiementClient paiementClient;
+    @Mock
+    private NotificationClient notificationClient;
 
     private final ReservationMapper reservationMapper = Mappers.getMapper(ReservationMapper.class);
     private ReservationService reservationService;
@@ -59,7 +76,10 @@ class ReservationSecurityTest {
     void setUp() {
         gatewaySecret = TestEphemeralSecretsPostProcessor.generateRandomSecret();
         interserviceSecret = TestEphemeralSecretsPostProcessor.generateRandomSecret();
-        reservationService = new ReservationService(reservationRepository, reservationMapper, circuitClient, evenementClient);
+        reservationService = new ReservationService(
+                reservationRepository, disponibiliteRepository, evenementRecuRepository,
+                disponibiliteLockService, reservationMapper, circuitClient, evenementClient,
+                paiementClient, notificationClient);
         securityFilter = new MicroserviceSecurityFilter(gatewaySecret, interserviceSecret);
     }
 
@@ -86,18 +106,19 @@ class ReservationSecurityTest {
     void bola_utilisateurBNePeutPasAccederALaReservationDUtilisateurA() {
         Reservation reservationA = Reservation.builder()
                 .id(10L)
-                .utilisateurId(2L) // Appartient à Utilisateur A (ID=2)
+                .referenceReservation("RES-A-10")
+                .utilisateurId(2L)
                 .nomClient("Utilisateur A")
                 .emailClient("user.a@uasz.sn")
                 .nombrePlaces(2)
                 .typeReservation(TypeReservation.CIRCUIT)
                 .statut(StatutReservation.CONFIRMEE)
-                .montantTotal(10000.0)
+                .montantTotal(new BigDecimal("10000.00"))
                 .build();
 
         when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservationA));
+        when(reservationRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(reservationA));
 
-        // Utilisateur B connecté (ID=4)
         SecurityUserContextHolder.setContext(new SecurityUserContext(4L, "TOURISTE", "user.b@uasz.sn", false, null));
 
         assertThatThrownBy(() -> reservationService.getByIdReservation(10L))
@@ -118,17 +139,18 @@ class ReservationSecurityTest {
     void bola_reservationHistoriqueSansUtilisateurId_estRefuseeFailClosed() {
         Reservation orphanReservation = Reservation.builder()
                 .id(77L)
-                .utilisateurId(null) // Réservation historique sans utilisateur associé
+                .referenceReservation("RES-ORPH-77")
+                .utilisateurId(null)
                 .nomClient("Client Historique")
                 .emailClient("user.a@uasz.sn")
                 .nombrePlaces(1)
                 .typeReservation(TypeReservation.CIRCUIT)
-                .statut(StatutReservation.CONFIRMEE)
+                .statut(StatutReservation.EN_ATTENTE_PAIEMENT)
                 .build();
 
         when(reservationRepository.findById(77L)).thenReturn(Optional.of(orphanReservation));
+        when(reservationRepository.findByIdForUpdate(77L)).thenReturn(Optional.of(orphanReservation));
 
-        // Même si l'email correspond, l'absence de utilisateurId bloque l'accès pour un TOURISTE
         SecurityUserContextHolder.setContext(new SecurityUserContext(2L, "TOURISTE", "user.a@uasz.sn", false, null));
 
         assertThatThrownBy(() -> reservationService.getByIdReservation(77L))
@@ -141,10 +163,11 @@ class ReservationSecurityTest {
     }
 
     @Test
-    @DisplayName("Section 5 : Appel de service non autorisé ou sans propriétaire valide -> rejet 403")
-    void bola_appelServiceNonAutoriseOuContournementPropriete_estRefuse403() {
+    @DisplayName("Section 5 : Appel de service non autorisé ou falsification statut/propriété -> rejet 403")
+    void bola_appelServiceNonAutoriseOuFalsificationStatut_estRefuse403() {
         Reservation reservationA = Reservation.builder()
                 .id(10L)
+                .referenceReservation("RES-A-10")
                 .utilisateurId(2L)
                 .nomClient("Utilisateur A")
                 .emailClient("user.a@uasz.sn")
@@ -152,39 +175,64 @@ class ReservationSecurityTest {
                 .statut(StatutReservation.CONFIRMEE)
                 .build();
 
-        // 1. Appel de service non autorisé (ms-circuit tente d'accéder aux réservations)
         SecurityUserContextHolder.setContext(new SecurityUserContext(2L, "TOURISTE", "user.a@uasz.sn", true, "ms-circuit"));
         assertThatThrownBy(() -> reservationService.getByIdReservation(10L))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("ms-circuit");
 
-        // 2. Appel de ms-paiement mais pour le compte de Utilisateur B (ID=4) sur la réservation de A (ID=2)
         when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservationA));
         SecurityUserContextHolder.setContext(new SecurityUserContext(4L, "TOURISTE", "user.b@uasz.sn", true, "ms-paiement"));
         assertThatThrownBy(() -> reservationService.getByIdReservation(10L))
                 .isInstanceOf(ForbiddenException.class)
                 .hasMessageContaining("autre utilisateur");
+
+        // ms-paiement authentifié pour le propriétaire même sans permission RESERVATION:LIRE_PROPRE (ou en tâche SYSTEM) est autorisé
+        SecurityUserContextHolder.setContext(new SecurityUserContext(
+                2L, "TOURISTE", List.of("PAIEMENT:INITIER"), "user.a@uasz.sn", true, "ms-paiement"));
+        assertThat(reservationService.getByIdReservation(10L).getId()).isEqualTo(10L);
+        SecurityUserContextHolder.setContext(new SecurityUserContext(
+                null, "SYSTEM", List.of(), "", true, "ms-paiement"));
+        assertThat(reservationService.getByIdReservation(10L).getId()).isEqualTo(10L);
+
+        // Un touriste ne peut jamais forcer statut=CONFIRMEE ou appeler l'endpoint interne événement-paiement
+        SecurityUserContextHolder.setContext(new SecurityUserContext(2L, "TOURISTE", "user.a@uasz.sn", false, null));
+        ReservationDto forged = ReservationDto.builder()
+                .nomClient("A").emailClient("user.a@uasz.sn").nombrePlaces(1)
+                .typeReservation(TypeReservation.CIRCUIT).circuitId(1L)
+                .statut(StatutReservation.CONFIRMEE).build();
+        assertThatThrownBy(() -> reservationService.saveReservation(forged))
+                .isInstanceOf(ForbiddenException.class);
+
+        assertThatThrownBy(() -> reservationService.traiterEvenementPaiement(10L,
+                EvenementPaiementNotificationRequest.builder()
+                        .eventId("e1").paiementId(1L).referenceTransaction("TX").typeEvenement("PAIEMENT_ACCEPTE")
+                        .montant(BigDecimal.TEN).build()))
+                .isInstanceOf(ForbiddenException.class);
     }
 
     @Test
-    @DisplayName("Section 6 : Vérification des permissions des 5 rôles sur ms-reservation")
+    @DisplayName("Section 6 : Vérification des permissions des 5 rôles et cloisonnement du guide sur ms-reservation")
     void rbac_verificationPermissionsCinqRoles() {
         Reservation reservationA = Reservation.builder()
-                .id(10L).utilisateurId(2L).nomClient("A").emailClient("a@uasz.sn")
+                .id(10L).referenceReservation("RES-10").utilisateurId(2L).nomClient("A").emailClient("a@uasz.sn")
                 .typeReservation(TypeReservation.CIRCUIT).statut(StatutReservation.CONFIRMEE).build();
         when(reservationRepository.findById(10L)).thenReturn(Optional.of(reservationA));
 
-        // 1. CONSERVATEUR ne possède aucune permission RESERVATION:* -> 403 Forbidden
         SecurityUserContextHolder.setContext(new SecurityUserContext(5L, "CONSERVATEUR", "cons@uasz.sn", false, null));
         assertThatThrownBy(() -> reservationService.getAllReservations()).isInstanceOf(ForbiddenException.class);
         assertThatThrownBy(() -> reservationService.getByIdReservation(10L)).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> reservationService.getStatistiques()).isInstanceOf(ForbiddenException.class);
 
-        // 2. GUIDE possède RESERVATION:LIRE_PROPRE mais pas RESERVATION:CREER ni RESERVATION:ANNULER_PROPRE
+        // GUIDE : pas de création, pas d'annulation, et pas d'accès au manifeste d'un autre guide
         SecurityUserContextHolder.setContext(new SecurityUserContext(6L, "GUIDE", "guide@uasz.sn", false, null));
         assertThatThrownBy(() -> reservationService.saveReservation(new ReservationDto())).isInstanceOf(ForbiddenException.class);
         assertThatThrownBy(() -> reservationService.annulerReservation(10L)).isInstanceOf(ForbiddenException.class);
+        CircuitDto autreGuideCircuit = new CircuitDto(1L, "Circuit", "Desc", "FACILE", 90, 5.0, 20, 5000.0);
+        autreGuideCircuit.setGuideResponsableId(99L);
+        when(circuitClient.getCircuitById(1L)).thenReturn(autreGuideCircuit);
+        assertThatThrownBy(() -> reservationService.getManifesteGuidePourCircuit(1L)).isInstanceOf(ForbiddenException.class);
 
-        // 3. GESTIONNAIRE_SITE possède RESERVATION:LIRE_TOUT et RESERVATION:GERER -> peut consulter la réservation de A
+        // GESTIONNAIRE_SITE : accès consultation et gestion
         SecurityUserContextHolder.setContext(new SecurityUserContext(3L, "GESTIONNAIRE_SITE", "gest@uasz.sn", false, null));
         ReservationDto dto = reservationService.getByIdReservation(10L);
         assertThat(dto.getId()).isEqualTo(10L);
@@ -212,7 +260,6 @@ class ReservationSecurityTest {
         String canonical = "POST|/api/reservations|2|TOURISTE|RESERVATION:CREER|a@uasz.sn|sess-1|" + ts + "|" + nonce + "|" + bodySha256;
         String sig = signHmac(canonical, gatewaySecret);
 
-        // 1. Requête valide -> 200 OK
         MockHttpServletRequest req1 = new MockHttpServletRequest("POST", "/api/reservations");
         req1.setContent(body);
         req1.addHeader("X-User-Id", "2");
@@ -228,7 +275,6 @@ class ReservationSecurityTest {
         assertThat(res1.getStatus()).isEqualTo(200);
         assertThat(chain1.getRequest()).isNotNull();
 
-        // 2. Rejeu de la même enveloppe Gateway (même nonce) -> 403 Forbidden
         MockHttpServletRequest reqReplay = new MockHttpServletRequest("POST", "/api/reservations");
         reqReplay.setContent(body);
         reqReplay.addHeader("X-User-Id", "2");
@@ -243,7 +289,6 @@ class ReservationSecurityTest {
         assertThat(resReplay.getStatus()).isEqualTo(403);
         assertThat(resReplay.getContentAsString()).contains("rejeu");
 
-        // 3. Modification du corps après signature -> 403 Forbidden
         String nonce2 = UUID.randomUUID().toString();
         String sig2 = signHmac("POST|/api/reservations|2|TOURISTE|RESERVATION:CREER|a@uasz.sn|sess-1|" + ts + "|" + nonce2 + "|" + bodySha256, gatewaySecret);
         MockHttpServletRequest reqTamperedBody = new MockHttpServletRequest("POST", "/api/reservations");
@@ -260,7 +305,7 @@ class ReservationSecurityTest {
     }
 
     @Test
-    @DisplayName("Section 4 : Appel Interservice -> vérification d'audience, ACL, intégrité de l'identité propagée et anti-rejeu")
+    @DisplayName("Section 4 : Appel Interservice -> vérification d'audience, ACL (lecture + événement paiement), anti-rejeu")
     void filter_interserviceSignatureAudienceAclEtFalsificationIdentite() throws Exception {
         long ts = Instant.now().getEpochSecond();
         String nonce = UUID.randomUUID().toString();
@@ -268,7 +313,6 @@ class ReservationSecurityTest {
         String canonical = "GET|/api/reservations/10|ms-reservation|ms-paiement|" + ts + "|" + nonce + "|2|TOURISTE|PAIEMENT:INITIER|a@uasz.sn|" + emptyBodySha;
         String sig = signHmac(canonical, interserviceSecret);
 
-        // 1. Appel valide depuis ms-paiement -> 200 OK
         MockHttpServletRequest reqValid = new MockHttpServletRequest("GET", "/api/reservations/10");
         reqValid.addHeader("X-Service-Name", "ms-paiement");
         reqValid.addHeader("X-Service-Audience", "ms-reservation");
@@ -284,7 +328,23 @@ class ReservationSecurityTest {
         securityFilter.doFilter(reqValid, resValid, new MockFilterChain());
         assertThat(resValid.getStatus()).isEqualTo(200);
 
-        // 2. Falsification de l'identité propagée après signature (X-User-Id remplacé par 1 / ADMINISTRATEUR) -> 403 Forbidden
+        String nonceCallback = UUID.randomUUID().toString();
+        String cbCanonical = "POST|/api/reservations/internal/10/evenement-paiement|ms-reservation|ms-paiement|"
+                + ts + "|" + nonceCallback + "|SYSTEM|SYSTEM|||" + emptyBodySha;
+        String cbSig = signHmac(cbCanonical, interserviceSecret);
+        MockHttpServletRequest reqCallback = new MockHttpServletRequest("POST", "/api/reservations/internal/10/evenement-paiement");
+        reqCallback.addHeader("X-Service-Name", "ms-paiement");
+        reqCallback.addHeader("X-Service-Audience", "ms-reservation");
+        reqCallback.addHeader("X-Service-Timestamp", String.valueOf(ts));
+        reqCallback.addHeader("X-Service-Nonce", nonceCallback);
+        reqCallback.addHeader("X-Content-SHA256", emptyBodySha);
+        reqCallback.addHeader("X-User-Id", "SYSTEM");
+        reqCallback.addHeader("X-User-Roles", "SYSTEM");
+        reqCallback.addHeader("X-Service-Signature", cbSig);
+        MockHttpServletResponse resCallback = new MockHttpServletResponse();
+        securityFilter.doFilter(reqCallback, resCallback, new MockFilterChain());
+        assertThat(resCallback.getStatus()).isEqualTo(200);
+
         String nonce2 = UUID.randomUUID().toString();
         String sig2 = signHmac("GET|/api/reservations/10|ms-reservation|ms-paiement|" + ts + "|" + nonce2 + "|2|TOURISTE|PAIEMENT:INITIER|a@uasz.sn|" + emptyBodySha, interserviceSecret);
         MockHttpServletRequest reqForgedUser = new MockHttpServletRequest("GET", "/api/reservations/10");
@@ -293,8 +353,8 @@ class ReservationSecurityTest {
         reqForgedUser.addHeader("X-Service-Timestamp", String.valueOf(ts));
         reqForgedUser.addHeader("X-Service-Nonce", nonce2);
         reqForgedUser.addHeader("X-Content-SHA256", emptyBodySha);
-        reqForgedUser.addHeader("X-User-Id", "1"); // Falsifié !
-        reqForgedUser.addHeader("X-User-Roles", "ADMINISTRATEUR"); // Falsifié !
+        reqForgedUser.addHeader("X-User-Id", "1");
+        reqForgedUser.addHeader("X-User-Roles", "ADMINISTRATEUR");
         reqForgedUser.addHeader("X-User-Permissions", "PAIEMENT:INITIER");
         reqForgedUser.addHeader("X-User-Email", "a@uasz.sn");
         reqForgedUser.addHeader("X-Service-Signature", sig2);
@@ -303,7 +363,6 @@ class ReservationSecurityTest {
         assertThat(resForgedUser.getStatus()).isEqualTo(403);
         assertThat(resForgedUser.getContentAsString()).contains("falsification");
 
-        // 3. Service appelant non autorisé par l'ACL (ms-circuit tente d'appeler ms-reservation) -> 403 Forbidden
         String nonce3 = UUID.randomUUID().toString();
         String sig3 = signHmac("GET|/api/reservations/10|ms-reservation|ms-circuit|" + ts + "|" + nonce3 + "|2|TOURISTE||a@uasz.sn|" + emptyBodySha, interserviceSecret);
         MockHttpServletRequest reqUnauthorizedService = new MockHttpServletRequest("GET", "/api/reservations/10");

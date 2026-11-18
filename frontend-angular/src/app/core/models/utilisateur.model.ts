@@ -31,17 +31,7 @@ export interface InscriptionPayload {
   actif?: boolean;
 }
 
-export type ModePaiement = 'WAVE' | 'ORANGE_MONEY' | 'CARTE_BANCAIRE' | 'ESPECES';
-
-export interface Paiement {
-  id: number;
-  referenceTransaction: string;
-  reservationId: number;
-  montant: number;
-  modePaiement: ModePaiement;
-  statut: 'EN_ATTENTE' | 'REUSSI' | 'ECHOUE';
-  datePaiement: string;
-}
+export type { ModePaiement, Paiement, StatutPaiement } from './paiement.model';
 
 export interface NotificationItem {
   id: number;

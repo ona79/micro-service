@@ -39,6 +39,7 @@ export interface Circuit {
   modeCalculDistance?: string;
   placesMax: number;
   prix: number;
+  devise?: string;
   statutCircuit?: StatutCircuit;
   donneeDemonstration?: boolean;
   guideResponsableId?: number | null;

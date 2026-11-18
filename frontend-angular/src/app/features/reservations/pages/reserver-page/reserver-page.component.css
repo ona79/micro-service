@@ -347,6 +347,110 @@
   cursor: not-allowed;
 }
 
+.booking-success__body {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.booking-success__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.dispo-bar {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.dispo-result {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--status-success-bg);
+  color: var(--status-success-ink);
+  font-size: var(--text-xs);
+}
+
+.dispo-result--closed {
+  background: var(--status-error-bg);
+  color: var(--status-error-ink);
+}
+
+.participants-panel {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.participants-panel__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.participant-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.draft-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--ink-secondary);
+  margin-bottom: var(--space-4);
+  cursor: pointer;
+}
+
+.res-item__actions--spread {
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.res-item__left-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.res-history-drawer {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface-canvas);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  font-size: var(--text-xs);
+}
+
+.drawer-heading {
+  font-weight: 700;
+  margin: var(--space-2) 0 0.25rem;
+}
+
+.drawer-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.ledger-pagination {
+  margin-top: var(--space-4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-xs);
+}
+
 @media (max-width: 1024px) {
   .desk-layout {
     grid-template-columns: 1fr;

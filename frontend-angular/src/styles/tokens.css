@@ -56,6 +56,14 @@
   --status-warning-border: #e4c485;
   --status-warning-ink: #704809;
 
+  /* Alias sémantiques compacts (badges & alertes) */
+  --success: var(--status-success-ink);
+  --success-soft: var(--status-success-bg);
+  --danger: var(--status-error-ink);
+  --danger-soft: var(--status-error-bg);
+  --warning: var(--status-warning-ink);
+  --warning-soft: var(--status-warning-bg);
+
   /* --- Bordures --- */
   --border-subtle: #e4ddd0;
   --border-strong: #cdc3b2;

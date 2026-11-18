@@ -268,50 +268,96 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
         boolean isNotificationPath = path.equals("/api/notifications") || path.startsWith("/api/notifications/");
 
         if (isReservationPath) {
-            if (token == null) {
-                writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
-                        tokenError != null ? tokenError : "Authentification requise pour effectuer cette opération.");
+            if (path.startsWith("/api/reservations/internal/") || path.equals("/api/reservations/internal")) {
+                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                        "Accès interdit : les endpoints internes ne sont pas accessibles via la Gateway.");
                 return;
             }
-            if ("POST".equalsIgnoreCase(method)
-                    && !token.hasPermission("RESERVATION:CREER")
-                    && !token.hasPermission("RESERVATION:GERER")) {
-                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
-                        "Accès interdit : permission RESERVATION:CREER requise.");
-                return;
-            }
-            if ("GET".equalsIgnoreCase(method)
-                    && !token.hasPermission("RESERVATION:LIRE_PROPRE")
-                    && !token.hasPermission("RESERVATION:LIRE_TOUT")) {
-                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
-                        "Accès interdit : permission de lecture de réservation requise.");
-                return;
-            }
-            if (("PUT".equalsIgnoreCase(method) || "DELETE".equalsIgnoreCase(method))
-                    && !token.hasPermission("RESERVATION:ANNULER_PROPRE")
-                    && !token.hasPermission("RESERVATION:GERER")) {
-                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
-                        "Accès interdit : permission d'annulation ou de gestion de réservation requise.");
-                return;
+            boolean isPublicDisponibilite = ("GET".equalsIgnoreCase(method) || "HEAD".equalsIgnoreCase(method))
+                    && (path.equals("/api/reservations/disponibilite") || path.startsWith("/api/reservations/disponibilite/"));
+            if (!isPublicDisponibilite) {
+                if (token == null) {
+                    writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                            tokenError != null ? tokenError : "Authentification requise pour effectuer cette opération.");
+                    return;
+                }
+                if (path.equals("/api/reservations/statistiques")) {
+                    if (!token.hasPermission("RESERVATION:LIRE_TOUT") && !token.hasPermission("RESERVATION:GERER")) {
+                        writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                                "Accès interdit : permission d'administration des réservations requise.");
+                        return;
+                    }
+                } else if (path.endsWith("/synchroniser") && "POST".equalsIgnoreCase(method)) {
+                    if (!token.hasPermission("RESERVATION:LIRE_PROPRE")
+                            && !token.hasPermission("RESERVATION:LIRE_TOUT")
+                            && !token.hasPermission("RESERVATION:GERER")) {
+                        writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                                "Accès interdit : permission de synchronisation de réservation requise.");
+                        return;
+                    }
+                } else if ("POST".equalsIgnoreCase(method)
+                        && !token.hasPermission("RESERVATION:CREER")
+                        && !token.hasPermission("RESERVATION:GERER")) {
+                    writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                            "Accès interdit : permission RESERVATION:CREER requise.");
+                    return;
+                } else if ("GET".equalsIgnoreCase(method)
+                        && !token.hasPermission("RESERVATION:LIRE_PROPRE")
+                        && !token.hasPermission("RESERVATION:LIRE_TOUT")) {
+                    writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                            "Accès interdit : permission de lecture de réservation requise.");
+                    return;
+                } else if (("PUT".equalsIgnoreCase(method) || "PATCH".equalsIgnoreCase(method) || "DELETE".equalsIgnoreCase(method))
+                        && !token.hasPermission("RESERVATION:ANNULER_PROPRE")
+                        && !token.hasPermission("RESERVATION:GERER")) {
+                    writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                            "Accès interdit : permission d'annulation ou de gestion de réservation requise.");
+                    return;
+                }
             }
         }
 
         if (isPaiementPath) {
+            if (path.startsWith("/api/paiements/internal/") || path.equals("/api/paiements/internal")) {
+                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                        "Accès interdit : les endpoints internes de paiement ne sont pas accessibles via la Gateway.");
+                return;
+            }
             if (token == null) {
                 writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
                         tokenError != null ? tokenError : "Authentification requise pour effectuer cette opération.");
                 return;
             }
-            if ("POST".equalsIgnoreCase(method) && !token.hasPermission("PAIEMENT:INITIER")) {
+            if (path.endsWith("/rembourser")) {
+                if (!"POST".equalsIgnoreCase(method)) {
+                    writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                            "Accès interdit : méthode non autorisée sur l'endpoint de remboursement.");
+                    return;
+                }
+                if (!token.hasPermission("PAIEMENT:REMBOURSER")) {
+                    writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                            "Accès interdit : permission PAIEMENT:REMBOURSER requise pour simuler un remboursement.");
+                    return;
+                }
+            } else if (path.equals("/api/paiements/statistiques") || path.startsWith("/api/paiements/outbox")) {
+                if (!token.hasPermission("PAIEMENT:LIRE_TOUT")) {
+                    writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                            "Accès interdit : permission PAIEMENT:LIRE_TOUT requise.");
+                    return;
+                }
+            } else if ("POST".equalsIgnoreCase(method) && !token.hasPermission("PAIEMENT:INITIER")) {
                 writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
                         "Accès interdit : permission PAIEMENT:INITIER requise.");
                 return;
-            }
-            if ("GET".equalsIgnoreCase(method)
+            } else if ("GET".equalsIgnoreCase(method)
                     && !token.hasPermission("PAIEMENT:LIRE_PROPRE")
                     && !token.hasPermission("PAIEMENT:LIRE_TOUT")) {
                 writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
                         "Accès interdit : permission de consultation des paiements requise.");
+                return;
+            } else if ("PUT".equalsIgnoreCase(method) || "PATCH".equalsIgnoreCase(method) || "DELETE".equalsIgnoreCase(method)) {
+                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                        "Accès interdit : modification ou suppression directe d'un paiement interdite.");
                 return;
             }
         }
@@ -580,7 +626,7 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
                     "EVENEMENT:PUBLIER", "EVENEMENT:ANNULER", "EVENEMENT:ARCHIVER",
                     "RESERVATION:CREER", "RESERVATION:LIRE_PROPRE", "RESERVATION:LIRE_TOUT",
                     "RESERVATION:ANNULER_PROPRE", "RESERVATION:GERER",
-                    "PAIEMENT:INITIER", "PAIEMENT:LIRE_PROPRE", "PAIEMENT:LIRE_TOUT",
+                    "PAIEMENT:INITIER", "PAIEMENT:LIRE_PROPRE", "PAIEMENT:LIRE_TOUT", "PAIEMENT:REMBOURSER",
                     "UTILISATEUR:LIRE_PROFIL", "UTILISATEUR:LIRE_TOUT", "UTILISATEUR:CREER_STAFF",
                     "UTILISATEUR:GERER_ROLES", "UTILISATEUR:SUPPRIMER", "AUDIT:LIRE"
             );
