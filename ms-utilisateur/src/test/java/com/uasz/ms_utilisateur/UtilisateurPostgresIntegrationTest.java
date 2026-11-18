@@ -5,8 +5,10 @@ import com.uasz.ms_utilisateur.entities.AuditSecurite;
 import com.uasz.ms_utilisateur.entities.RefreshToken;
 import com.uasz.ms_utilisateur.entities.RoleUtilisateur;
 import com.uasz.ms_utilisateur.entities.SessionUtilisateur;
+import com.uasz.ms_utilisateur.entities.StatutValidationGuide;
 import com.uasz.ms_utilisateur.exceptions.UnauthorizedException;
 import com.uasz.ms_utilisateur.repositories.AuditSecuriteRepository;
+import com.uasz.ms_utilisateur.repositories.GuideProfilRepository;
 import com.uasz.ms_utilisateur.repositories.RefreshTokenRepository;
 import com.uasz.ms_utilisateur.repositories.SessionUtilisateurRepository;
 import com.uasz.ms_utilisateur.repositories.UtilisateurRepository;
@@ -68,12 +70,19 @@ class UtilisateurPostgresIntegrationTest {
     @Autowired
     private AuditSecuriteRepository auditRepository;
 
+    @Autowired
+    private GuideProfilRepository guideProfilRepository;
+
     @Test
     void testPostgresConnectionFlywayAndHibernateValidation() {
         assertThat(utilisateurRepository).isNotNull();
         long count = utilisateurRepository.count();
         System.out.println(">>> [POSTGRES 16 TEST] ms-utilisateur connecté avec succès ! Nombre d'utilisateurs : " + count);
         assertThat(count).isGreaterThanOrEqualTo(5);
+        assertThat(guideProfilRepository.findByUtilisateurId(5L))
+                .isPresent()
+                .get()
+                .satisfies(gp -> assertThat(gp.getStatutValidation()).isEqualTo(StatutValidationGuide.VALIDE));
     }
 
     @Test

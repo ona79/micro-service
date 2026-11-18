@@ -78,22 +78,26 @@ public class MicroserviceSecurityFilter extends OncePerRequestFilter {
         String gatewayToken = cachedRequest.getHeader("X-Internal-Gateway-Token");
         String serviceSignature = cachedRequest.getHeader("X-Service-Signature");
 
-        if (serviceSignature != null && !serviceSignature.isBlank()) {
-            if (validateInterserviceCall(cachedRequest, response, serviceSignature)) {
-                filterChain.doFilter(cachedRequest, response);
+        try {
+            if (serviceSignature != null && !serviceSignature.isBlank()) {
+                if (validateInterserviceCall(cachedRequest, response, serviceSignature)) {
+                    filterChain.doFilter(cachedRequest, response);
+                }
+                return;
             }
-            return;
-        }
 
-        if (gatewayToken != null && !gatewayToken.isBlank()) {
-            if (validateGatewayCall(cachedRequest, response, gatewayToken)) {
-                filterChain.doFilter(cachedRequest, response);
+            if (gatewayToken != null && !gatewayToken.isBlank()) {
+                if (validateGatewayCall(cachedRequest, response, gatewayToken)) {
+                    filterChain.doFilter(cachedRequest, response);
+                }
+                return;
             }
-            return;
-        }
 
-        writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
-                "Accès direct non autorisé. La requête doit transiter par l'API Gateway.");
+            writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                    "Accès direct non autorisé. La requête doit transiter par l'API Gateway.");
+        } finally {
+            SecurityUserContextHolder.clear();
+        }
     }
 
     private boolean validateGatewayCall(CachedBodyHttpServletRequest request,
@@ -158,6 +162,16 @@ public class MicroserviceSecurityFilter extends OncePerRequestFilter {
             return false;
         }
 
+        Long parsedUserId = parseNullableLong(userIdForSig);
+        SecurityUserContextHolder.setContext(new SecurityUserContext(
+                parsedUserId,
+                roleForSig,
+                emailForSig,
+                false,
+                null,
+                SecurityUserContext.parsePermissions(permsForSig, roleForSig)
+        ));
+
         return true;
     }
 
@@ -184,9 +198,14 @@ public class MicroserviceSecurityFilter extends OncePerRequestFilter {
         String upperMethod = request.getMethod() != null ? request.getMethod().toUpperCase(Locale.ROOT) : "GET";
         String normalizedPath = normalizePath(request.getRequestURI());
 
-        if (!("api-gateway".equals(callerService.trim())
+        boolean allowedGatewaySessionCheck = "api-gateway".equals(callerService.trim())
                 && "GET".equalsIgnoreCase(upperMethod)
-                && normalizedPath.startsWith("/api/utilisateurs/internal/sessions/"))) {
+                && normalizedPath.startsWith("/api/utilisateurs/internal/sessions/");
+        boolean allowedGuideCheck = ("ms-circuit".equals(callerService.trim()) || "ms-reservation".equals(callerService.trim()))
+                && "GET".equalsIgnoreCase(upperMethod)
+                && normalizedPath.startsWith("/api/guides/internal/");
+
+        if (!allowedGatewaySessionCheck && !allowedGuideCheck) {
             writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
                     "Appel interservice non autorisé par la matrice ACL : " + callerService + " -> " + SERVICE_NAME);
             return false;
@@ -235,7 +254,27 @@ public class MicroserviceSecurityFilter extends OncePerRequestFilter {
             return false;
         }
 
+        SecurityUserContextHolder.setContext(new SecurityUserContext(
+                parseNullableLong(userIdForSig),
+                roleForSig,
+                emailForSig,
+                true,
+                callerService.trim(),
+                SecurityUserContext.parsePermissions(permsForSig, roleForSig)
+        ));
+
         return true;
+    }
+
+    private Long parseNullableLong(String val) {
+        if (val == null || val.isBlank() || "ANONYMOUS".equals(val) || "SYSTEM".equals(val)) {
+            return null;
+        }
+        try {
+            return Long.parseLong(val.trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private String defaultIfBlank(String val, String fallback) {
