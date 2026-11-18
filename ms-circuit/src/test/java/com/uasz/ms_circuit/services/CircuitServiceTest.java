@@ -3,10 +3,13 @@ package com.uasz.ms_circuit.services;
 import com.uasz.ms_circuit.clients.PatrimoineClient;
 import com.uasz.ms_circuit.dto.CircuitDto;
 import com.uasz.ms_circuit.dto.EtapeDto;
+import com.uasz.ms_circuit.dto.PageResponseDto;
 import com.uasz.ms_circuit.dto.PatrimoineDto;
 import com.uasz.ms_circuit.entities.Circuit;
 import com.uasz.ms_circuit.entities.Difficulte;
 import com.uasz.ms_circuit.entities.Etape;
+import com.uasz.ms_circuit.entities.MoyenTransport;
+import com.uasz.ms_circuit.entities.StatutCircuit;
 import com.uasz.ms_circuit.exceptions.BadRequestException;
 import com.uasz.ms_circuit.exceptions.ForbiddenException;
 import com.uasz.ms_circuit.exceptions.ResourceNotFoundException;
@@ -26,6 +29,7 @@ import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -67,7 +71,7 @@ class CircuitServiceTest {
     }
 
     @Test
-    void saveCircuit_calculeDureeEtDistanceEtEnrichitEtapes() {
+    void saveCircuit_calculeDureeEtDistanceOrthodromiqueIndicativeEtEnrichitEtapes() {
         when(patrimoineClient.getPatrimoineById(1L)).thenReturn(p1);
         when(patrimoineClient.getPatrimoineById(2L)).thenReturn(p2);
         when(circuitRepository.save(any(Circuit.class))).thenAnswer(inv -> {
@@ -86,6 +90,7 @@ class CircuitServiceTest {
         assertThat(saved.getId()).isEqualTo(10L);
         assertThat(saved.getDureeEstimee()).isEqualTo(105);
         assertThat(saved.getDistanceTotale()).isGreaterThan(10.0);
+        assertThat(saved.getModeCalculDistance()).isEqualTo("ESTIMATION_ORTHODROMIQUE_INDICATIVE");
         assertThat(saved.getEtapes()).hasSize(2);
         assertThat(saved.getEtapes().get(0).getOrdre()).isEqualTo(1);
         assertThat(saved.getEtapes().get(0).getPatrimoine().getNomPatrimoine()).isEqualTo("Mémorial du Joola");
@@ -94,7 +99,35 @@ class CircuitServiceTest {
     }
 
     @Test
-    void rbac_verificationPermissionsCinqRolesSurCircuits() {
+    void saveCircuit_patrimoineArchive_leveBadRequest() {
+        PatrimoineDto pArchive = new PatrimoineDto(5L, "Site Archivé", "PAT-ARC-005", "Desc", "Hist",
+                "Oussouye", 100, 12.48f, -16.54f);
+        pArchive.setStatutPublication("ARCHIVE");
+        when(patrimoineClient.getPatrimoineById(5L)).thenReturn(pArchive);
+
+        EtapeDto e1 = new EtapeDto(null, 1, 60, 5L, null);
+        CircuitDto input = new CircuitDto(null, "Circuit", "Desc", Difficulte.FACILE,
+                0, 0.0, 20, 3000.0, List.of(e1));
+
+        assertThatThrownBy(() -> circuitService.saveCircuit(input))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("archivé");
+    }
+
+    @Test
+    void saveCircuit_ordreDupliqueOuInvalide_leveBadRequest() {
+        EtapeDto e1 = new EtapeDto(null, 1, 60, 1L, null);
+        EtapeDto e2 = new EtapeDto(null, 1, 45, 2L, null);
+        CircuitDto input = new CircuitDto(null, "Circuit", "Desc", Difficulte.FACILE,
+                0, 0.0, 20, 3000.0, List.of(e1, e2));
+
+        assertThatThrownBy(() -> circuitService.saveCircuit(input))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("ordre 1");
+    }
+
+    @Test
+    void rbacEtBola_verificationPermissionsCinqRolesEtPerimetreGuideSurCircuits() {
         EtapeDto e1 = new EtapeDto(null, 1, 60, 1L, null);
         CircuitDto input = new CircuitDto(null, "Circuit", "Desc", Difficulte.FACILE, 0, 0.0, 20, 3000.0, List.of(e1));
 
@@ -103,10 +136,63 @@ class CircuitServiceTest {
         assertThatThrownBy(() -> circuitService.saveCircuit(input)).isInstanceOf(ForbiddenException.class);
         assertThatThrownBy(() -> circuitService.updateCircuit(1L, input)).isInstanceOf(ForbiddenException.class);
 
-        // 2. GUIDE possède CIRCUIT:MODIFIER mais pas CIRCUIT:CREER ni CIRCUIT:SUPPRIMER
+        // 2. GUIDE possède CIRCUIT:MODIFIER mais pas CIRCUIT:CREER, CIRCUIT:PUBLIER ni CIRCUIT:SUPPRIMER
         SecurityUserContextHolder.setContext(new SecurityUserContext(5L, "GUIDE", "guide@uasz.sn", false, null));
         assertThatThrownBy(() -> circuitService.saveCircuit(input)).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> circuitService.publierCircuit(1L)).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> circuitService.archiverCircuit(1L, "Motif")).isInstanceOf(ForbiddenException.class);
         assertThatThrownBy(() -> circuitService.deleteCircuit(1L)).isInstanceOf(ForbiddenException.class);
+
+        // 3. BOLA : GUIDE (id=5) tente de modifier un circuit assigné à un autre guide (guideResponsableId=99) -> 403
+        Circuit circuitAutreGuide = Circuit.builder()
+                .id(1L)
+                .nomCircuit("Circuit Guide 99")
+                .guideResponsableId(99L)
+                .etapes(new ArrayList<>())
+                .build();
+        when(circuitRepository.findById(1L)).thenReturn(Optional.of(circuitAutreGuide));
+        assertThatThrownBy(() -> circuitService.updateCircuit(1L, input))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("autre guide");
+    }
+
+    @Test
+    void workflowEtRecherche_soumettrePublierArchiverEtRechercherCircuits() {
+        Etape etape = Etape.builder().id(1L).ordre(1).dureeVisite(90).patrimoineId(1L).build();
+        Circuit circuit = Circuit.builder()
+                .id(1L)
+                .nomCircuit("Circuit Pirogue et Mangrove")
+                .descriptionCircuit("Traversée des bolongs")
+                .difficulte(Difficulte.MOYEN)
+                .moyenTransport(MoyenTransport.PIROGUE)
+                .zoneGeographique("BASSE_CASAMANCE")
+                .dureeEstimee(90)
+                .distanceTotale(18.5)
+                .placesMax(15)
+                .prix(12000.0)
+                .statutCircuit(StatutCircuit.BROUILLON)
+                .etapes(new ArrayList<>(List.of(etape)))
+                .build();
+        etape.setCircuit(circuit);
+
+        when(circuitRepository.findById(1L)).thenReturn(Optional.of(circuit));
+        when(circuitRepository.save(any(Circuit.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(patrimoineClient.getPatrimoineById(1L)).thenReturn(p1);
+
+        CircuitDto soumis = circuitService.soumettreCircuit(1L);
+        assertThat(soumis.getStatutCircuit()).isEqualTo(StatutCircuit.SOUMIS);
+
+        CircuitDto publie = circuitService.publierCircuit(1L);
+        assertThat(publie.getStatutCircuit()).isEqualTo(StatutCircuit.PUBLIE);
+
+        when(circuitRepository.findAll()).thenReturn(List.of(circuit));
+        PageResponseDto<CircuitDto> page = circuitService.rechercherCircuits(
+                "Pirogue", Difficulte.MOYEN, MoyenTransport.PIROGUE, "BASSE_CASAMANCE",
+                StatutCircuit.PUBLIE, 120, 25.0, 15000.0, false, 0, 10, "prix", "asc");
+        assertThat(page.getTotalElements()).isEqualTo(1);
+
+        CircuitDto archive = circuitService.archiverCircuit(1L, "Fin de saison");
+        assertThat(archive.getStatutCircuit()).isEqualTo(StatutCircuit.ARCHIVE);
     }
 
     @Test

@@ -1,6 +1,9 @@
 package com.uasz.ms_circuit.entities;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -33,10 +36,16 @@ public class Etape {
     /** Identifiant du patrimoine dans ms-patrimoine (pas de clé étrangère : autre base) */
     private Long patrimoineId;
 
+    @Column(name = "description_etape", length = 1000)
+    private String descriptionEtape;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "moyen_transport", length = 50)
+    private MoyenTransport moyenTransport;
+
     @ManyToOne
     @JoinColumn(name = "circuit_id")
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     private Circuit circuit;
 }
-
