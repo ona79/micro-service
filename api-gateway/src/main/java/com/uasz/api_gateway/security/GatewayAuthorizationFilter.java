@@ -254,7 +254,7 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
                         tokenError != null ? tokenError : "Authentification requise pour effectuer une modification sur le catalogue.");
                 return;
             }
-            String requiredPerm = resolveRequiredCatalogPermission(isPatrimoinePath, isCircuitPath, method);
+            String requiredPerm = resolveRequiredCatalogPermission(isPatrimoinePath, isCircuitPath, method, path);
             if (!token.hasPermission(requiredPerm)) {
                 writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
                         "Accès interdit : permission " + requiredPerm + " requise pour le rôle " + token.role() + ".");
@@ -357,8 +357,19 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
         filterChain.doFilter(wrappedRequest, response);
     }
 
-    private String resolveRequiredCatalogPermission(boolean isPatrimoine, boolean isCircuit, String method) {
+    private String resolveRequiredCatalogPermission(boolean isPatrimoine, boolean isCircuit, String method, String path) {
         String domain = isPatrimoine ? "PATRIMOINE" : (isCircuit ? "CIRCUIT" : "EVENEMENT");
+        if (path != null) {
+            if (path.endsWith("/publier")) {
+                return domain + ":PUBLIER";
+            }
+            if (path.endsWith("/archiver")) {
+                return domain + ":ARCHIVER";
+            }
+            if (path.endsWith("/annuler") && "EVENEMENT".equals(domain)) {
+                return "EVENEMENT:ANNULER";
+            }
+        }
         if ("POST".equalsIgnoreCase(method)) {
             return domain + ":CREER";
         }
@@ -549,18 +560,24 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
             );
             case "CONSERVATEUR" -> List.of(
                     "PATRIMOINE:LIRE", "PATRIMOINE:CREER", "PATRIMOINE:MODIFIER", "PATRIMOINE:SUPPRIMER",
+                    "PATRIMOINE:PUBLIER", "PATRIMOINE:ARCHIVER",
                     "CIRCUIT:LIRE", "EVENEMENT:LIRE", "UTILISATEUR:LIRE_PROFIL"
             );
             case "GESTIONNAIRE_SITE" -> List.of(
                     "PATRIMOINE:LIRE",
                     "CIRCUIT:LIRE", "CIRCUIT:CREER", "CIRCUIT:MODIFIER", "CIRCUIT:SUPPRIMER",
+                    "CIRCUIT:PUBLIER", "CIRCUIT:ARCHIVER",
                     "EVENEMENT:LIRE", "EVENEMENT:CREER", "EVENEMENT:MODIFIER", "EVENEMENT:SUPPRIMER",
+                    "EVENEMENT:PUBLIER", "EVENEMENT:ANNULER", "EVENEMENT:ARCHIVER",
                     "RESERVATION:LIRE_TOUT", "RESERVATION:GERER", "UTILISATEUR:LIRE_PROFIL"
             );
             case "ADMINISTRATEUR" -> List.of(
                     "PATRIMOINE:LIRE", "PATRIMOINE:CREER", "PATRIMOINE:MODIFIER", "PATRIMOINE:SUPPRIMER",
+                    "PATRIMOINE:PUBLIER", "PATRIMOINE:ARCHIVER",
                     "CIRCUIT:LIRE", "CIRCUIT:CREER", "CIRCUIT:MODIFIER", "CIRCUIT:SUPPRIMER",
+                    "CIRCUIT:PUBLIER", "CIRCUIT:ARCHIVER",
                     "EVENEMENT:LIRE", "EVENEMENT:CREER", "EVENEMENT:MODIFIER", "EVENEMENT:SUPPRIMER",
+                    "EVENEMENT:PUBLIER", "EVENEMENT:ANNULER", "EVENEMENT:ARCHIVER",
                     "RESERVATION:CREER", "RESERVATION:LIRE_PROPRE", "RESERVATION:LIRE_TOUT",
                     "RESERVATION:ANNULER_PROPRE", "RESERVATION:GERER",
                     "PAIEMENT:INITIER", "PAIEMENT:LIRE_PROPRE", "PAIEMENT:LIRE_TOUT",
