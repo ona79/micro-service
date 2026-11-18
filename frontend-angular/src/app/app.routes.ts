@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard, roleGuard } from './core/guards/auth.guard';
+import { authGuard, guestGuard, permissionGuard, roleGuard } from './core/guards/auth.guard';
 import { MainLayoutComponent } from './core/layout/main-layout/main-layout.component';
 
 export const routes: Routes = [
@@ -117,12 +117,8 @@ export const routes: Routes = [
       },
       {
         path: 'espace-guide',
-        title: 'Mon Espace Guide',
-        canActivate: [authGuard, roleGuard(['GUIDE'])],
-        loadComponent: () =>
-          import(
-            './features/guides/pages/guide-workspace-page/guide-workspace-page.component'
-          ).then((m) => m.GuideWorkspacePageComponent),
+        redirectTo: '/pro/mon-profil-guide',
+        pathMatch: 'full',
       },
       {
         path: 'notifications',
@@ -209,7 +205,7 @@ export const routes: Routes = [
         title: 'Administration & Gestion',
         canActivate: [
           authGuard,
-          roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE', 'CONSERVATEUR', 'GUIDE']),
+          roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE', 'CONSERVATEUR']),
         ],
         loadComponent: () =>
           import(
@@ -224,6 +220,155 @@ export const routes: Routes = [
             (m) => m.ForbiddenPageComponent
           ),
       },
+    ],
+  },
+  {
+    path: 'pro',
+    loadComponent: () =>
+      import('./core/layout/pro-layout/pro-layout.component').then((m) => m.ProLayoutComponent),
+    canActivate: [
+      authGuard,
+      roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE', 'CONSERVATEUR', 'GUIDE']),
+    ],
+    children: [
+      {
+        path: '',
+        redirectTo: 'tableau-de-bord',
+        pathMatch: 'full',
+      },
+      {
+        path: 'tableau-de-bord',
+        title: 'Tableau de bord Pro',
+        canActivate: [roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE', 'CONSERVATEUR', 'GUIDE'])],
+        loadComponent: () =>
+          import('./features/pro/pages/pro-dashboard-page/pro-dashboard-page.component').then(
+            (m) => m.ProDashboardPageComponent
+          ),
+      },
+      {
+        path: 'statistiques',
+        title: 'Statistiques Pro',
+        canActivate: [roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE', 'CONSERVATEUR', 'GUIDE'])],
+        loadComponent: () =>
+          import('./features/pro/pages/pro-statistiques-page/pro-statistiques-page.component').then(
+            (m) => m.ProStatistiquesPageComponent
+          ),
+      },
+      {
+        path: 'patrimoines',
+        title: 'Gestion Patrimoine',
+        canActivate: [roleGuard(['ADMINISTRATEUR', 'CONSERVATEUR', 'GESTIONNAIRE_SITE'])],
+        loadComponent: () =>
+          import('./features/pro/pages/pro-patrimoines-page/pro-patrimoines-page.component').then(
+            (m) => m.ProPatrimoinesPageComponent
+          ),
+      },
+      {
+        path: 'circuits',
+        title: 'Gestion Circuits',
+        canActivate: [
+          roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE', 'GUIDE']),
+          permissionGuard(['CIRCUIT:CREER', 'CIRCUIT:MODIFIER', 'CIRCUIT:PUBLIER']),
+        ],
+        loadComponent: () =>
+          import('./features/pro/pages/pro-circuits-page/pro-circuits-page.component').then(
+            (m) => m.ProCircuitsPageComponent
+          ),
+      },
+      {
+        path: 'evenements',
+        title: 'Gestion Événements',
+        canActivate: [roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE'])],
+        loadComponent: () =>
+          import('./features/pro/pages/pro-evenements-page/pro-evenements-page.component').then(
+            (m) => m.ProEvenementsPageComponent
+          ),
+      },
+      {
+        path: 'guides',
+        title: 'Validation des Guides',
+        canActivate: [roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE']), permissionGuard(['GUIDE:VALIDER'])],
+        loadComponent: () =>
+          import('./features/pro/pages/pro-guides-admin-page/pro-guides-admin-page.component').then(
+            (m) => m.ProGuidesAdminPageComponent
+          ),
+      },
+      {
+        path: 'mon-profil-guide',
+        title: 'Mon Espace Guide',
+        canActivate: [roleGuard(['GUIDE']), permissionGuard(['GUIDE:GERER_PROPRE_PROFIL'])],
+        loadComponent: () =>
+          import(
+            './features/pro/pages/pro-guide-workspace-page/pro-guide-workspace-page.component'
+          ).then((m) => m.ProGuideWorkspacePageComponent),
+      },
+      {
+        path: 'manifestes',
+        title: 'Manifestes Circuits',
+        canActivate: [roleGuard(['GUIDE', 'GESTIONNAIRE_SITE', 'ADMINISTRATEUR'])],
+        loadComponent: () =>
+          import('./features/pro/pages/pro-manifestes-page/pro-manifestes-page.component').then(
+            (m) => m.ProManifestesPageComponent
+          ),
+      },
+      {
+        path: 'reservations',
+        title: 'Supervision Réservations',
+        canActivate: [
+          roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE']),
+          permissionGuard(['RESERVATION:LIRE_TOUT', 'RESERVATION:GERER']),
+        ],
+        loadComponent: () =>
+          import('./features/pro/pages/pro-reservations-page/pro-reservations-page.component').then(
+            (m) => m.ProReservationsPageComponent
+          ),
+      },
+      {
+        path: 'paiements',
+        title: 'Paiements Simulés & Remboursements',
+        canActivate: [roleGuard(['ADMINISTRATEUR']), permissionGuard(['PAIEMENT:LIRE_TOUT'])],
+        loadComponent: () =>
+          import('./features/pro/pages/pro-paiements-page/pro-paiements-page.component').then(
+            (m) => m.ProPaiementsPageComponent
+          ),
+      },
+      {
+        path: 'moderation',
+        title: 'Modération Avis & Signalements',
+        canActivate: [roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE']), permissionGuard(['AVIS:MODERER'])],
+        loadComponent: () =>
+          import('./features/pro/pages/pro-moderation-page/pro-moderation-page.component').then(
+            (m) => m.ProModerationPageComponent
+          ),
+      },
+      {
+        path: 'notifications',
+        title: 'Notifications Pro',
+        canActivate: [roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE', 'CONSERVATEUR', 'GUIDE'])],
+        loadComponent: () =>
+          import(
+            './features/pro/pages/pro-notifications-page/pro-notifications-page.component'
+          ).then((m) => m.ProNotificationsPageComponent),
+      },
+      {
+        path: 'utilisateurs',
+        title: 'Utilisateurs & Audit Sécurité',
+        canActivate: [roleGuard(['ADMINISTRATEUR']), permissionGuard(['UTILISATEUR:LIRE_TOUT'])],
+        loadComponent: () =>
+          import('./features/pro/pages/pro-utilisateurs-page/pro-utilisateurs-page.component').then(
+            (m) => m.ProUtilisateursPageComponent
+          ),
+      },
+      {
+        path: '**',
+        redirectTo: 'tableau-de-bord',
+      },
+    ],
+  },
+  {
+    path: '',
+    component: MainLayoutComponent,
+    children: [
       {
         path: '**',
         title: 'Page introuvable',

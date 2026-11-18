@@ -10,7 +10,6 @@ import {
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import {
-  LucideAward,
   LucideBell,
   LucideCheckCircle2,
   LucideCreditCard,
@@ -68,7 +67,6 @@ type AccountTab = 'reservations' | 'paiements' | 'avis' | 'notifications' | 'pro
     LucideBell,
     LucideCheckCircle2,
     LucideLogOut,
-    LucideAward,
     LucideStar,
     LucideEye,
     LucideUser,
@@ -103,15 +101,10 @@ type AccountTab = 'reservations' | 'paiements' | 'avis' | 'notifications' | 'pro
             </div>
 
             <div class="account-hero__actions">
-              @if (authStore.isStaff()) {
-                <a routerLink="/administration" class="btn-admin">
-                  Accéder au Back-Office ({{ authStore.roleLabel() }})
-                </a>
-              }
-              @if (authStore.isGuide()) {
-                <a routerLink="/espace-guide" class="btn-admin">
-                  <svg lucideAward [size]="16" aria-hidden="true"></svg>
-                  <span>Mon Espace Guide</span>
+              @if (authStore.isBackOfficeRole()) {
+                <a routerLink="/pro/tableau-de-bord" class="btn-admin">
+                  <svg lucideShieldCheck [size]="16" aria-hidden="true"></svg>
+                  <span>Ouvrir l'Espace Pro ({{ authStore.roleLabel() }})</span>
                 </a>
               }
               <a routerLink="/reserver" class="btn-primary">
@@ -907,9 +900,6 @@ export class AccountPageComponent implements OnInit {
     const email = user?.email?.toLowerCase();
     const all = this.reservationStore.items();
     if (!email) return [];
-    if (this.authStore.isStaff()) {
-      return all;
-    }
     return all.filter(
       (r) =>
         (user?.id != null && r.utilisateurId === user.id) ||

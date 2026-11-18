@@ -15,6 +15,7 @@ import {
   StatutSignalement,
 } from '../../../core/models/avis.model';
 import { PageResponse } from '../../../core/models/patrimoine.model';
+import { ModerationStats } from '../../../core/models/statistics.model';
 
 @Injectable({ providedIn: 'root' })
 export class AvisApiService {
@@ -102,5 +103,9 @@ export class AvisApiService {
       commentaire,
       ...(statutAvisCible ? { statutAvisCible } : {}),
     });
+  }
+
+  getModerationStatistiques(): Observable<ModerationStats> {
+    return this.http.get<ModerationStats>('/moderation/statistiques');
   }
 }

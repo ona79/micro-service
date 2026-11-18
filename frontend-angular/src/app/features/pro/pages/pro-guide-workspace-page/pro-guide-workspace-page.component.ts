@@ -1,0 +1,390 @@
+import { Dialog } from '@angular/cdk/dialog';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
+import { LucideAward, LucideCheckCircle2, LucideSend } from '@lucide/angular';
+import { firstValueFrom } from 'rxjs';
+import { toast } from 'ngx-sonner';
+import { AuthStore } from '../../../../core/auth/auth.store';
+import { extractErrorMessage } from '../../../../core/models/api-error.model';
+import {
+  GuideHistorique,
+  GuideProfil,
+  formatGuideStatusLabel,
+  guideStatusBadgeClass,
+} from '../../../../core/models/guide.model';
+import { UiAvisSectionComponent } from '../../../../shared/components/ui-avis-section/ui-avis-section.component';
+import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confirm-dialog/ui-confirm-dialog.component';
+import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
+import { GuideApiService } from '../../../guides/data-access/guide-api.service';
+
+@Component({
+  selector: 'app-pro-guide-workspace-page',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    DateFrPipe,
+    UiAvisSectionComponent,
+    UiErrorBannerComponent,
+    LucideAward,
+    LucideSend,
+    LucideCheckCircle2,
+  ],
+  template: `
+    <header class="bo-header">
+      <div>
+        <p class="bo-header__eyebrow">Espace Guide Touristique Local</p>
+        <h1 class="bo-header__title">Mon dossier professionnel &amp; disponibilité</h1>
+        <p class="bo-header__lead">
+          Complétez vos informations agréées, gérez votre visibilité dans l’annuaire et suivez les
+          décisions de validation administrative.
+        </p>
+      </div>
+      <div class="bo-header__actions">
+        <a routerLink="/pro/circuits" class="bo-btn">Mes circuits</a>
+        <a routerLink="/pro/manifestes" class="bo-btn">Mes manifestes</a>
+      </div>
+    </header>
+
+    @if (loadError()) {
+      <app-ui-error-banner [message]="loadError()!" (retry)="loadWorkspace()" />
+    } @else if (loading()) {
+      <p class="bo-cell-sub">Chargement de votre dossier guide...</p>
+    } @else {
+      @if (actionError()) {
+        <app-ui-error-banner
+          title="Opération impossible"
+          [message]="actionError()!"
+          [showRetry]="false"
+        />
+      }
+
+      @if (profil(); as p) {
+        <section class="bo-panel">
+          <div class="bo-panel__head">
+            <div class="bo-actions-cell">
+              <span [class]="badgeClass(p.statutValidation)">
+                <svg lucideAward [size]="13" aria-hidden="true"></svg>
+                {{ formatStatus(p.statutValidation) }}
+              </span>
+              @if (p.visibilitePublique) {
+                <span class="ui-badge ui-badge--success">Visible annuaire public</span>
+              } @else {
+                <span class="ui-badge ui-badge--neutral">Non visible publiquement</span>
+              }
+              <span class="ui-badge" [class.ui-badge--success]="p.disponible" [class.ui-badge--neutral]="!p.disponible">
+                {{ p.disponible ? 'Disponible' : 'Indisponible' }}
+              </span>
+            </div>
+
+            <div class="bo-actions-cell">
+              @if (p.statutValidation === 'BROUILLON' || p.statutValidation === 'REJETE') {
+                <button type="button" class="bo-btn bo-btn--primary" (click)="soumettre()" [disabled]="busy()">
+                  <svg lucideSend [size]="14" aria-hidden="true"></svg>
+                  <span>Soumettre pour validation</span>
+                </button>
+              }
+              @if (p.statutValidation === 'VALIDE') {
+                <button type="button" class="bo-btn" (click)="toggleDisponibilite(p)" [disabled]="busy()">
+                  {{ p.disponible ? 'Marquer indisponible' : 'Marquer disponible' }}
+                </button>
+                <button type="button" class="bo-btn" (click)="toggleVisibilite(p)" [disabled]="busy()">
+                  {{ p.visibilitePublique ? 'Masquer annuaire' : 'Rendre visible annuaire' }}
+                </button>
+              }
+              @if (p.statutValidation !== 'DESACTIVE') {
+                <button type="button" class="bo-btn bo-btn--danger" (click)="desactiver()" [disabled]="busy()">
+                  Désactiver mon profil
+                </button>
+              }
+            </div>
+          </div>
+
+          @if (p.motifDecision) {
+            <p class="bo-notice">Décision administrative : {{ p.motifDecision }}</p>
+          }
+        </section>
+      }
+
+      <div class="bo-charts-grid">
+        <section class="bo-panel">
+          <div class="bo-panel__head">
+            <h2 class="bo-panel__title">Éditer mon profil guide</h2>
+          </div>
+
+          <form [formGroup]="guideForm" (ngSubmit)="saveProfil()" class="bo-form-grid" novalidate>
+            <div class="bo-field bo-form-span2">
+              <label for="guide-pres" class="bo-label">Présentation courte *</label>
+              <input id="guide-pres" type="text" class="bo-input" formControlName="presentationCourte" />
+              @if (guideForm.controls.presentationCourte.touched && guideForm.controls.presentationCourte.invalid) {
+                <p class="bo-error">La présentation courte est obligatoire (5 caractères minimum).</p>
+              }
+            </div>
+
+            <div class="bo-field bo-form-span2">
+              <label for="guide-bio" class="bo-label">Biographie détaillée (20 caractères min.) *</label>
+              <textarea id="guide-bio" class="bo-textarea" rows="4" formControlName="biographie"></textarea>
+              @if (guideForm.controls.biographie.touched && guideForm.controls.biographie.invalid) {
+                <p class="bo-error">Une biographie d'au moins 20 caractères est obligatoire.</p>
+              }
+            </div>
+
+            <div class="bo-field">
+              <label for="guide-langues" class="bo-label">Langues parlées *</label>
+              <input id="guide-langues" type="text" class="bo-input" formControlName="languesParlees" placeholder="Français, Diola, Wolof" />
+            </div>
+
+            <div class="bo-field">
+              <label for="guide-zones" class="bo-label">Zones d'intervention *</label>
+              <input id="guide-zones" type="text" class="bo-input" formControlName="zonesIntervention" placeholder="Oussouye, Carabane, Ziguinchor" />
+            </div>
+
+            <div class="bo-field bo-form-span2">
+              <label for="guide-spec" class="bo-label">Spécialités *</label>
+              <input id="guide-spec" type="text" class="bo-input" formControlName="specialites" />
+            </div>
+
+            <div class="bo-field">
+              <label for="guide-exp" class="bo-label">Années d'expérience *</label>
+              <input id="guide-exp" type="number" min="0" max="70" class="bo-input" formControlName="anneesExperience" />
+            </div>
+
+            <div class="bo-field">
+              <label for="guide-tarif" class="bo-label">Tarif journalier indicatif (XOF)</label>
+              <input id="guide-tarif" type="number" min="0" step="500" class="bo-input" formControlName="tarifJournalierIndicatif" />
+            </div>
+
+            <div class="bo-field">
+              <label for="guide-carte" class="bo-label">N° carte professionnelle</label>
+              <input id="guide-carte" type="text" class="bo-input" formControlName="numeroCarteProfessionnelle" />
+            </div>
+
+            <div class="bo-field">
+              <label for="guide-docs" class="bo-label">Documents justificatifs</label>
+              <input id="guide-docs" type="text" class="bo-input" formControlName="documentsJustificatifs" />
+            </div>
+
+            <div class="bo-form-span2">
+              <button type="submit" class="bo-btn bo-btn--primary" [disabled]="busy()">
+                <svg lucideCheckCircle2 [size]="15" aria-hidden="true"></svg>
+                <span>{{ busy() ? 'Enregistrement...' : 'Enregistrer mon dossier' }}</span>
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section class="bo-panel">
+          <div class="bo-panel__head">
+            <h2 class="bo-panel__title">Historique des validations &amp; transitions</h2>
+          </div>
+          @if (historique().length === 0) {
+            <p class="bo-cell-sub">Aucune décision enregistrée pour le moment.</p>
+          } @else {
+            <ul style="list-style: none; padding: 0; display: grid; gap: var(--space-3);">
+              @for (h of historique(); track h.id) {
+                <li style="border-bottom: 1px dashed var(--border-subtle); padding-bottom: var(--space-2);">
+                  <div class="bo-actions-cell">
+                    <span class="ui-badge ui-badge--neutral">
+                      {{ h.ancienStatut || 'INITIAL' }} → {{ h.nouveauStatut }}
+                    </span>
+                    <span class="bo-cell-sub">{{ h.dateTransition | dateFr: 'd MMM yyyy HH:mm' }}</span>
+                  </div>
+                  @if (h.motif) {
+                    <p style="font-size: var(--text-sm); margin: 0.3rem 0 0;">{{ h.motif }}</p>
+                  }
+                </li>
+              }
+            </ul>
+          }
+        </section>
+      </div>
+
+      @if (authStore.user(); as u) {
+        <section class="bo-panel">
+          <app-ui-avis-section cibleType="GUIDE" [cibleId]="u.id" />
+        </section>
+      }
+    }
+  `,
+})
+export class ProGuideWorkspacePageComponent implements OnInit {
+  private readonly fb = inject(FormBuilder);
+  private readonly dialog = inject(Dialog);
+  protected readonly authStore = inject(AuthStore);
+  private readonly guideApi = inject(GuideApiService);
+
+  protected readonly loading = signal(true);
+  protected readonly busy = signal(false);
+  protected readonly loadError = signal<string | null>(null);
+  protected readonly actionError = signal<string | null>(null);
+
+  protected readonly profil = signal<GuideProfil | null>(null);
+  protected readonly historique = signal<GuideHistorique[]>([]);
+
+  protected readonly formatStatus = formatGuideStatusLabel;
+  protected readonly badgeClass = guideStatusBadgeClass;
+
+  protected readonly guideForm = this.fb.nonNullable.group({
+    presentationCourte: ['', [Validators.required, Validators.minLength(5), Validators.maxLength(500)]],
+    biographie: ['', [Validators.required, Validators.minLength(20), Validators.maxLength(4000)]],
+    languesParlees: ['Français', [Validators.required]],
+    zonesIntervention: ['Ziguinchor, Basse-Casamance', [Validators.required]],
+    specialites: ['Histoire & Patrimoine culturel', [Validators.required]],
+    anneesExperience: [0, [Validators.required, Validators.min(0), Validators.max(70)]],
+    tarifJournalierIndicatif: [0 as number | null, [Validators.min(0)]],
+    numeroCarteProfessionnelle: [''],
+    documentsJustificatifs: [''],
+  });
+
+  ngOnInit(): void {
+    void this.loadWorkspace();
+  }
+
+  async loadWorkspace(): Promise<void> {
+    this.loading.set(true);
+    this.loadError.set(null);
+    this.actionError.set(null);
+    try {
+      const p = await firstValueFrom(this.guideApi.getMonProfil());
+      this.profil.set(p);
+      this.guideForm.patchValue({
+        presentationCourte: p.presentationCourte ?? '',
+        biographie: p.biographie ?? '',
+        languesParlees: p.languesParlees ?? 'Français',
+        zonesIntervention: p.zonesIntervention ?? '',
+        specialites: p.specialites ?? '',
+        anneesExperience: p.anneesExperience ?? 0,
+        tarifJournalierIndicatif: p.tarifJournalierIndicatif ?? null,
+        numeroCarteProfessionnelle: p.numeroCarteProfessionnelle ?? '',
+        documentsJustificatifs: p.documentsJustificatifs ?? '',
+      });
+      const hist = await firstValueFrom(this.guideApi.getHistorique(p.id));
+      this.historique.set(hist);
+    } catch (err) {
+      const msg = extractErrorMessage(err);
+      if (msg.toLowerCase().includes('introuvable') || msg.includes('404')) {
+        this.profil.set(null);
+      } else {
+        this.loadError.set(msg);
+      }
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  async saveProfil(): Promise<void> {
+    this.actionError.set(null);
+    if (this.guideForm.invalid) {
+      this.guideForm.markAllAsTouched();
+      return;
+    }
+    this.busy.set(true);
+    try {
+      const v = this.guideForm.getRawValue();
+      const saved = await firstValueFrom(
+        this.guideApi.upsertMonProfil({
+          presentationCourte: v.presentationCourte.trim(),
+          biographie: v.biographie.trim(),
+          languesParlees: v.languesParlees.trim(),
+          zonesIntervention: v.zonesIntervention.trim(),
+          specialites: v.specialites.trim(),
+          anneesExperience: Number(v.anneesExperience),
+          tarifJournalierIndicatif: v.tarifJournalierIndicatif != null ? Number(v.tarifJournalierIndicatif) : null,
+          numeroCarteProfessionnelle: v.numeroCarteProfessionnelle.trim() || null,
+          documentsJustificatifs: v.documentsJustificatifs.trim() || null,
+        })
+      );
+      this.profil.set(saved);
+      toast.success('Profil guide enregistré avec succès.');
+      const hist = await firstValueFrom(this.guideApi.getHistorique(saved.id));
+      this.historique.set(hist);
+    } catch (err) {
+      this.actionError.set(extractErrorMessage(err));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async soumettre(): Promise<void> {
+    this.busy.set(true);
+    this.actionError.set(null);
+    try {
+      const updated = await firstValueFrom(this.guideApi.soumettreMonProfil());
+      this.profil.set(updated);
+      toast.success('Dossier soumis pour validation administrative.');
+      this.historique.set(await firstValueFrom(this.guideApi.getHistorique(updated.id)));
+    } catch (err) {
+      this.actionError.set(extractErrorMessage(err));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async toggleDisponibilite(p: GuideProfil): Promise<void> {
+    this.busy.set(true);
+    this.actionError.set(null);
+    try {
+      const updated = await firstValueFrom(
+        this.guideApi.changerDisponibilite(!p.disponible, p.visibilitePublique)
+      );
+      this.profil.set(updated);
+      toast.success(updated.disponible ? 'Statut : Disponible.' : 'Statut : Indisponible.');
+    } catch (err) {
+      this.actionError.set(extractErrorMessage(err));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async toggleVisibilite(p: GuideProfil): Promise<void> {
+    this.busy.set(true);
+    this.actionError.set(null);
+    try {
+      const updated = await firstValueFrom(
+        this.guideApi.changerDisponibilite(p.disponible, !p.visibilitePublique)
+      );
+      this.profil.set(updated);
+      toast.success(updated.visibilitePublique ? 'Profil visible publiquement.' : 'Profil masqué de l’annuaire.');
+    } catch (err) {
+      this.actionError.set(extractErrorMessage(err));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async desactiver(): Promise<void> {
+    const confirmed = await firstValueFrom(
+      this.dialog
+        .open<boolean>(UiConfirmDialogComponent, {
+          data: {
+            title: 'Désactiver votre profil guide ?',
+            message:
+              'Votre profil ne sera plus visible dans l’annuaire public ni disponible pour de nouveaux circuits.',
+            confirmLabel: 'Confirmer la désactivation',
+            cancelLabel: 'Conserver actif',
+            variant: 'danger',
+          },
+        })
+        .closed
+    );
+    if (!confirmed) return;
+
+    this.busy.set(true);
+    this.actionError.set(null);
+    try {
+      const updated = await firstValueFrom(
+        this.guideApi.desactiverMonProfil('Désactivation volontaire par le guide')
+      );
+      this.profil.set(updated);
+      toast.info('Votre profil guide a été désactivé.');
+      this.historique.set(await firstValueFrom(this.guideApi.getHistorique(updated.id)));
+    } catch (err) {
+      this.actionError.set(extractErrorMessage(err));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+}

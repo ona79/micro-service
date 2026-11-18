@@ -27,27 +27,15 @@
               </a>
             </li>
           }
-          @if (authStore.isStaff()) {
+          @if (authStore.isBackOfficeRole()) {
             <li>
               <a
-                routerLink="/administration"
+                routerLink="/pro/tableau-de-bord"
                 routerLinkActive="nav-link--active"
                 class="nav-link nav-link--staff"
               >
                 <svg lucideShieldCheck [size]="15" aria-hidden="true"></svg>
-                <span>Administration</span>
-              </a>
-            </li>
-          }
-          @if (authStore.isGuide()) {
-            <li>
-              <a
-                routerLink="/espace-guide"
-                routerLinkActive="nav-link--active"
-                class="nav-link nav-link--staff"
-              >
-                <svg lucideAward [size]="15" aria-hidden="true"></svg>
-                <span>Espace Guide</span>
+                <span>Espace Pro</span>
               </a>
             </li>
           }
@@ -165,27 +153,15 @@
                   </a>
                 </li>
               }
-              @if (authStore.isStaff()) {
+              @if (authStore.isBackOfficeRole()) {
                 <li>
                   <a
-                    routerLink="/administration"
+                    routerLink="/pro/tableau-de-bord"
                     routerLinkActive="mobile-nav-link--active"
                     class="mobile-nav-link"
                     (click)="closeMenu()"
                   >
-                    Administration ({{ authStore.roleLabel() }})
-                  </a>
-                </li>
-              }
-              @if (authStore.isGuide()) {
-                <li>
-                  <a
-                    routerLink="/espace-guide"
-                    routerLinkActive="mobile-nav-link--active"
-                    class="mobile-nav-link"
-                    (click)="closeMenu()"
-                  >
-                    Mon Espace Guide
+                    Espace Pro ({{ authStore.roleLabel() }})
                   </a>
                 </li>
               }

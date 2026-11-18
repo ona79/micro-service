@@ -174,45 +174,49 @@ interface EtapeFormItem {
             <span>Patrimoines ({{ patrimoineStore.items().length }})</span>
           </button>
 
-          <button
-            type="button"
-            class="admin-tab"
-            [class.admin-tab--active]="activeTab() === 'circuits'"
-            (click)="switchTab('circuits')"
-          >
-            <svg lucideRoute [size]="16" aria-hidden="true"></svg>
-            <span>Circuits &amp; Inter-Services ({{ circuitStore.items().length }})</span>
-          </button>
+          @if (canManageOperations()) {
+            <button
+              type="button"
+              class="admin-tab"
+              [class.admin-tab--active]="activeTab() === 'circuits'"
+              (click)="switchTab('circuits')"
+            >
+              <svg lucideRoute [size]="16" aria-hidden="true"></svg>
+              <span>Circuits &amp; Inter-Services ({{ circuitStore.items().length }})</span>
+            </button>
 
-          <button
-            type="button"
-            class="admin-tab"
-            [class.admin-tab--active]="activeTab() === 'evenements'"
-            (click)="switchTab('evenements')"
-          >
-            <svg lucideCalendar [size]="16" aria-hidden="true"></svg>
-            <span>Événements ({{ evenementStore.items().length }})</span>
-          </button>
+            <button
+              type="button"
+              class="admin-tab"
+              [class.admin-tab--active]="activeTab() === 'evenements'"
+              (click)="switchTab('evenements')"
+            >
+              <svg lucideCalendar [size]="16" aria-hidden="true"></svg>
+              <span>Événements ({{ evenementStore.items().length }})</span>
+            </button>
 
-          <button
-            type="button"
-            class="admin-tab"
-            [class.admin-tab--active]="activeTab() === 'reservations'"
-            (click)="switchTab('reservations')"
-          >
-            <svg lucideTicket [size]="16" aria-hidden="true"></svg>
-            <span>Réservations</span>
-          </button>
+            <button
+              type="button"
+              class="admin-tab"
+              [class.admin-tab--active]="activeTab() === 'reservations'"
+              (click)="switchTab('reservations')"
+            >
+              <svg lucideTicket [size]="16" aria-hidden="true"></svg>
+              <span>Réservations</span>
+            </button>
+          }
 
-          <button
-            type="button"
-            class="admin-tab"
-            [class.admin-tab--active]="activeTab() === 'paiements'"
-            (click)="switchTab('paiements')"
-          >
-            <svg lucideCreditCard [size]="16" aria-hidden="true"></svg>
-            <span>Paiements Simulés</span>
-          </button>
+          @if (authStore.isAdmin()) {
+            <button
+              type="button"
+              class="admin-tab"
+              [class.admin-tab--active]="activeTab() === 'paiements'"
+              (click)="switchTab('paiements')"
+            >
+              <svg lucideCreditCard [size]="16" aria-hidden="true"></svg>
+              <span>Paiements Simulés</span>
+            </button>
+          }
 
           @if (canValidateGuides()) {
             <button
@@ -250,15 +254,17 @@ interface EtapeFormItem {
             </button>
           }
 
-          <button
-            type="button"
-            class="admin-tab"
-            [class.admin-tab--active]="activeTab() === 'utilisateurs'"
-            (click)="switchTab('utilisateurs')"
-          >
-            <svg lucideUsers [size]="16" aria-hidden="true"></svg>
-            <span>Gestion des utilisateurs</span>
-          </button>
+          @if (authStore.isAdmin()) {
+            <button
+              type="button"
+              class="admin-tab"
+              [class.admin-tab--active]="activeTab() === 'utilisateurs'"
+              (click)="switchTab('utilisateurs')"
+            >
+              <svg lucideUsers [size]="16" aria-hidden="true"></svg>
+              <span>Gestion des utilisateurs</span>
+            </button>
+          }
         </nav>
 
         @if (actionError()) {
@@ -2030,6 +2036,10 @@ export class AdminDashboardPageComponent implements OnInit {
   protected readonly moderationStatusBadgeClass = moderationBadgeClass;
   protected readonly formatNotificationEventLabel = formatNotificationEventLabel;
 
+  protected readonly canManageOperations = computed(() => {
+    const role = this.authStore.user()?.role;
+    return this.authStore.isAdmin() || role === 'GESTIONNAIRE_SITE';
+  });
   protected readonly canValidateGuides = computed(() => {
     const role = this.authStore.user()?.role;
     return this.authStore.isAdmin() || role === 'GESTIONNAIRE_SITE';

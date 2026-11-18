@@ -8,6 +8,7 @@ import {
   StatutCircuit,
 } from '../../../core/models/circuit.model';
 import { PageResponse } from '../../../core/models/patrimoine.model';
+import { CircuitStats } from '../../../core/models/statistics.model';
 
 export interface CircuitSearchParams {
   q?: string;
@@ -101,5 +102,9 @@ export class CircuitApiService {
     return this.http.get<Record<string, unknown>>(
       `/circuits/communication/${mode}/patrimoines/${patrimoineId}`
     );
+  }
+
+  getStatistiques(): Observable<CircuitStats> {
+    return this.http.get<CircuitStats>('/circuits/statistiques');
   }
 }
