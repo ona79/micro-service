@@ -236,12 +236,12 @@ import { NotificationStore } from '../../../notifications/data-access/notificati
                 @for (n of adminItems(); track n.id) {
                   <tr>
                     <td>
-                      <strong class="tabular-nums">#{{ n.id }}</strong>
+                      <strong class="tabular-nums">{{ n.id }}</strong>
                       <span class="bo-cell-sub">{{ n.dateEnvoi | dateFr: 'd MMM HH:mm' }}</span>
                     </td>
                     <td>
                       <span class="bo-cell-title">{{ n.destinataire }}</span>
-                      <span class="bo-cell-sub">{{ n.canal }} · User #{{ n.utilisateurId ?? 'N/A' }}</span>
+                      <span class="bo-cell-sub">{{ n.canal }} · User {{ n.utilisateurId ?? 'N/A' }}</span>
                     </td>
                     <td>
                       <span class="bo-cell-title">{{ n.sujet }}</span>
@@ -421,7 +421,7 @@ export class ProNotificationsPageComponent implements OnInit {
     this.busy.set(true);
     try {
       await firstValueFrom(this.notifApi.relancerNotification(n.id));
-      toast.success(`Notification #${n.id} relancée.`);
+      toast.success(`Notification ${n.id} relancée.`);
       await this.loadAdmin(this.adminPage());
     } catch (err) {
       toast.error(extractErrorMessage(err));

@@ -371,7 +371,7 @@ export class ReserverPageComponent implements OnInit {
           `Réservation ${created.referenceReservation || '#' + created.id} créée : passez au paiement simulé.`
         );
       } else {
-        toast.success(`Réservation brouillon #${created.id} enregistrée.`);
+        toast.success(`Réservation brouillon ${created.id} enregistrée.`);
       }
     } catch {
       toast.error('La réservation n’a pas pu être enregistrée.');
@@ -381,7 +381,7 @@ export class ReserverPageComponent implements OnInit {
   protected async submitDraft(res: Reservation): Promise<void> {
     try {
       await this.reservationStore.soumettreReservation(res.id);
-      toast.success(`Réservation #${res.id} soumise pour paiement.`);
+      toast.success(`Réservation ${res.id} soumise pour paiement.`);
     } catch (err) {
       toast.error(extractErrorMessage(err));
     }
@@ -408,9 +408,9 @@ export class ReserverPageComponent implements OnInit {
 
     try {
       await this.reservationStore.cancelReservation(res.id);
-      toast.success(`Réservation #${res.id} annulée.`);
+      toast.success(`Réservation ${res.id} annulée.`);
     } catch {
-      toast.error(`Impossible d'annuler la réservation #${res.id}.`);
+      toast.error(`Impossible d'annuler la réservation ${res.id}.`);
     }
   }
 
@@ -423,7 +423,7 @@ export class ReserverPageComponent implements OnInit {
     if (!res.circuitId) return 'Circuit';
     return (
       this.circuitStore.items().find((c) => c.id === res.circuitId)?.nomCircuit ??
-      `Circuit #${res.circuitId}`
+      `Circuit ${res.circuitId}`
     );
   }
 
@@ -432,7 +432,7 @@ export class ReserverPageComponent implements OnInit {
     if (!res.evenementId) return 'Événement';
     return (
       this.evenementStore.items().find((e) => e.id === res.evenementId)?.nomEvenement ??
-      `Événement #${res.evenementId}`
+      `Événement ${res.evenementId}`
     );
   }
 

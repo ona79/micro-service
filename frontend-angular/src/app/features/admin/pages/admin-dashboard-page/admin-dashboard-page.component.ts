@@ -540,7 +540,7 @@ interface EtapeFormItem {
                       <option [ngValue]="null">Aucun guide affecté</option>
                       @for (g of guidesCatalog(); track g.utilisateurId) {
                         <option [ngValue]="g.utilisateurId">
-                          Guide #{{ g.utilisateurId }} — {{ g.prenom }} {{ g.nom }} ({{ g.zonesIntervention }})
+                          Guide {{ g.utilisateurId }} — {{ g.prenom }} {{ g.nom }} ({{ g.zonesIntervention }})
                         </option>
                       }
                     </select>
@@ -552,7 +552,7 @@ interface EtapeFormItem {
                   @for (etape of circuitEtapes(); track $index) {
                     <div class="form-row" style="align-items:end;background:var(--surface-canvas);padding:0.5rem;border-radius:var(--radius-sm);">
                       <div class="form-field">
-                        <label>Ordre #{{ etape.ordre }} — Site patrimonial</label>
+                        <label>Ordre {{ etape.ordre }} — Site patrimonial</label>
                         <select
                           class="form-input"
                           [ngModel]="etape.patrimoineId"
@@ -560,7 +560,7 @@ interface EtapeFormItem {
                           (ngModelChange)="updateEtapePatrimoine($index, $event)"
                         >
                           @for (p of patrimoineStore.items(); track p.id) {
-                            <option [ngValue]="p.id">#{{ p.id }} — {{ p.nomPatrimoine }}</option>
+                            <option [ngValue]="p.id">{{ p.id }} — {{ p.nomPatrimoine }}</option>
                           }
                         </select>
                       </div>
@@ -620,7 +620,7 @@ interface EtapeFormItem {
                   <label for="comm-pat">Patrimoine cible</label>
                   <select id="comm-pat" class="form-input" [(ngModel)]="commPatrimoineId">
                     @for (p of patrimoineStore.items(); track p.id) {
-                      <option [ngValue]="p.id">#{{ p.id }} — {{ p.nomPatrimoine }}</option>
+                      <option [ngValue]="p.id">{{ p.id }} — {{ p.nomPatrimoine }}</option>
                     }
                   </select>
                 </div>
@@ -666,7 +666,7 @@ interface EtapeFormItem {
                               >
                                 <option value="">— Sans guide —</option>
                                 @for (g of guidesCatalog(); track g.utilisateurId) {
-                                  <option [ngValue]="g.utilisateurId">#{{ g.utilisateurId }} {{ g.prenom }} {{ g.nom }}</option>
+                                  <option [ngValue]="g.utilisateurId">{{ g.utilisateurId }} {{ g.prenom }} {{ g.nom }}</option>
                                 }
                               </select>
                             </div>
@@ -1087,7 +1087,7 @@ interface EtapeFormItem {
                           <strong>{{ p.referenceTransaction }}</strong><br />
                           <small>{{ (p.datePaiement || p.dateCreation) | dateFr: 'datetime' }}</small>
                         </td>
-                        <td class="tabular-nums">#{{ p.reservationId }}</td>
+                        <td class="tabular-nums">{{ p.reservationId }}</td>
                         <td>{{ p.modePaiement }}</td>
                         <td class="tabular-nums"><strong>{{ p.montant | fcfaPrice }}</strong></td>
                         <td><small>{{ p.synchroReservationStatut || 'N/A' }}</small></td>
@@ -1271,7 +1271,7 @@ interface EtapeFormItem {
               @if (selectedGuideAction(); as pending) {
                 <div class="admin-card" style="background:var(--surface-canvas);margin-bottom:var(--space-4);">
                   <h3 class="admin-card__title" style="font-size:var(--text-base);">
-                    Confirmer l’action « {{ pending.action }} » sur {{ pending.guide.prenom }} {{ pending.guide.nom }} (#{{ pending.guide.id }})
+                    Confirmer l’action « {{ pending.action }} » sur {{ pending.guide.prenom }} {{ pending.guide.nom }} ({{ pending.guide.id }})
                   </h3>
                   <div class="form-field">
                     <label for="guide-decision-motif">
@@ -1308,7 +1308,7 @@ interface EtapeFormItem {
                     @for (g of adminGuides(); track g.id) {
                       <tr>
                         <td>
-                          <strong>#{{ g.id }} · {{ g.prenom }} {{ g.nom }}</strong><br />
+                          <strong>{{ g.id }} · {{ g.prenom }} {{ g.nom }}</strong><br />
                           <small>{{ g.email || 'utilisateur #' + g.utilisateurId }}</small>
                           @if (g.motifDecision) {
                             <br /><small>Motif : {{ g.motifDecision }}</small>
@@ -1355,7 +1355,7 @@ interface EtapeFormItem {
                 <div style="margin-top:var(--space-5);">
                   <div class="section-head">
                     <h3 class="admin-card__title" style="margin:0;font-size:var(--text-base);">
-                      Historique d’audit — {{ histTarget.prenom }} {{ histTarget.nom }} (#{{ histTarget.id }})
+                      Historique d’audit — {{ histTarget.prenom }} {{ histTarget.nom }} ({{ histTarget.id }})
                     </h3>
                     <button type="button" class="btn-xs" (click)="guideHistoriqueTarget.set(null)">Fermer</button>
                   </div>
@@ -1374,7 +1374,7 @@ interface EtapeFormItem {
                           <tr>
                             <td class="tabular-nums">{{ h.dateTransition | dateFr }}</td>
                             <td>{{ h.ancienStatut || 'NOUVEAU' }} → <strong>{{ h.nouveauStatut }}</strong></td>
-                            <td>#{{ h.acteurId }} ({{ h.acteurRole }})</td>
+                            <td>{{ h.acteurId }} ({{ h.acteurRole }})</td>
                             <td>{{ h.motif || '—' }}</td>
                           </tr>
                         }
@@ -1411,7 +1411,7 @@ interface EtapeFormItem {
                 @if (selectedSignalementAction(); as sigPending) {
                   <div class="admin-card" style="background:var(--surface-canvas);margin-bottom:var(--space-4);">
                     <h3 class="admin-card__title" style="font-size:var(--text-base);">
-                      Traiter signalement #{{ sigPending.signalement.id }} ({{ sigPending.decision }})
+                      Traiter signalement {{ sigPending.signalement.id }} ({{ sigPending.decision }})
                     </h3>
                     <div class="form-field">
                       <label for="sig-decision-comment">Justification de modération *</label>
@@ -1445,11 +1445,11 @@ interface EtapeFormItem {
                       @for (s of moderationSignalements(); track s.id) {
                         <tr>
                           <td>
-                            <strong>#{{ s.id }} · {{ s.categorie }}</strong><br />
+                            <strong>{{ s.id }} · {{ s.categorie }}</strong><br />
                             <small>Par {{ s.signaleParNom }} le {{ s.dateSignalement | dateFr }}</small>
                           </td>
                           <td>
-                            <strong>Avis #{{ s.avisId }}</strong>
+                            <strong>Avis {{ s.avisId }}</strong>
                             @if (s.avis) {
                               <span class="tabular-nums"> ({{ s.avis.note }}/5)</span><br />
                               <small>{{ s.avis.commentaire }}</small>
@@ -1513,7 +1513,7 @@ interface EtapeFormItem {
                 @if (selectedAvisAction(); as avisPending) {
                   <div class="admin-card" style="background:var(--surface-canvas);margin-bottom:var(--space-4);">
                     <h3 class="admin-card__title" style="font-size:var(--text-base);">
-                      Appliquer « {{ formatModerationStatusLabel(avisPending.decision) }} » à l’avis #{{ avisPending.avis.id }}
+                      Appliquer « {{ formatModerationStatusLabel(avisPending.decision) }} » à l’avis {{ avisPending.avis.id }}
                     </h3>
                     <div class="form-field">
                       <label for="avis-decision-motif">Motif obligatoire pour l’audit *</label>
@@ -1547,7 +1547,7 @@ interface EtapeFormItem {
                         <tr>
                           <td>
                             <strong>{{ a.auteurNom }}</strong><br />
-                            <small>{{ a.cibleType }} #{{ a.cibleId }} · Rés. #{{ a.reservationId }}</small>
+                            <small>{{ a.cibleType }} {{ a.cibleId }} · Rés. {{ a.reservationId }}</small>
                           </td>
                           <td>
                             <strong class="tabular-nums">{{ a.note }}/5</strong>
@@ -1588,7 +1588,7 @@ interface EtapeFormItem {
                   <div style="margin-top:var(--space-5);">
                     <div class="section-head">
                       <h3 class="admin-card__title" style="margin:0;font-size:var(--text-base);">
-                        Historique de modération — Avis #{{ avisHistTarget.id }}
+                        Historique de modération — Avis {{ avisHistTarget.id }}
                       </h3>
                       <button type="button" class="btn-xs" (click)="avisHistoriqueTarget.set(null)">Fermer</button>
                     </div>
@@ -1607,7 +1607,7 @@ interface EtapeFormItem {
                             <tr>
                               <td class="tabular-nums">{{ h.dateDecision | dateFr }}</td>
                               <td>{{ h.ancienStatut || 'NOUVEAU' }} → <strong>{{ h.nouveauStatut }}</strong></td>
-                              <td>#{{ h.acteurId }} ({{ h.acteurRole }})</td>
+                              <td>{{ h.acteurId }} ({{ h.acteurRole }})</td>
                               <td>{{ h.justification }}</td>
                             </tr>
                           }
@@ -1675,7 +1675,7 @@ interface EtapeFormItem {
                       <tr>
                         <td>
                           <strong>{{ n.destinataire }}</strong><br />
-                          <small>Utilisateur #{{ n.utilisateurId ?? '—' }}</small>
+                          <small>Utilisateur {{ n.utilisateurId ?? '—' }}</small>
                         </td>
                         <td>
                           <strong>{{ formatNotificationEventLabel(n.typeEvenement) }}</strong><br />
@@ -2311,7 +2311,7 @@ export class AdminDashboardPageComponent implements OnInit {
   }
 
   protected async deletePatrimoine(id: number): Promise<void> {
-    if (!(await this.confirmDialog(`Archiver ou supprimer le patrimoine #${id} ?`, 'Cette action est soumise aux règles d’intégrité référentielle P03/P04.', 'Confirmer'))) {
+    if (!(await this.confirmDialog(`Archiver ou supprimer le patrimoine ${id} ?`, 'Cette action est soumise aux règles d’intégrité référentielle P03/P04.', 'Confirmer'))) {
       return;
     }
     this.actionError.set(null);
@@ -2491,7 +2491,7 @@ export class AdminDashboardPageComponent implements OnInit {
   }
 
   protected async deleteCircuit(id: number): Promise<void> {
-    if (!(await this.confirmDialog(`Archiver ou supprimer le circuit #${id} ?`, 'Un circuit référencé par des réservations ne sera jamais détruit physiquement.', 'Confirmer'))) {
+    if (!(await this.confirmDialog(`Archiver ou supprimer le circuit ${id} ?`, 'Un circuit référencé par des réservations ne sera jamais détruit physiquement.', 'Confirmer'))) {
       return;
     }
     this.actionError.set(null);
@@ -2585,7 +2585,7 @@ export class AdminDashboardPageComponent implements OnInit {
   }
 
   protected async deleteEvenement(id: number): Promise<void> {
-    if (!(await this.confirmDialog(`Archiver ou supprimer l’événement #${id} ?`, 'Si des réservations sont rattachées à cet événement, il sera protégé ou archivé.', 'Confirmer'))) {
+    if (!(await this.confirmDialog(`Archiver ou supprimer l’événement ${id} ?`, 'Si des réservations sont rattachées à cet événement, il sera protégé ou archivé.', 'Confirmer'))) {
       return;
     }
     this.actionError.set(null);
@@ -2627,7 +2627,7 @@ export class AdminDashboardPageComponent implements OnInit {
     this.actionError.set(null);
     try {
       await firstValueFrom(this.reservationApi.synchroniser(id));
-      toast.success(`Réservation #${id} synchronisée avec ms-paiement`);
+      toast.success(`Réservation ${id} synchronisée avec ms-paiement`);
       await this.loadReservationsPage(this.resPage());
     } catch (err) {
       this.actionError.set(normalizeHttpError(err).message);
@@ -2645,7 +2645,7 @@ export class AdminDashboardPageComponent implements OnInit {
     this.actionError.set(null);
     try {
       await firstValueFrom(this.reservationApi.cancel(r.id, 'Annulation administrative'));
-      toast.success(`Réservation #${r.id} annulée`);
+      toast.success(`Réservation ${r.id} annulée`);
       await this.loadReservationsPage(this.resPage());
     } catch (err) {
       this.actionError.set(normalizeHttpError(err).message);
@@ -2680,7 +2680,7 @@ export class AdminDashboardPageComponent implements OnInit {
   protected async rembourserAdminPaiement(p: Paiement): Promise<void> {
     if (!(await this.confirmDialog(
       `Rembourser intégralement ${p.referenceTransaction} ?`,
-      `Remboursement simulé P04 de ${p.montant} ${p.devise || 'XOF'} pour la réservation #${p.reservationId} (réservé ADMINISTRATEUR).`,
+      `Remboursement simulé P04 de ${p.montant} ${p.devise || 'XOF'} pour la réservation ${p.reservationId} (réservé ADMINISTRATEUR).`,
       'Confirmer le remboursement simulé'
     ))) {
       return;
@@ -2739,7 +2739,7 @@ export class AdminDashboardPageComponent implements OnInit {
   }
 
   protected async deleteUser(id: number): Promise<void> {
-    if (!(await this.confirmDialog(`Supprimer l’utilisateur #${id} ?`, 'Cette action est irréversible.', 'Supprimer'))) {
+    if (!(await this.confirmDialog(`Supprimer l’utilisateur ${id} ?`, 'Cette action est irréversible.', 'Supprimer'))) {
       return;
     }
     this.actionError.set(null);
@@ -2763,7 +2763,7 @@ export class AdminDashboardPageComponent implements OnInit {
 
   protected guideLabel(guideUtilisateurId: number): string {
     const found = this.guidesCatalog().find((g) => g.utilisateurId === guideUtilisateurId);
-    return found ? `${found.prenom} ${found.nom} (#${guideUtilisateurId})` : `#${guideUtilisateurId}`;
+    return found ? `${found.prenom} ${found.nom} (${guideUtilisateurId})` : `${guideUtilisateurId}`;
   }
 
   protected async assignGuideToCircuit(circuitId: number, rawGuideId: unknown): Promise<void> {
@@ -2771,7 +2771,7 @@ export class AdminDashboardPageComponent implements OnInit {
     const guideId = rawGuideId === '' || rawGuideId == null ? null : Number(rawGuideId);
     try {
       await firstValueFrom(this.circuitApi.affecterGuideResponsable(circuitId, guideId));
-      toast.success(guideId ? `Guide #${guideId} affecté au circuit #${circuitId}` : `Affectation guide retirée du circuit #${circuitId}`);
+      toast.success(guideId ? `Guide ${guideId} affecté au circuit ${circuitId}` : `Affectation guide retirée du circuit ${circuitId}`);
       await this.circuitStore.reload();
     } catch (err) {
       this.actionError.set(normalizeHttpError(err).message);
@@ -2817,19 +2817,19 @@ export class AdminDashboardPageComponent implements OnInit {
       const id = pending.guide.id;
       if (pending.action === 'VALIDER') {
         await firstValueFrom(this.guideApi.validerProfil(id, motif || undefined));
-        toast.success(`Guide #${id} validé et publié dans l'annuaire`);
+        toast.success(`Guide ${id} validé et publié dans l'annuaire`);
       } else if (pending.action === 'REJETER') {
         await firstValueFrom(this.guideApi.rejeterProfil(id, motif));
-        toast.success(`Dossier guide #${id} rejeté`);
+        toast.success(`Dossier guide ${id} rejeté`);
       } else if (pending.action === 'SUSPENDRE') {
         await firstValueFrom(this.guideApi.suspendreProfil(id, motif));
-        toast.success(`Guide #${id} suspendu`);
+        toast.success(`Guide ${id} suspendu`);
       } else if (pending.action === 'REACTIVER') {
         await firstValueFrom(this.guideApi.reactiverProfil(id, motif || undefined));
-        toast.success(`Guide #${id} réactivé`);
+        toast.success(`Guide ${id} réactivé`);
       } else {
         await firstValueFrom(this.guideApi.desactiverProfilParAdmin(id, motif || undefined));
-        toast.success(`Guide #${id} désactivé`);
+        toast.success(`Guide ${id} désactivé`);
       }
       this.cancelGuideDecision();
       await this.loadAdminGuides();
@@ -2892,7 +2892,7 @@ export class AdminDashboardPageComponent implements OnInit {
           pending.decision === 'VALIDE_CONTENU_RETIRE' ? 'MASQUE' : undefined
         )
       );
-      toast.success(`Signalement #${pending.signalement.id} traité`);
+      toast.success(`Signalement ${pending.signalement.id} traité`);
       this.selectedSignalementAction.set(null);
       await this.loadModerationData();
     } catch (err) {
@@ -2918,7 +2918,7 @@ export class AdminDashboardPageComponent implements OnInit {
       await firstValueFrom(
         this.avisApi.deciderModerationAvis(pending.avis.id, pending.decision, motif)
       );
-      toast.success(`Avis #${pending.avis.id} passé au statut ${pending.decision}`);
+      toast.success(`Avis ${pending.avis.id} passé au statut ${pending.decision}`);
       this.selectedAvisAction.set(null);
       await this.loadModerationData();
     } catch (err) {
@@ -2961,7 +2961,7 @@ export class AdminDashboardPageComponent implements OnInit {
     this.actionError.set(null);
     try {
       await firstValueFrom(this.notificationApi.relancerNotification(id));
-      toast.success(`Relance exécutée pour la notification #${id}`);
+      toast.success(`Relance exécutée pour la notification ${id}`);
       await this.loadAdminNotifications(this.notifAdminPage());
     } catch (err) {
       this.actionError.set(normalizeHttpError(err).message);

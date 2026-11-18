@@ -205,7 +205,7 @@ import { GuideApiService } from '../../data-access/guide-api.service';
 
               @if (manifesteCircuitId() !== null) {
                 <div class="manifeste-box">
-                  <h3>Manifeste des participants — Circuit #{{ manifesteCircuitId() }}</h3>
+                  <h3>Manifeste des participants — Circuit {{ manifesteCircuitId() }}</h3>
                   @if (manifeste().length === 0) {
                     <p class="muted">Aucune réservation confirmée ou active pour ce circuit.</p>
                   } @else {

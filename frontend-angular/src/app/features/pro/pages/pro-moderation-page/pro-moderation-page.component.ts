@@ -110,12 +110,12 @@ import { AvisApiService } from '../../../avis/data-access/avis-api.service';
                 @for (s of signalements(); track s.id) {
                   <tr>
                     <td>
-                      <strong>#{{ s.id }} · {{ s.categorie }}</strong>
+                      <strong>{{ s.id }} · {{ s.categorie }}</strong>
                       <span class="bo-cell-sub">{{ s.dateSignalement | dateFr: 'd MMM yyyy HH:mm' }} par {{ s.signaleParNom }}</span>
                     </td>
                     <td>{{ s.motif }}</td>
                     <td>
-                      <span class="bo-cell-title">Avis #{{ s.avisId }} ({{ s.avisStatutActuel || 'INCONNU' }})</span>
+                      <span class="bo-cell-title">Avis {{ s.avisId }} ({{ s.avisStatutActuel || 'INCONNU' }})</span>
                       @if (s.avis) {
                         <span class="bo-cell-sub">« {{ s.avis.commentaire }} »</span>
                       }
@@ -196,7 +196,7 @@ import { AvisApiService } from '../../../avis/data-access/avis-api.service';
                       <span class="bo-cell-sub">{{ a.note }} / 5 · {{ a.datePublication | dateFr: 'd MMM yyyy' }}</span>
                     </td>
                     <td>
-                      <span class="ui-badge ui-badge--neutral">{{ a.cibleType }} #{{ a.cibleId }}</span>
+                      <span class="ui-badge ui-badge--neutral">{{ a.cibleType }} {{ a.cibleId }}</span>
                       <span class="bo-cell-sub">{{ a.commentaire }}</span>
                     </td>
                     <td>
@@ -236,7 +236,7 @@ import { AvisApiService } from '../../../avis/data-access/avis-api.service';
     >
       @if (pendingSigDecision(); as ps) {
         <div class="bo-panel" style="margin: 0;">
-          <p class="bo-cell-title">Traiter signalement #{{ ps.sig.id }} → {{ ps.decision }}</p>
+          <p class="bo-cell-title">Traiter signalement {{ ps.sig.id }} → {{ ps.decision }}</p>
           <p class="bo-cell-sub">{{ ps.sig.motif }}</p>
           <label for="sig-justif" class="bo-label" style="margin-top: var(--space-3);">Justification obligatoire (5 car. min.) *</label>
           <textarea id="sig-justif" class="bo-textarea" rows="3" [(ngModel)]="justification"></textarea>
@@ -254,7 +254,7 @@ import { AvisApiService } from '../../../avis/data-access/avis-api.service';
 
       @if (pendingAvisDecision(); as pa) {
         <div class="bo-panel" style="margin: 0;">
-          <p class="bo-cell-title">Modérer avis #{{ pa.avis.id }} → {{ pa.decision }}</p>
+          <p class="bo-cell-title">Modérer avis {{ pa.avis.id }} → {{ pa.decision }}</p>
           <p class="bo-cell-sub">« {{ pa.avis.commentaire }} »</p>
           <label for="avis-justif" class="bo-label" style="margin-top: var(--space-3);">Justification obligatoire (5 car. min.) *</label>
           <textarea id="avis-justif" class="bo-textarea" rows="3" [(ngModel)]="justification"></textarea>
@@ -359,7 +359,7 @@ export class ProModerationPageComponent implements OnInit {
   async openAvisHistory(a: Avis): Promise<void> {
     this.pendingSigDecision.set(null);
     this.pendingAvisDecision.set(null);
-    this.drawerTitle.set(`Historique avis #${a.id}`);
+    this.drawerTitle.set(`Historique avis ${a.id}`);
     this.drawerOpen.set(true);
     try {
       this.historique.set(await firstValueFrom(this.avisApi.getHistoriqueModeration(a.id)));
@@ -373,7 +373,7 @@ export class ProModerationPageComponent implements OnInit {
     this.pendingSigDecision.set({ sig, decision });
     this.justification = '';
     this.justifError.set(null);
-    this.drawerTitle.set(`Signalement #${sig.id}`);
+    this.drawerTitle.set(`Signalement ${sig.id}`);
     this.historique.set([]);
     this.drawerOpen.set(true);
   }
@@ -383,7 +383,7 @@ export class ProModerationPageComponent implements OnInit {
     this.pendingAvisDecision.set({ avis: a, decision });
     this.justification = '';
     this.justifError.set(null);
-    this.drawerTitle.set(`Modérer avis #${a.id}`);
+    this.drawerTitle.set(`Modérer avis ${a.id}`);
     this.historique.set([]);
     this.drawerOpen.set(true);
   }
@@ -413,7 +413,7 @@ export class ProModerationPageComponent implements OnInit {
           p.decision === 'VALIDE_CONTENU_RETIRE' ? 'MASQUE' : undefined
         )
       );
-      toast.success(`Signalement #${p.sig.id} traité.`);
+      toast.success(`Signalement ${p.sig.id} traité.`);
       this.closeDrawer();
       await this.loadAll();
     } catch (err) {
@@ -436,7 +436,7 @@ export class ProModerationPageComponent implements OnInit {
       await firstValueFrom(
         this.avisApi.deciderModerationAvis(p.avis.id, p.decision, this.justification.trim())
       );
-      toast.success(`Avis #${p.avis.id} mis à jour (${p.decision}).`);
+      toast.success(`Avis ${p.avis.id} mis à jour (${p.decision}).`);
       this.closeDrawer();
       await this.loadAll();
     } catch (err) {

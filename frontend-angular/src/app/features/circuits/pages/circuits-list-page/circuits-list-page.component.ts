@@ -171,7 +171,7 @@ export class CircuitsListPageComponent implements OnInit {
 
   protected getStopLabel(patrimoineId: number, inlinePat: Patrimoine | null): string {
     if (inlinePat?.nomPatrimoine) return inlinePat.nomPatrimoine;
-    return this.patrimoineStore.byIdMap().get(patrimoineId)?.nomPatrimoine ?? `Site #${patrimoineId}`;
+    return this.patrimoineStore.byIdMap().get(patrimoineId)?.nomPatrimoine ?? `Site ${patrimoineId}`;
   }
 
   protected getResume(id: number): AvisResume | null {

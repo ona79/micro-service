@@ -119,7 +119,7 @@
             } @else if (ev.patrimoineId) {
               <h2>Site patrimonial d'accueil</h2>
               <p>
-                Site patrimonial associé : identifiant #{{ ev.patrimoineId }}.
+                Site patrimonial associé : identifiant {{ ev.patrimoineId }}.
                 <a [routerLink]="['/patrimoines', ev.patrimoineId]">Consulter la fiche</a>
               </p>
             }

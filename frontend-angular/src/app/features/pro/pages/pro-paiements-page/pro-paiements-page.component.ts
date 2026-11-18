@@ -149,7 +149,7 @@ import { PaiementApiService } from '../../../paiements/data-access/paiement-api.
                   </td>
                   <td class="tabular-nums">
                     {{ p.montant | fcfaPrice }}
-                    <span class="bo-cell-sub">Réservation #{{ p.reservationId }}</span>
+                    <span class="bo-cell-sub">Réservation {{ p.reservationId }}</span>
                   </td>
                   <td>
                     <span [class]="statusBadge(p.statut)">{{ statusLabel(p.statut) }}</span>
@@ -199,7 +199,7 @@ import { PaiementApiService } from '../../../paiements/data-access/paiement-api.
           <div class="bo-kv-row"><dt>Simulation</dt><dd>{{ d.mentionSimulation || 'PAIEMENT SIMULÉ' }}</dd></div>
           <div class="bo-kv-row"><dt>Opérateur / Tél</dt><dd>{{ formatMode(d.modePaiement) }} · {{ d.numeroTelephoneMasque || '—' }}</dd></div>
           <div class="bo-kv-row"><dt>Montant</dt><dd class="tabular-nums">{{ d.montant | fcfaPrice }}</dd></div>
-          <div class="bo-kv-row"><dt>Réservation liée</dt><dd>#{{ d.reservationId }} {{ d.reservation?.referenceReservation || '' }}</dd></div>
+          <div class="bo-kv-row"><dt>Réservation liée</dt><dd>{{ d.reservationId }} {{ d.reservation?.referenceReservation || '' }}</dd></div>
           <div class="bo-kv-row"><dt>Synchro résa</dt><dd>{{ d.synchroReservationStatut || 'N/A' }}</dd></div>
           <div class="bo-kv-row"><dt>Corrélation</dt><dd>{{ d.correlationId || '—' }}</dd></div>
           @if (d.motifDecision) {
@@ -317,7 +317,7 @@ export class ProPaiementsPageComponent implements OnInit {
         .open<boolean>(UiConfirmDialogComponent, {
           data: {
             title: `Rembourser (simulé) ${p.referenceTransaction} ?`,
-            message: `Un remboursement simulé de ${p.montant} XOF passera la transaction #${p.id} à REMBOURSE et synchronisera la réservation liée.`,
+            message: `Un remboursement simulé de ${p.montant} XOF passera la transaction ${p.id} à REMBOURSE et synchronisera la réservation liée.`,
             confirmLabel: 'Confirmer le remboursement',
             cancelLabel: 'Annuler',
             variant: 'danger',

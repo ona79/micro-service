@@ -545,7 +545,7 @@ export class ReservationDetailPageComponent {
     return [
       { label: 'Accueil', to: '/' },
       { label: 'Mon Espace', to: '/mon-espace' },
-      { label: r?.referenceReservation ?? `Réservation #${this.id()}` },
+      { label: r?.referenceReservation ?? `Réservation ${this.id()}` },
     ];
   });
 
@@ -553,9 +553,9 @@ export class ReservationDetailPageComponent {
     const r = this.reservation();
     if (!r) return 'Réservation';
     if (r.typeReservation === 'CIRCUIT') {
-      return r.circuit?.nomCircuit ?? `Circuit #${r.circuitId}`;
+      return r.circuit?.nomCircuit ?? `Circuit ${r.circuitId}`;
     }
-    return r.evenement?.nomEvenement ?? `Événement #${r.evenementId}`;
+    return r.evenement?.nomEvenement ?? `Événement ${r.evenementId}`;
   });
 
   protected readonly prestationLink = computed<unknown[] | null>(() => {
