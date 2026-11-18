@@ -9,6 +9,9 @@ if [ -z "$JAVA_HOME" ] || [ ! -x "$JAVA_HOME/bin/java" ]; then
   fi
 fi
 
+export SECURITY_SESSION_SECRET="${SECURITY_SESSION_SECRET:-$(openssl rand -base64 48 | tr -d '\n')}"
+export SECURITY_INTERSERVICE_SECRET="${SECURITY_INTERSERVICE_SECRET:-$(openssl rand -base64 48 | tr -d '\n')}"
+
 SERVICES=(
   discovery-server
   ms-patrimoine
@@ -23,12 +26,12 @@ SERVICES=(
 
 echo "=================================================================="
 echo " VÉRIFICATION D'INTÉGRATION CONTINUE (9 SERVICES - JAVA 21)"
-echo " Architecture Cible P01 : Sans Config Server, Multi-profils"
+echo " Architecture Cible P02 : Sécurité Zero-Trust & RBAC"
 echo "=================================================================="
 
 for s in "${SERVICES[@]}"; do
   echo ">>> [BUILD & TEST] $s ..."
-  (cd "$s" && ./mvnw -o -B test)
+  (cd "$s" && ./mvnw -Dmaven.repo.local="${MAVEN_REPO_LOCAL:-/home/mahou-dev/.m2_local}" -B test)
 done
 
 echo "=================================================================="
