@@ -79,13 +79,30 @@ jobs:
           export SECURITY_SESSION_SECRET="$(openssl rand -base64 48 | tr -d '\n')"
           export SECURITY_INTERSERVICE_SECRET="$(openssl rand -base64 48 | tr -d '\n')"
           chmod +x ./mvnw
-          if ! ./mvnw --version >/dev/null 2>&1; then
+          MVN_CMD=""
+          for attempt in 1 2 3; do
+            if ./mvnw --version >/dev/null 2>&1; then
+              MVN_CMD="./mvnw"
+              break
+            fi
+            echo ">>> Tentative $attempt/3 d'initialisation de ./mvnw échouée, nouvelle tentative..."
+            sleep 5
+          done
+          if [ -z "$MVN_CMD" ]; then
             echo ">>> Wrapper Maven indisponible sur le réseau, bascule vers Maven système."
             MVN_CMD="mvn"
-          else
-            MVN_CMD="./mvnw"
+            if [ -d "${HOME}/.m2/repository" ]; then
+              find "${HOME}/.m2/repository" -name "_remote.repositories" -delete || true
+            fi
           fi
-          "$MVN_CMD" -B clean test package
+          "$MVN_CMD" -B clean test package || {
+            echo ">>> Échec Maven transitoire détecté, nouvelle tentative dans 10s..."
+            sleep 10
+            if [ -d "${HOME}/.m2/repository" ]; then
+              find "${HOME}/.m2/repository" -name "_remote.repositories" -delete || true
+            fi
+            "$MVN_CMD" -B clean test package
+          }
 
       - name: Conservation de l'artefact JAR (${{ matrix.service }})
         uses: actions/upload-artifact@v4
