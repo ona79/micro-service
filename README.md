@@ -92,9 +92,18 @@ Chaque microservice dispose de profils Spring Boot indépendants de Config Serve
 ## 🧪 EXÉCUTION DES TESTS AUTOMATISÉS
 
 ```bash
-# Tests unitaires et intégration de l'ensemble des modules backend Java (62 tests)
+# 1. Tests unitaires et d'intégration de l'ensemble des 9 services backend Java (140 tests exécutés en mode H2/MockMvc)
 ./verify-integration.sh
 
-# Tests unitaires et composants du frontend Angular (31 tests)
-cd frontend-angular && npm test -- --watch=false
+# 2. Tests d'intégration et de concurrence sur PostgreSQL 16 réel avec migrations Flyway V1..V4 (8 tests sur les 7 bases isolées)
+eval "$(docker inspect postgres --format '{{range .Config.Env}}{{println "export " .}}{{end}}' | grep '_PASSWORD=')" && ./verify-postgres.sh
+
+# 3. Build de production et tests Vitest du frontend Angular 22 (34 tests sur 13 suites)
+npm --prefix frontend-angular run build
+npm --prefix frontend-angular run test -- --watch=false
 ```
+
+Documentation technique détaillée :
+- **Cœur métier touristique P03** : [docs/P03_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md](docs/P03_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md)
+- **Spécification OpenAPI P03** : [docs/api/OPENAPI_P03_CATALOGUE.yaml](docs/api/OPENAPI_P03_CATALOGUE.yaml)
+- **Sécurité Zero-Trust & RBAC P02** : [docs/security/P02_RAPPORT_FINAL.md](docs/security/P02_RAPPORT_FINAL.md)
