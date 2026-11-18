@@ -13,4 +13,6 @@ public interface CircuitRepository extends JpaRepository<Circuit, Long>, JpaSpec
     List<Circuit> findByStatutCircuit(StatutCircuit statutCircuit);
 
     List<Circuit> findByDifficulteAndStatutCircuit(Difficulte difficulte, StatutCircuit statutCircuit);
+
+    List<Circuit> findByGuideResponsableIdOrderByIdDesc(Long guideResponsableId);
 }

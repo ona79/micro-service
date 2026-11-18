@@ -2,27 +2,31 @@ package com.uasz.ms_circuit.services;
 
 import com.uasz.ms_circuit.clients.HttpClientsConfig;
 import com.uasz.ms_circuit.clients.PatrimoineClient;
+import com.uasz.ms_circuit.clients.UtilisateurGuideClient;
 import com.uasz.ms_circuit.dto.CircuitDto;
 import com.uasz.ms_circuit.dto.EtapeDto;
+import com.uasz.ms_circuit.dto.GuideVerificationDto;
 import com.uasz.ms_circuit.dto.PageResponseDto;
 import com.uasz.ms_circuit.dto.PatrimoineDto;
 import com.uasz.ms_circuit.entities.Circuit;
+import com.uasz.ms_circuit.entities.CircuitNotificationOutbox;
 import com.uasz.ms_circuit.entities.Difficulte;
 import com.uasz.ms_circuit.entities.Etape;
 import com.uasz.ms_circuit.entities.MoyenTransport;
 import com.uasz.ms_circuit.entities.StatutCircuit;
+import com.uasz.ms_circuit.entities.StatutOutbox;
 import com.uasz.ms_circuit.exceptions.BadRequestException;
 import com.uasz.ms_circuit.exceptions.ForbiddenException;
 import com.uasz.ms_circuit.exceptions.ResourceNotFoundException;
 import com.uasz.ms_circuit.exceptions.ServiceIndisponibleException;
 import com.uasz.ms_circuit.exceptions.UnauthorizedException;
 import com.uasz.ms_circuit.mappers.CircuitMapper;
+import com.uasz.ms_circuit.repositories.CircuitNotificationOutboxRepository;
 import com.uasz.ms_circuit.repositories.CircuitRepository;
 import com.uasz.ms_circuit.security.SecurityUserContext;
 import com.uasz.ms_circuit.security.SecurityUserContextHolder;
 import feign.FeignException;
 import jakarta.persistence.criteria.Predicate;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,10 +37,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -44,21 +51,32 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class CircuitService implements ICircuitService {
 
+    public static final ZoneId CASAMANCE_ZONE = ZoneId.of("Africa/Dakar");
     private static final double RAYON_TERRE_KM = 6371.0;
     private static final int MAX_PAGE_SIZE = 50;
 
     private final CircuitRepository circuitRepository;
     private final CircuitMapper circuitMapper;
     private final PatrimoineClient patrimoineClient;
+
+    @Autowired(required = false)
+    private UtilisateurGuideClient utilisateurGuideClient;
+
+    @Autowired(required = false)
+    private CircuitNotificationOutboxRepository notificationOutboxRepository;
+
+    @Autowired(required = false)
+    private CircuitNotificationOutboxRelayService notificationOutboxRelayService;
 
     @Autowired(required = false)
     private RestTemplate restTemplate;
@@ -68,6 +86,31 @@ public class CircuitService implements ICircuitService {
 
     @Value("${patrimoine.url:http://localhost:3001}")
     private String patrimoineUrl;
+
+    @Autowired
+    public CircuitService(
+            CircuitRepository circuitRepository,
+            CircuitMapper circuitMapper,
+            PatrimoineClient patrimoineClient,
+            @Autowired(required = false) UtilisateurGuideClient utilisateurGuideClient,
+            @Autowired(required = false) CircuitNotificationOutboxRepository notificationOutboxRepository,
+            @Autowired(required = false) CircuitNotificationOutboxRelayService notificationOutboxRelayService
+    ) {
+        this.circuitRepository = circuitRepository;
+        this.circuitMapper = circuitMapper;
+        this.patrimoineClient = patrimoineClient;
+        this.utilisateurGuideClient = utilisateurGuideClient;
+        this.notificationOutboxRepository = notificationOutboxRepository;
+        this.notificationOutboxRelayService = notificationOutboxRelayService;
+    }
+
+    public CircuitService(
+            CircuitRepository circuitRepository,
+            CircuitMapper circuitMapper,
+            PatrimoineClient patrimoineClient
+    ) {
+        this(circuitRepository, circuitMapper, patrimoineClient, null, null, null);
+    }
 
     @Override
     public CircuitDto saveCircuit(CircuitDto circuitDto) {
@@ -82,6 +125,8 @@ public class CircuitService implements ICircuitService {
         if (circuit.getStatutCircuit() == StatutCircuit.PUBLIE && !caller.hasPermission("CIRCUIT:PUBLIER")) {
             throw new ForbiddenException("Accès interdit : la permission CIRCUIT:PUBLIER est requise pour publier directement un circuit.");
         }
+
+        GuideVerificationDto verifiedGuide = verifierGuideEligibilite(circuit.getGuideResponsableId());
 
         boolean requirePublishedPatrimoines = circuit.getStatutCircuit() == StatutCircuit.PUBLIE
                 || circuit.getStatutCircuit() == StatutCircuit.SOUMIS;
@@ -99,7 +144,11 @@ public class CircuitService implements ICircuitService {
             circuit.setDatePublication(now);
         }
 
-        return toDtoEnrichi(circuitRepository.save(circuit), patrimoines);
+        Circuit saved = circuitRepository.save(circuit);
+        if (verifiedGuide != null) {
+            notifierAffectationGuide(saved, verifiedGuide, "Affectation à un nouveau circuit");
+        }
+        return toDtoEnrichi(saved, patrimoines);
     }
 
     @Override
@@ -232,8 +281,12 @@ public class CircuitService implements ICircuitService {
         normaliserValeursParDefaut(circuit);
 
         // Un GUIDE ne peut jamais modifier ni s'approprier guideResponsableId
+        GuideVerificationDto newlyAssignedGuide = null;
         if ("GUIDE".equals(caller.role())) {
             circuit.setGuideResponsableId(persistedGuideResponsableId);
+        } else if (circuit.getGuideResponsableId() != null
+                && !Objects.equals(persistedGuideResponsableId, circuit.getGuideResponsableId())) {
+            newlyAssignedGuide = verifierGuideEligibilite(circuit.getGuideResponsableId());
         }
 
         if (circuit.getStatutCircuit() == StatutCircuit.PUBLIE
@@ -263,7 +316,47 @@ public class CircuitService implements ICircuitService {
             }
         }
 
-        return toDtoEnrichi(circuitRepository.save(circuit), patrimoines);
+        Circuit saved = circuitRepository.save(circuit);
+        if (newlyAssignedGuide != null) {
+            notifierAffectationGuide(saved, newlyAssignedGuide, "Affectation ou réaffectation au circuit");
+        }
+        return toDtoEnrichi(saved, patrimoines);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CircuitDto> getMesCircuitsGuide() {
+        SecurityUserContext caller = SecurityUserContextHolder.getContext();
+        if (caller == null || caller.userId() == null) {
+            throw new UnauthorizedException("Authentification requise.");
+        }
+        if (!"GUIDE".equals(caller.role()) && !caller.hasPermission("CIRCUIT:PUBLIER")) {
+            throw new ForbiddenException("Accès interdit : espace réservé aux guides.");
+        }
+        return circuitRepository.findByGuideResponsableIdOrderByIdDesc(caller.userId()).stream()
+                .map(circuitMapper::toDto)
+                .toList();
+    }
+
+    @Override
+    public CircuitDto affecterGuideResponsable(Long circuitId, Long guideUtilisateurId) {
+        SecurityUserContext caller = requirePermission("CIRCUIT:MODIFIER");
+        if ("GUIDE".equals(caller.role())) {
+            throw new ForbiddenException("Accès interdit : un guide ne peut pas affecter ou réaffecter un guide sur un circuit.");
+        }
+        Circuit circuit = findCircuit(circuitId);
+        Long previousGuideId = circuit.getGuideResponsableId();
+        GuideVerificationDto verified = verifierGuideEligibilite(guideUtilisateurId);
+
+        circuit.setGuideResponsableId(guideUtilisateurId);
+        circuit.setModifieParId(caller.userId());
+        circuit.setDateModification(LocalDateTime.now());
+        Circuit saved = circuitRepository.save(circuit);
+
+        if (verified != null && !Objects.equals(previousGuideId, guideUtilisateurId)) {
+            notifierAffectationGuide(saved, verified, "Affectation explicite comme guide responsable");
+        }
+        return circuitMapper.toDto(saved);
     }
 
     @Override
@@ -370,6 +463,78 @@ public class CircuitService implements ICircuitService {
                     && !incomingDto.getGuideResponsableId().equals(persistedCircuit.getGuideResponsableId())) {
                 throw new ForbiddenException(
                         "Accès interdit : un guide ne peut pas modifier ou réaffecter le guide responsable d'un circuit.");
+            }
+            if (utilisateurGuideClient != null) {
+                GuideVerificationDto profileCheck;
+                try {
+                    profileCheck = utilisateurGuideClient.verifierGuide(caller.userId());
+                } catch (FeignException.NotFound ex) {
+                    throw new ForbiddenException("Votre profil guide n'existe pas ou n'est pas validé.");
+                } catch (FeignException ex) {
+                    log.error("ms-utilisateur indisponible pour vérification du guide {}", caller.userId(), ex);
+                    throw new ServiceIndisponibleException("Le service ms-utilisateur est indisponible pour vérifier votre statut guide.");
+                }
+                if (profileCheck == null || !profileCheck.isProfilValide()) {
+                    throw new ForbiddenException("Votre profil de guide est inactif, non validé ou suspendu (statut : "
+                            + (profileCheck != null ? profileCheck.getStatutValidation() : "INCONNU") + ").");
+                }
+            }
+        }
+    }
+
+    private GuideVerificationDto verifierGuideEligibilite(Long guideUtilisateurId) {
+        if (guideUtilisateurId == null || utilisateurGuideClient == null) {
+            return null;
+        }
+        try {
+            GuideVerificationDto guide = utilisateurGuideClient.verifierGuide(guideUtilisateurId);
+            if (guide == null || !guide.isProfilValide()) {
+                throw new BadRequestException("L'utilisateur #" + guideUtilisateurId
+                        + " n'est pas un guide actif au profil validé (statut : "
+                        + (guide != null ? guide.getStatutValidation() : "ABSENT") + ").");
+            }
+            return guide;
+        } catch (FeignException.NotFound ex) {
+            throw new BadRequestException("Le guide responsable #" + guideUtilisateurId + " est introuvable dans ms-utilisateur.");
+        } catch (FeignException ex) {
+            log.error("ms-utilisateur indisponible lors de la vérification du guide {}", guideUtilisateurId, ex);
+            throw new ServiceIndisponibleException("Le service ms-utilisateur est indisponible pour vérifier le guide responsable.");
+        }
+    }
+
+    private void notifierAffectationGuide(Circuit circuit, GuideVerificationDto guide, String raison) {
+        if (notificationOutboxRepository == null || guide.getEmail() == null || guide.getEmail().isBlank()) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now(CASAMANCE_ZONE);
+        String correlationId = "CIRCUIT-GUIDE-" + circuit.getId() + "-" + UUID.randomUUID().toString().substring(0, 8);
+        CircuitNotificationOutbox savedOutbox = notificationOutboxRepository.save(CircuitNotificationOutbox.builder()
+                .eventId(UUID.randomUUID().toString())
+                .correlationId(correlationId)
+                .utilisateurId(guide.getUtilisateurId())
+                .destinataire(guide.getEmail())
+                .sujet("Affectation guide sur le circuit : " + circuit.getNomCircuit())
+                .contenu("Bonjour " + guide.getNomComplet() + ", vous avez été désigné(e) comme guide responsable du circuit « "
+                        + circuit.getNomCircuit() + " » (#" + circuit.getId() + "). Action : " + raison + ".")
+                .typeEvenement("GUIDE_AFFECTE_CIRCUIT")
+                .cibleType("CIRCUIT")
+                .cibleId(circuit.getId())
+                .idempotencyKey("CIRCUIT:" + circuit.getId() + ":GUIDE:" + guide.getUtilisateurId() + ":" + correlationId)
+                .statut(StatutOutbox.EN_ATTENTE)
+                .prochaineTentativeAt(now)
+                .createdAt(now)
+                .build());
+
+        if (notificationOutboxRelayService != null) {
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        notificationOutboxRelayService.tenterLivraison(savedOutbox.getId());
+                    }
+                });
+            } else {
+                notificationOutboxRelayService.tenterLivraison(savedOutbox.getId());
             }
         }
     }

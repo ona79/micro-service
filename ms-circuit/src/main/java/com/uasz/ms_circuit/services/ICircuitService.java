@@ -33,7 +33,11 @@ public interface ICircuitService {
 
     CircuitDto getByIdCircuit(Long id);
 
+    List<CircuitDto> getMesCircuitsGuide();
+
     CircuitDto updateCircuit(Long id, CircuitDto circuitDto);
+
+    CircuitDto affecterGuideResponsable(Long circuitId, Long guideUtilisateurId);
 
     CircuitDto soumettreCircuit(Long id);
 

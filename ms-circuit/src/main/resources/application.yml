@@ -30,6 +30,10 @@ management:
 
 patrimoine:
   url: ${PATRIMOINE_URL:http://localhost:3001}
+utilisateur:
+  url: ${UTILISATEUR_URL:http://localhost:3005}
+notification:
+  url: ${NOTIFICATION_URL:http://localhost:3007}
 
 eureka:
   client:
@@ -109,3 +113,8 @@ management:
     web:
       exposure:
         include: 'health,info'
+
+utilisateur:
+  url: ${UTILISATEUR_URL:}
+notification:
+  url: ${NOTIFICATION_URL:}
