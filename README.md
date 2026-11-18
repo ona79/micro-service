@@ -104,6 +104,7 @@ npm --prefix frontend-angular exec ng test -- --no-watch
 ```
 
 Documentation technique détaillée :
+- **Back-Office Professionnel, RBAC/BOLA & Rapports P07** : [docs/P07_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md](docs/P07_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md)
 - **Expérience Touristique Publique & Design System Casamance P06** : [frontend-angular/docs/P06_GUIDE_ET_RAPPORT.md](frontend-angular/docs/P06_GUIDE_ET_RAPPORT.md)
 - **Guides, Avis Vérifiés, Modération & Notifications P05** : [docs/P05_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md](docs/P05_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md)
 - **Spécification OpenAPI P05** : [docs/api/OPENAPI_P05_GUIDES_AVIS_NOTIFICATIONS.yaml](docs/api/OPENAPI_P05_GUIDES_AVIS_NOTIFICATIONS.yaml)
