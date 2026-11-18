@@ -1,14 +1,14 @@
 # GUIDE D'INSTALLATION, CONFIGURATION ET DÉPLOIEMENT
 
 ## 1. Prérequis
-- Node.js `>= 22.22.3` (vérifié avec `v26.12.0`) et npm `11+`.
-- Les 10 microservices backend démarrés (API Gateway sur `:8080`).
+- Node.js `>= 22.22.3` et npm `11+`.
+- Les 9 microservices backend démarrés (API Gateway sur `:8090`).
 
 ## 2. Développement local
 ```bash
 cd frontend-angular
 npm install
-npm start        # Lance ng serve avec proxy.conf.json (/api -> http://localhost:8080)
+npm start        # Lance ng serve avec proxy.conf.json (/api -> http://localhost:8090)
 ```
 Ouvrir `http://localhost:4200`.
 
@@ -20,9 +20,8 @@ npx playwright test              # Exécute la suite E2E, responsive et A11y (Ch
 ```
 
 ## 4. Déploiement Docker / Nginx
-Un `Dockerfile` multi-stage et un `nginx.conf` (fallback SPA + reverse-proxy `/api/` vers `http://api-gateway:8080/api/`) sont fournis dans `frontend-angular/`.
+Un `Dockerfile` multi-stage et un `nginx.conf` (fallback SPA `try_files` + reverse-proxy `/api/` vers `http://api-gateway:8090/api/`) sont intégrés au `docker-compose.yml` racine.
 ```bash
-docker build -t patrimoine-frontend-angular:v1 ./frontend-angular
-docker run -p 4200:80 patrimoine-frontend-angular:v1
+docker compose up -d --build
 ```
-Pour l'intégrer dans `docker-compose.yml` (après validation), déclarer un service `frontend-angular` dépendant d'`api-gateway` sur le même réseau Docker Compose.
+L'application est servie sur `http://localhost` (port `80` exposé par `frontend-angular`). En configuration Compose standard, les microservices restent privés sur `app-net` / `data-net`.
