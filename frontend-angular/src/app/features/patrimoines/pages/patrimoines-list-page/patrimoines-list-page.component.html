@@ -102,6 +102,19 @@
               <svg lucideMapPin [size]="15" aria-hidden="true"></svg>
               <span>Proximité active (✕)</span>
             </button>
+            <div class="gps-rayon-wrap">
+              <label for="gps-rayon-select" class="sr-only">Rayon de recherche GPS</label>
+              <select
+                id="gps-rayon-select"
+                class="control-input control-input--sm"
+                [ngModel]="selectedRayonKm()"
+                (ngModelChange)="onRayonChange($event)"
+              >
+                @for (r of rayonsKm; track r.value) {
+                  <option [value]="r.value">{{ r.label }}</option>
+                }
+              </select>
+            </div>
           }
 
           @if (hasActiveFilters() || gpsLocation()) {
@@ -148,7 +161,7 @@
     </section>
 
     @if (loading() && publishedItems().length === 0) {
-      <app-ui-skeleton-grid [count]="3" label="Chargement des sites patrimoniaux..." />
+      <app-ui-loading-state label="Chargement des sites patrimoniaux de Casamance..." />
     } @else if (error() && publishedItems().length === 0) {
       <app-ui-error-banner
         title="Erreur lors du chargement des patrimoines"
@@ -222,102 +235,82 @@
     } @else {
       <div class="patrimoines-grid">
         @for (pat of publishedItems(); track pat.id) {
-          <article
+          <app-ui-card
+            [interactive]="true"
             class="pat-card"
             [class.pat-card--memorial]="isMemorial(pat)"
           >
-            <a
-              [routerLink]="['/patrimoines', pat.id]"
-              class="pat-card__media"
-              [attr.aria-label]="pat.nomPatrimoine"
-            >
-              <app-ui-patrimoine-image
-                [codePatrimoine]="pat.codePatrimoine"
-                [nomPatrimoine]="pat.nomPatrimoine"
-                [imageUrl]="pat.imageUrl"
-                [sobriete]="isMemorial(pat)"
-              />
-            </a>
-            <div class="pat-card__body">
-              <div class="pat-card__badges">
-                <span class="ui-badge">{{ pat.codePatrimoine }}</span>
-                @if (pat.distanceKm != null) {
-                  <span class="ui-badge ui-badge--success" title="Distance approximative">📍 ~{{ pat.distanceKm }} km</span>
-                }
-                @if (pat.categoriePatrimoine) {
-                  <span class="ui-badge ui-badge--ochre">
-                    {{ formatCategorie(pat.categoriePatrimoine) }}
-                  </span>
-                }
-                @if (pat.zoneGeographique) {
-                  <span class="ui-badge ui-badge--neutral">
-                    {{ formatZone(pat.zoneGeographique) }}
-                  </span>
-                }
-                @if (isMemorial(pat)) {
-                  <span class="ui-badge ui-badge--memorial">Lieu de mémoire</span>
-                }
-                @if (getResume(pat.id); as res) {
-                  @if (res.totalAvis > 0) {
-                    <span class="ui-badge ui-badge--success tabular-nums">
-                      <svg lucideStar [size]="12" aria-hidden="true"></svg>
-                      {{ res.noteMoyenne }}/5 ({{ res.totalAvis }})
-                    </span>
-                  }
-                }
-              </div>
-              <h2 class="pat-card__title">
-                <a [routerLink]="['/patrimoines', pat.id]">{{ pat.nomPatrimoine }}</a>
-              </h2>
-              <p class="pat-card__desc">{{ pat.descriptionPatrimoine }}</p>
-              <dl class="pat-card__meta">
-                <div>
-                  <dt>Localisation</dt>
-                  <dd>{{ pat.localite || pat.adressePatrimoine || 'Casamance' }}</dd>
-                </div>
-                <div>
-                  <dt>Capacité</dt>
-                  <dd class="tabular-nums">{{ pat.capacitePatrimoine }} visiteurs</dd>
-                </div>
-              </dl>
-              <div class="pat-card__footer">
-                <a [routerLink]="['/patrimoines', pat.id]" class="pat-card__cta">
-                  <span>Voir le détail</span>
-                  <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
-                </a>
-              </div>
+            <div slot="media">
+              <a
+                [routerLink]="['/patrimoines', pat.id]"
+                class="pat-card__media"
+                [attr.aria-label]="pat.nomPatrimoine"
+              >
+                <app-ui-patrimoine-image
+                  [codePatrimoine]="pat.codePatrimoine"
+                  [nomPatrimoine]="pat.nomPatrimoine"
+                  [imageUrl]="pat.imageUrl"
+                  [sobriete]="isMemorial(pat)"
+                />
+              </a>
             </div>
-          </article>
+            <div slot="header" class="pat-card__badges">
+              <span class="ui-badge">{{ pat.codePatrimoine }}</span>
+              @if (pat.distanceKm != null) {
+                <span class="ui-badge ui-badge--success" title="Distance approximative">📍 ~{{ pat.distanceKm }} km</span>
+              }
+              @if (pat.categoriePatrimoine) {
+                <span class="ui-badge ui-badge--ochre">
+                  {{ formatCategorie(pat.categoriePatrimoine) }}
+                </span>
+              }
+              @if (pat.zoneGeographique) {
+                <span class="ui-badge ui-badge--neutral">
+                  {{ formatZone(pat.zoneGeographique) }}
+                </span>
+              }
+              @if (isMemorial(pat)) {
+                <span class="ui-badge ui-badge--memorial">Lieu de mémoire</span>
+              }
+              @if (getResume(pat.id); as res) {
+                @if (res.totalAvis > 0) {
+                  <span class="ui-badge ui-badge--success tabular-nums">
+                    <svg lucideStar [size]="12" aria-hidden="true"></svg>
+                    {{ res.noteMoyenne }}/5 ({{ res.totalAvis }})
+                  </span>
+                }
+              }
+            </div>
+            <h2 class="pat-card__title">
+              <a [routerLink]="['/patrimoines', pat.id]">{{ pat.nomPatrimoine }}</a>
+            </h2>
+            <p class="pat-card__desc">{{ pat.descriptionPatrimoine }}</p>
+            <dl class="pat-card__meta">
+              <div>
+                <dt>Localisation</dt>
+                <dd>{{ pat.localite || pat.adressePatrimoine || 'Casamance' }}</dd>
+              </div>
+              <div>
+                <dt>Capacité</dt>
+                <dd class="tabular-nums">{{ pat.capacitePatrimoine }} visiteurs</dd>
+              </div>
+            </dl>
+            <div slot="footer" class="pat-card__footer">
+              <a [routerLink]="['/patrimoines', pat.id]" class="pat-card__cta">
+                <span>Voir le détail</span>
+                <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
+              </a>
+            </div>
+          </app-ui-card>
         }
       </div>
 
-      @if (totalPages() > 1) {
-        <nav
-          class="pagination-bar"
-          aria-label="Pagination des sites patrimoniaux"
-          style="display:flex;justify-content:center;align-items:center;gap:0.75rem;margin-top:2rem;"
-        >
-          <button
-            type="button"
-            class="btn-reset"
-            [disabled]="currentPage() <= 1"
-            (click)="goToPage(currentPage() - 1)"
-          >
-            Précédent
-          </button>
-          <span class="tabular-nums" style="font-size:0.875rem;">
-            Page <strong>{{ currentPage() }}</strong> sur <strong>{{ totalPages() }}</strong>
-          </span>
-          <button
-            type="button"
-            class="btn-reset"
-            [disabled]="currentPage() >= totalPages()"
-            (click)="goToPage(currentPage() + 1)"
-          >
-            Suivant
-          </button>
-        </nav>
-      }
+      <app-ui-pagination
+        [page]="currentPage() - 1"
+        [totalPages]="totalPages()"
+        [totalElements]="totalElements()"
+        (pageChange)="goToPage($event + 1)"
+      />
     }
   </div>
 </div>

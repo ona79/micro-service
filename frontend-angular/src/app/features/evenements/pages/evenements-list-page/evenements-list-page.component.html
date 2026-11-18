@@ -108,7 +108,7 @@
     </section>
 
     @if (loading() && publishedEvents().length === 0) {
-      <app-ui-skeleton-grid [count]="2" label="Chargement de l’agenda culturel..." />
+      <app-ui-loading-state label="Chargement de l’agenda culturel de Casamance..." />
     } @else if (error() && publishedEvents().length === 0) {
       <app-ui-error-banner
         title="Erreur lors du chargement des événements"
@@ -130,9 +130,9 @@
           @let patLie = resolvePatrimoine(ev);
           @let sobre = isMemorialEvent(ev);
           <article class="agenda-row" [class.agenda-row--memorial]="sobre">
-            <div class="agenda-row__date">
-              <span class="date-day tabular-nums">{{ ev.dateDebut | dateFr: 'dd' }}</span>
-              <span class="date-month">{{ ev.dateDebut | dateFr: 'MMM yyyy' }}</span>
+            <div class="agenda-date-stamp">
+              <span class="agenda-date-stamp__day tabular-nums">{{ ev.dateDebut | dateFr: 'dd' }}</span>
+              <span class="agenda-date-stamp__month">{{ ev.dateDebut | dateFr: 'MMM yyyy' }}</span>
             </div>
 
             <a [routerLink]="['/evenements', ev.id]" class="agenda-row__media">
@@ -229,31 +229,12 @@
       </div>
 
       @if (totalPages() > 1) {
-        <nav
-          class="pagination-bar"
-          aria-label="Pagination de l’agenda culturel"
-          style="display:flex;justify-content:center;align-items:center;gap:0.75rem;margin-top:2rem;"
-        >
-          <button
-            type="button"
-            class="btn-reset"
-            [disabled]="currentPage() <= 1"
-            (click)="goToPage(currentPage() - 1)"
-          >
-            Précédent
-          </button>
-          <span class="tabular-nums" style="font-size:0.875rem;">
-            Page <strong>{{ currentPage() }}</strong> sur <strong>{{ totalPages() }}</strong>
-          </span>
-          <button
-            type="button"
-            class="btn-reset"
-            [disabled]="currentPage() >= totalPages()"
-            (click)="goToPage(currentPage() + 1)"
-          >
-            Suivant
-          </button>
-        </nav>
+        <app-ui-pagination
+          [page]="currentPage() - 1"
+          [totalPages]="totalPages()"
+          [totalElements]="totalElements()"
+          (pageChange)="goToPage($event + 1)"
+        />
       }
     }
   </div>

@@ -28,7 +28,7 @@ import {
 import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confirm-dialog/ui-confirm-dialog.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
-import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skeleton-grid/ui-skeleton-grid.component';
+import { UiLoadingStateComponent } from '../../../../shared/components/ui-loading-state/ui-loading-state.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
 import { CircuitStore } from '../../../circuits/data-access/circuit.store';
@@ -53,7 +53,7 @@ type StatusFilter = 'ALL' | StatutReservation;
     LucideRefreshCw,
     LucideSearch,
     LucideTicket,
-    UiSkeletonGridComponent,
+    UiLoadingStateComponent,
     UiErrorBannerComponent,
     UiEmptyStateComponent,
     DateFrPipe,

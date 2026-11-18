@@ -135,7 +135,7 @@
     </section>
 
     @if (loading() && publishedCircuits().length === 0) {
-      <app-ui-skeleton-grid [count]="2" label="Chargement des circuits touristiques..." />
+      <app-ui-loading-state label="Chargement des circuits touristiques de Casamance..." />
     } @else if (error() && publishedCircuits().length === 0) {
       <app-ui-error-banner
         title="Erreur lors du chargement des circuits"
@@ -156,130 +156,109 @@
         @for (circuit of publishedCircuits(); track circuit.id) {
           @let stops = getOrderedStops(circuit);
           @let firstPat = getFirstPatrimoine(circuit);
-          <article class="route-card">
-            <a [routerLink]="['/circuits', circuit.id]" class="route-card__media">
-              <app-ui-patrimoine-image
-                [codePatrimoine]="firstPat?.codePatrimoine"
-                [nomPatrimoine]="firstPat?.nomPatrimoine ?? circuit.nomCircuit"
-                [imageUrl]="circuit.imageUrl || firstPat?.imageUrl"
-              />
-            </a>
+          <app-ui-card [interactive]="true" class="route-card">
+            <div slot="media">
+              <a [routerLink]="['/circuits', circuit.id]" class="route-card__media">
+                <app-ui-patrimoine-image
+                  [codePatrimoine]="firstPat?.codePatrimoine"
+                  [nomPatrimoine]="firstPat?.nomPatrimoine ?? circuit.nomCircuit"
+                  [imageUrl]="circuit.imageUrl || firstPat?.imageUrl"
+                />
+              </a>
+            </div>
 
-            <div class="route-card__body">
-              <div class="route-card__top">
-                <div class="route-card__badges">
-                  <span class="ui-badge ui-badge--ochre">
-                    {{ circuit.difficulte | difficulteLabel }}
-                  </span>
-                  <span class="ui-badge tabular-nums">
-                    {{ stops.length }} étape{{ stops.length > 1 ? 's' : '' }}
-                  </span>
-                  @if (circuit.moyenTransport) {
-                    <span class="ui-badge">{{ circuit.moyenTransport }}</span>
+            <div slot="header" class="route-card__top">
+              <div class="route-card__badges">
+                <span class="ui-badge ui-badge--ochre">
+                  {{ circuit.difficulte | difficulteLabel }}
+                </span>
+                <span class="ui-badge tabular-nums">
+                  {{ stops.length }} étape{{ stops.length > 1 ? 's' : '' }}
+                </span>
+                @if (circuit.moyenTransport) {
+                  <span class="ui-badge">{{ circuit.moyenTransport }}</span>
+                }
+                @if (getResume(circuit.id); as res) {
+                  @if (res.totalAvis > 0) {
+                    <span class="ui-badge ui-badge--success tabular-nums">
+                      <svg lucideStar [size]="12" aria-hidden="true"></svg>
+                      {{ res.noteMoyenne }}/5 ({{ res.totalAvis }})
+                    </span>
                   }
-                  @if (getResume(circuit.id); as res) {
-                    @if (res.totalAvis > 0) {
-                      <span class="ui-badge ui-badge--success tabular-nums">
-                        <svg lucideStar [size]="12" aria-hidden="true"></svg>
-                        {{ res.noteMoyenne }}/5 ({{ res.totalAvis }})
-                      </span>
-                    }
-                  }
-                </div>
-                <span class="route-card__price tabular-nums">
-                  {{ circuit.prix | fcfaPrice }}
+                }
+              </div>
+              <span class="route-card__price tabular-nums">
+                {{ circuit.prix | fcfaPrice }}
+              </span>
+            </div>
+
+            <h2 class="route-card__title">
+              <a [routerLink]="['/circuits', circuit.id]">{{ circuit.nomCircuit }}</a>
+            </h2>
+
+            <p class="route-card__desc">
+              {{
+                circuit.presentationTouristique ||
+                  circuit.descriptionCircuit ||
+                  'Parcours touristique reliant plusieurs sites patrimoniaux majeurs de Casamance.'
+              }}
+            </p>
+
+            @if (stops.length > 0) {
+              <ol class="stop-chain" aria-label="Aperçu des étapes">
+                @for (stop of stops; track stop.id || stop.ordre) {
+                  <li class="stop-chain__item">
+                    <span class="stop-chain__num">{{ stop.ordre }}</span>
+                    <span>{{ getStopLabel(stop.patrimoineId, stop.patrimoine) }}</span>
+                  </li>
+                }
+              </ol>
+            }
+
+            <div slot="footer" class="route-card__footer">
+              <div class="route-metrics tabular-nums">
+                <span>
+                  <svg lucideClock [size]="15" aria-hidden="true"></svg>
+                  {{ circuit.dureeEstimee | durationMinutes }}
+                </span>
+                <span title="Estimation orthodromique indicative à vol d’oiseau entre étapes">
+                  <svg lucideRoute [size]="15" aria-hidden="true"></svg>
+                  ~{{ circuit.distanceTotale || 0 }} km (vol d’oiseau · indicatif)
+                </span>
+                <span>
+                  <svg lucideUsers [size]="15" aria-hidden="true"></svg>
+                  {{ circuit.placesMax }} places max
                 </span>
               </div>
 
-              <h2 class="route-card__title">
-                <a [routerLink]="['/circuits', circuit.id]">{{ circuit.nomCircuit }}</a>
-              </h2>
-
-              <p class="route-card__desc">
-                {{
-                  circuit.presentationTouristique ||
-                    circuit.descriptionCircuit ||
-                    'Parcours touristique reliant plusieurs sites patrimoniaux majeurs de Casamance.'
-                }}
-              </p>
-
-              @if (stops.length > 0) {
-                <ol class="stop-chain" aria-label="Aperçu des étapes">
-                  @for (stop of stops; track stop.id || stop.ordre) {
-                    <li class="stop-chain__item">
-                      <span class="stop-chain__num">{{ stop.ordre }}</span>
-                      <span>{{ getStopLabel(stop.patrimoineId, stop.patrimoine) }}</span>
-                    </li>
-                  }
-                </ol>
-              }
-
-              <div class="route-card__footer">
-                <div class="route-metrics tabular-nums">
-                  <span>
-                    <svg lucideClock [size]="15" aria-hidden="true"></svg>
-                    {{ circuit.dureeEstimee | durationMinutes }}
-                  </span>
-                  <span title="Estimation orthodromique indicative à vol d’oiseau entre étapes">
-                    <svg lucideRoute [size]="15" aria-hidden="true"></svg>
-                    ~{{ circuit.distanceTotale || 0 }} km (vol d’oiseau · indicatif)
-                  </span>
-                  <span>
-                    <svg lucideUsers [size]="15" aria-hidden="true"></svg>
-                    {{ circuit.placesMax }} places max
-                  </span>
-                </div>
-
-                <div class="route-actions">
-                  <a
-                    [routerLink]="['/circuits', circuit.id]"
-                    class="route-btn route-btn--secondary"
-                  >
-                    <span>Voir l’itinéraire</span>
-                    <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
-                  </a>
-                  <a
-                    routerLink="/reserver"
-                    [queryParams]="{ type: 'CIRCUIT', circuitId: circuit.id }"
-                    class="route-btn route-btn--primary"
-                  >
-                    <svg lucideTicket [size]="15" aria-hidden="true"></svg>
-                    <span>Réserver</span>
-                  </a>
-                </div>
+              <div class="route-actions">
+                <a
+                  [routerLink]="['/circuits', circuit.id]"
+                  class="route-btn route-btn--secondary"
+                >
+                  <span>Voir l’itinéraire</span>
+                  <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
+                </a>
+                <a
+                  routerLink="/reserver"
+                  [queryParams]="{ type: 'CIRCUIT', circuitId: circuit.id }"
+                  class="route-btn route-btn--primary"
+                >
+                  <svg lucideTicket [size]="15" aria-hidden="true"></svg>
+                  <span>Réserver</span>
+                </a>
               </div>
             </div>
-          </article>
+          </app-ui-card>
         }
       </div>
 
-      @if (totalPages() > 1) {
-        <nav
-          class="pagination-bar"
-          aria-label="Pagination des circuits"
-          style="display:flex;justify-content:center;align-items:center;gap:0.75rem;margin-top:2rem;"
-        >
-          <button
-            type="button"
-            class="btn-reset"
-            [disabled]="currentPage() <= 1"
-            (click)="goToPage(currentPage() - 1)"
-          >
-            Précédent
-          </button>
-          <span class="tabular-nums" style="font-size:0.875rem;">
-            Page <strong>{{ currentPage() }}</strong> sur <strong>{{ totalPages() }}</strong>
-          </span>
-          <button
-            type="button"
-            class="btn-reset"
-            [disabled]="currentPage() >= totalPages()"
-            (click)="goToPage(currentPage() + 1)"
-          >
-            Suivant
-          </button>
-        </nav>
-      }
+      <app-ui-pagination
+        [page]="currentPage() - 1"
+        [totalPages]="totalPages()"
+        [totalElements]="totalElements()"
+        (pageChange)="goToPage($event + 1)"
+      />
     }
   </div>
 </div>

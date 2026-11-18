@@ -26,6 +26,14 @@
         <button type="submit" class="hero-search__submit">Rechercher</button>
       </form>
 
+      <div class="hero-topics" aria-label="Recherches rapides thématiques">
+        <span class="hero-topics__label">Incontournables :</span>
+        <a [routerLink]="['/patrimoines']" [queryParams]="{ q: 'impluvium' }" class="hero-topic-chip">Cases à impluvium</a>
+        <a [routerLink]="['/patrimoines']" [queryParams]="{ q: 'Carabane' }" class="hero-topic-chip">Île de Carabane</a>
+        <a routerLink="/circuits" class="hero-topic-chip">Bolongs &amp; pirogue</a>
+        <a routerLink="/evenements" class="hero-topic-chip">Agenda culturel</a>
+      </div>
+
       <div class="hero-actions">
         <a routerLink="/patrimoines" class="btn-primary">
           <span>Découvrir les sites</span>
@@ -134,7 +142,7 @@
     </div>
 
     @if (patrimoineStore.loading() && publishedPatrimoines().length === 0) {
-      <app-ui-skeleton-grid [count]="4" />
+      <app-ui-loading-state label="Chargement des patrimoines de Casamance..." />
     } @else if (patrimoineStore.error()) {
       <app-ui-error-banner
         title="Impossible de charger les patrimoines"
@@ -200,8 +208,8 @@
       @if (featuredPatrimoines().length > 1) {
         <div class="featured-secondary-grid">
           @for (pat of featuredPatrimoines().slice(1); track pat.id) {
-            <article class="pat-card" [class.pat-card--memorial]="isMemorial(pat)">
-              <div class="pat-card__media">
+            <app-ui-card [interactive]="true" class="pat-card" [class.pat-card--memorial]="isMemorial(pat)">
+              <div slot="media" class="pat-card__media">
                 <app-ui-patrimoine-image
                   [codePatrimoine]="pat.codePatrimoine"
                   [nomPatrimoine]="pat.nomPatrimoine"
@@ -209,36 +217,36 @@
                   [sobriete]="isMemorial(pat)"
                 />
               </div>
-              <div class="pat-card__body">
-                <div class="card-tags">
-                  @if (isMemorial(pat)) {
-                    <span class="ui-badge ui-badge--memorial">Lieu de mémoire</span>
-                  } @else if (pat.categoriePatrimoine) {
-                    <span class="ui-badge ui-badge--neutral">{{ pat.categoriePatrimoine }}</span>
+              <div slot="header" class="card-tags">
+                @if (isMemorial(pat)) {
+                  <span class="ui-badge ui-badge--memorial">Lieu de mémoire</span>
+                } @else if (pat.categoriePatrimoine) {
+                  <span class="ui-badge ui-badge--neutral">{{ pat.categoriePatrimoine }}</span>
+                }
+                @if (getPatrimoineResume(pat.id); as res) {
+                  @if (res.totalAvis > 0) {
+                    <span class="ui-badge ui-badge--ochre tabular-nums">
+                      <svg lucideStar [size]="12" aria-hidden="true"></svg>
+                      {{ res.noteMoyenne }}/5
+                    </span>
                   }
-                  @if (getPatrimoineResume(pat.id); as res) {
-                    @if (res.totalAvis > 0) {
-                      <span class="ui-badge ui-badge--ochre tabular-nums">
-                        <svg lucideStar [size]="12" aria-hidden="true"></svg>
-                        {{ res.noteMoyenne }}/5
-                      </span>
-                    }
-                  }
-                </div>
-                <h3 class="pat-card__title">{{ pat.nomPatrimoine }}</h3>
-                <p class="pat-card__place">
-                  <svg lucideMapPin [size]="13" aria-hidden="true"></svg>
-                  <span>{{ pat.adressePatrimoine || pat.localite || 'Casamance' }}</span>
-                </p>
-                <p class="pat-card__desc">
-                  {{ pat.descriptionPatrimoine || 'Description patrimoniale disponible sur la fiche.' }}
-                </p>
+                }
+              </div>
+              <h3 class="pat-card__title">{{ pat.nomPatrimoine }}</h3>
+              <p class="pat-card__place">
+                <svg lucideMapPin [size]="13" aria-hidden="true"></svg>
+                <span>{{ pat.adressePatrimoine || pat.localite || 'Casamance' }}</span>
+              </p>
+              <p class="pat-card__desc">
+                {{ pat.descriptionPatrimoine || 'Description patrimoniale disponible sur la fiche.' }}
+              </p>
+              <div slot="footer">
                 <a [routerLink]="['/patrimoines', pat.id]" class="card-link">
                   <span>Voir la fiche</span>
                   <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
                 </a>
               </div>
-            </article>
+            </app-ui-card>
           }
         </div>
       }
@@ -267,8 +275,8 @@
     } @else {
       <div class="cards-three-grid">
         @for (cir of featuredCircuits(); track cir.id) {
-          <article class="info-card">
-            <div class="card-tags">
+          <app-ui-card [interactive]="true" class="info-card">
+            <div slot="header" class="card-tags">
               <span class="ui-badge ui-badge--ochre">{{ cir.difficulte | difficulteLabel }}</span>
               @if (cir.moyenTransport) {
                 <span class="ui-badge ui-badge--neutral">{{ cir.moyenTransport }}</span>
@@ -302,14 +310,14 @@
                 <dd class="tabular-nums">{{ cir.prix | fcfaPrice }}</dd>
               </div>
             </dl>
-            <div class="info-card__actions">
+            <div slot="footer" class="info-card__actions">
               <a [routerLink]="['/circuits', cir.id]" class="card-link">
                 <svg lucideRoute [size]="14" aria-hidden="true"></svg>
                 <span>Découvrir l’itinéraire</span>
                 <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
               </a>
             </div>
-          </article>
+          </app-ui-card>
         }
       </div>
     }
@@ -337,8 +345,8 @@
     } @else {
       <div class="cards-three-grid">
         @for (ev of featuredEvenements(); track ev.id) {
-          <article class="info-card">
-            <div class="card-tags">
+          <app-ui-card [interactive]="true" class="info-card">
+            <div slot="header" class="card-tags">
               <span class="ui-badge ui-badge--clay">{{ ev.typeEvenement | evenementType }}</span>
               @if (ev.ouvertReservation !== false) {
                 <span class="ui-badge ui-badge--success">Réservable</span>
@@ -356,14 +364,14 @@
             <p class="info-card__desc">
               {{ ev.descriptionEvenement || 'Événement patrimonial et culturel de Casamance.' }}
             </p>
-            <div class="info-card__actions">
+            <div slot="footer" class="info-card__actions">
               <strong class="price-inline tabular-nums">{{ ev.prix | fcfaPrice }}</strong>
               <a [routerLink]="['/evenements', ev.id]" class="card-link">
                 <span>Détails</span>
                 <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
               </a>
             </div>
-          </article>
+          </app-ui-card>
         }
       </div>
     }
@@ -394,8 +402,8 @@
     } @else {
       <div class="cards-three-grid">
         @for (g of featuredGuides(); track g.id) {
-          <article class="guide-home-card">
-            <div class="guide-home-card__head">
+          <app-ui-card [interactive]="true" class="guide-home-card">
+            <div slot="header" class="guide-home-card__head">
               <div class="guide-home-card__avatar" aria-hidden="true">
                 {{ g.prenom.slice(0, 1) }}{{ g.nom.slice(0, 1) }}
               </div>
@@ -416,7 +424,7 @@
               <svg lucideUsers [size]="14" aria-hidden="true"></svg>
               <span>Langues : {{ g.languesParlees }}</span>
             </p>
-            <div class="info-card__actions">
+            <div slot="footer" class="info-card__actions">
               <span class="ui-badge" [class.ui-badge--ochre]="g.disponible" [class.ui-badge--neutral]="!g.disponible">
                 {{ g.disponible ? 'Disponible' : 'Complet' }}
               </span>
@@ -425,10 +433,51 @@
                 <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
               </a>
             </div>
-          </article>
+          </app-ui-card>
         }
       </div>
     }
+  </div>
+</section>
+
+<section class="page-section reassurance-section" aria-labelledby="reassurance-title">
+  <div class="container">
+    <div class="section-header section-header--center">
+      <div>
+        <p class="eyebrow">Engagement pour un tourisme respectueux</p>
+        <h2 id="reassurance-title" class="section-title">Pourquoi découvrir la Casamance avec notre plateforme</h2>
+      </div>
+    </div>
+    <div class="reassurance-grid">
+      <div class="reassurance-card">
+        <div class="reassurance-card__icon" aria-hidden="true">
+          <svg lucideAward [size]="24"></svg>
+        </div>
+        <h3 class="reassurance-card__title">Guides locaux certifiés</h3>
+        <p class="reassurance-card__desc">Accompagnateurs agréés et accrédités par les conservateurs du patrimoine pour un guidage respectueux et authentique.</p>
+      </div>
+      <div class="reassurance-card">
+        <div class="reassurance-card__icon" aria-hidden="true">
+          <svg lucideShieldCheck [size]="24"></svg>
+        </div>
+        <h3 class="reassurance-card__title">Préservation &amp; mémoire</h3>
+        <p class="reassurance-card__desc">Valorisation pérenne des bois sacrés, des cases à impluvium et des traditions orales du peuple diola et mandingue.</p>
+      </div>
+      <div class="reassurance-card">
+        <div class="reassurance-card__icon" aria-hidden="true">
+          <svg lucideRoute [size]="24"></svg>
+        </div>
+        <h3 class="reassurance-card__title">Circuits &amp; réservations en direct</h3>
+        <p class="reassurance-card__desc">Calcul des disponibilités en temps réel, calendrier à jour et tarification officielle validée par l'Université.</p>
+      </div>
+      <div class="reassurance-card">
+        <div class="reassurance-card__icon" aria-hidden="true">
+          <svg lucideTicket [size]="24"></svg>
+        </div>
+        <h3 class="reassurance-card__title">Billets QR &amp; paiements simulés</h3>
+        <p class="reassurance-card__desc">E-billets électroniques sécurisés utilisables sur mobile et paiement pédagogique Wave / Orange Money transparent.</p>
+      </div>
+    </div>
   </div>
 </section>
 

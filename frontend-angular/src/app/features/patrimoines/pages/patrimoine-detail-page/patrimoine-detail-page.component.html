@@ -1,7 +1,7 @@
 <div class="page-section">
   <div class="container">
     @if (loading()) {
-      <app-ui-skeleton-grid [count]="2" label="Chargement de la fiche du patrimoine..." />
+      <app-ui-loading-state label="Chargement de la fiche patrimoniale de Casamance..." />
     } @else if (error() || !patrimoine()) {
       <app-ui-breadcrumb [items]="breadcrumbs()" />
       <app-ui-error-banner
@@ -224,35 +224,40 @@
 
       @if (autresPatrimoines().length > 0) {
         <section class="related-section">
-          <h2 class="related-section__title">À voir aussi</h2>
+          <h2 class="related-section__title">À voir aussi en Casamance</h2>
           <div class="related-grid">
             @for (autre of autresPatrimoines(); track autre.id) {
-              <article
+              <app-ui-card
+                [interactive]="true"
                 class="related-card"
                 [class.related-card--memorial]="isPatMemorial(autre)"
               >
-                <a [routerLink]="['/patrimoines', autre.id]" class="related-card__media">
-                  <app-ui-patrimoine-image
-                    [codePatrimoine]="autre.codePatrimoine"
-                    [nomPatrimoine]="autre.nomPatrimoine"
-                    [imageUrl]="autre.imageUrl"
-                    [sobriete]="isPatMemorial(autre)"
-                  />
-                </a>
-                <div class="related-card__body">
+                <div slot="media">
+                  <a [routerLink]="['/patrimoines', autre.id]" class="related-card__media">
+                    <app-ui-patrimoine-image
+                      [codePatrimoine]="autre.codePatrimoine"
+                      [nomPatrimoine]="autre.nomPatrimoine"
+                      [imageUrl]="autre.imageUrl"
+                      [sobriete]="isPatMemorial(autre)"
+                    />
+                  </a>
+                </div>
+                <div slot="header">
                   <span class="ui-badge">{{ autre.codePatrimoine }}</span>
-                  <h3 class="related-card__title">
-                    <a [routerLink]="['/patrimoines', autre.id]">
-                      {{ autre.nomPatrimoine }}
-                    </a>
-                  </h3>
-                  <p class="related-card__loc">{{ autre.adressePatrimoine || 'Casamance' }}</p>
+                </div>
+                <h3 class="related-card__title">
+                  <a [routerLink]="['/patrimoines', autre.id]">
+                    {{ autre.nomPatrimoine }}
+                  </a>
+                </h3>
+                <p class="related-card__loc">{{ autre.adressePatrimoine || 'Casamance' }}</p>
+                <div slot="footer">
                   <a [routerLink]="['/patrimoines', autre.id]" class="related-card__link">
                     <span>Lire la fiche</span>
                     <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
                   </a>
                 </div>
-              </article>
+              </app-ui-card>
             }
           </div>
         </section>

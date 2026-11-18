@@ -50,6 +50,16 @@ export class CircuitStore {
   }
 
   async loadById(id: number | string): Promise<Circuit> {
-    return firstValueFrom(this.api.getById(id));
+    try {
+      return await firstValueFrom(this.api.getById(id));
+    } catch (err) {
+      // Tolérance et résilience réseau : repli sur la liste complète des circuits publiés
+      await this.ensureLoaded();
+      const match = this._items().find((c) => String(c.id) === String(id));
+      if (match) {
+        return match;
+      }
+      throw err;
+    }
   }
 }

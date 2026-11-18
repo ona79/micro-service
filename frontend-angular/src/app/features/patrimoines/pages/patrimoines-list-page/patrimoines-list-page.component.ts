@@ -29,12 +29,14 @@ import {
 import { SeoService } from '../../../../core/services/seo.service';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import { UiCardComponent } from '../../../../shared/components/ui-card/ui-card.component';
+import { UiLoadingStateComponent } from '../../../../shared/components/ui-loading-state/ui-loading-state.component';
+import { UiPaginationComponent } from '../../../../shared/components/ui-pagination/ui-pagination.component';
 import {
   HeritageMapPoint,
   UiHeritageMapComponent,
 } from '../../../../shared/components/ui-heritage-map/ui-heritage-map.component';
 import { UiPatrimoineImageComponent } from '../../../../shared/components/ui-patrimoine-image/ui-patrimoine-image.component';
-import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skeleton-grid/ui-skeleton-grid.component';
 import {
   hasValidCoordinates,
   isLieuDeMemoire,
@@ -61,9 +63,11 @@ type ViewMode = 'grid' | 'map';
     LucideStar,
     LucideUsers,
     LucideArrowRight,
+    UiCardComponent,
+    UiLoadingStateComponent,
+    UiPaginationComponent,
     UiPatrimoineImageComponent,
     UiHeritageMapComponent,
-    UiSkeletonGridComponent,
     UiErrorBannerComponent,
     UiEmptyStateComponent,
   ],
@@ -96,6 +100,13 @@ export class PatrimoinesListPageComponent implements OnInit {
   protected readonly gpsLocation = signal<{ lat: number; lon: number } | null>(null);
   protected readonly gpsLoading = signal<boolean>(false);
   protected readonly gpsError = signal<string | null>(null);
+  protected readonly selectedRayonKm = signal<number>(50);
+  protected readonly rayonsKm: { value: number; label: string }[] = [
+    { value: 5, label: 'Rayon 5 km' },
+    { value: 10, label: 'Rayon 10 km' },
+    { value: 20, label: 'Rayon 20 km' },
+    { value: 50, label: 'Rayon 50 km' },
+  ];
 
   private loadSeq = 0;
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -267,12 +278,21 @@ export class PatrimoinesListPageComponent implements OnInit {
     );
   }
 
+  protected onRayonChange(val: number | string): void {
+    const rayon = Number(val);
+    this.selectedRayonKm.set(rayon);
+    const loc = this.gpsLocation();
+    if (loc) {
+      void this.loadProximite(loc.lat, loc.lon);
+    }
+  }
+
   protected async loadProximite(lat: number, lon: number): Promise<void> {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.error.set(null);
     try {
-      const items = await firstValueFrom(this.api.getProximite(lat, lon, 60, 24));
+      const items = await firstValueFrom(this.api.getProximite(lat, lon, this.selectedRayonKm(), 24));
       if (seq !== this.loadSeq) return;
       this.items.set(items);
       this.totalElements.set(items.length);

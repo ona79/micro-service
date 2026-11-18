@@ -578,3 +578,109 @@
     grid-template-columns: 1fr;
   }
 }
+
+.hero-topics {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+  font-size: var(--text-xs);
+}
+
+.hero-topics__label {
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+.hero-topic-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  background-color: var(--surface-sand);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  color: var(--ink-secondary);
+  text-decoration: none;
+  font-weight: 600;
+  transition: all var(--transition-fast);
+}
+
+.hero-topic-chip:hover {
+  background-color: var(--brand-soft);
+  color: var(--brand-primary);
+  border-color: var(--brand-primary);
+}
+
+.section-header--center {
+  text-align: center;
+  max-width: 680px;
+  margin: 0 auto var(--space-8);
+}
+
+.reassurance-section {
+  background-color: var(--surface-sand);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.reassurance-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-6);
+}
+
+@media (max-width: 1024px) {
+  .reassurance-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .reassurance-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.reassurance-card {
+  padding: var(--space-5);
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  box-shadow: var(--shadow-xs);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.reassurance-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.reassurance-card__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background-color: var(--brand-soft);
+  color: var(--brand-primary);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.reassurance-card__title {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  margin: 0;
+  color: var(--ink-primary);
+}
+
+.reassurance-card__desc {
+  font-size: var(--text-sm);
+  color: var(--ink-secondary);
+  line-height: 1.55;
+  margin: 0;
+}
+

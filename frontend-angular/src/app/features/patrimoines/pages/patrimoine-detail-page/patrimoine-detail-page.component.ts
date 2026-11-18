@@ -24,6 +24,8 @@ import {
   BreadcrumbItem,
   UiBreadcrumbComponent,
 } from '../../../../shared/components/ui-breadcrumb/ui-breadcrumb.component';
+import { UiCardComponent } from '../../../../shared/components/ui-card/ui-card.component';
+import { UiLoadingStateComponent } from '../../../../shared/components/ui-loading-state/ui-loading-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
 import {
   HeritageMapPoint,
@@ -57,9 +59,10 @@ import { PatrimoineStore } from '../../data-access/patrimoine.store';
     LucideRoute,
     LucideTicket,
     UiBreadcrumbComponent,
+    UiCardComponent,
+    UiLoadingStateComponent,
     UiPatrimoineImageComponent,
     UiHeritageMapComponent,
-    UiSkeletonGridComponent,
     UiErrorBannerComponent,
     UiAvisSectionComponent,
     DateFrPipe,

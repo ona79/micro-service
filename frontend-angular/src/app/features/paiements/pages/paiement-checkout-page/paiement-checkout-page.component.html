@@ -23,7 +23,7 @@
 
   @if (loading()) {
     <div class="checkout-loading">
-      <app-ui-skeleton-grid [count]="2" />
+      <app-ui-loading-state label="Initialisation du module de paiement simulé Wave & Orange Money..." />
     </div>
   } @else if (loadError(); as errorMsg) {
     <div class="checkout-error-box">

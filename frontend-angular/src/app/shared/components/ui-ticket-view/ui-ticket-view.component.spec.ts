@@ -66,8 +66,11 @@ describe('UiTicketViewComponent', () => {
     fixture.detectChanges();
     await fixture.whenStable();
 
-    // Attendre que l'effet asynchrone Promise.all résolve les dataUrl
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    // Attendre que l'effet asynchrone Promise.all résolve les dataUrl de manière robuste
+    for (let i = 0; i < 25; i++) {
+      if (component.billetsWithQr().length > 0) break;
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    }
     fixture.detectChanges();
 
     const el: HTMLElement = fixture.nativeElement;

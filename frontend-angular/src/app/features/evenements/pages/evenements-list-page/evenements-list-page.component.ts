@@ -23,10 +23,11 @@ import { AvisResume } from '../../../../core/models/avis.model';
 import { Evenement, TypeEvenement } from '../../../../core/models/evenement.model';
 import { Patrimoine, ZoneCasamance } from '../../../../core/models/patrimoine.model';
 import { SeoService } from '../../../../core/services/seo.service';
+import { UiLoadingStateComponent } from '../../../../shared/components/ui-loading-state/ui-loading-state.component';
+import { UiPaginationComponent } from '../../../../shared/components/ui-pagination/ui-pagination.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
 import { UiPatrimoineImageComponent } from '../../../../shared/components/ui-patrimoine-image/ui-patrimoine-image.component';
-import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skeleton-grid/ui-skeleton-grid.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { EvenementTypePipe } from '../../../../shared/pipes/evenement-type.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
@@ -49,8 +50,9 @@ import { EvenementApiService } from '../../data-access/evenement-api.service';
     LucideUsers,
     LucideArrowRight,
     LucideTicket,
+    UiLoadingStateComponent,
+    UiPaginationComponent,
     UiPatrimoineImageComponent,
-    UiSkeletonGridComponent,
     UiErrorBannerComponent,
     UiEmptyStateComponent,
     DateFrPipe,

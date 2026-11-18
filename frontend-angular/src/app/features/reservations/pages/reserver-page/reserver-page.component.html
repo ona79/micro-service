@@ -434,7 +434,7 @@
         </div>
 
         @if (reservationStore.loading() && reservationStore.items().length === 0) {
-          <app-ui-skeleton-grid [count]="2" variant="rows" label="Chargement des réservations..." />
+          <app-ui-loading-state label="Chargement des réservations du compte en cours..." />
         } @else if (reservationStore.listError() && reservationStore.items().length === 0) {
           <app-ui-error-banner
             title="Erreur de chargement des réservations"

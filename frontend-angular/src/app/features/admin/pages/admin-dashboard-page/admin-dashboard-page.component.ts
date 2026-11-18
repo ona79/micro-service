@@ -8,6 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import {
   LucideAward,
   LucideBell,
@@ -142,10 +143,19 @@ interface EtapeFormItem {
     LucideAward,
     LucideMessageSquare,
     LucideBell,
+    RouterLink,
   ],
   template: `
     <div class="page-section">
       <div class="container">
+        <div class="ui-sim-banner" style="margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <strong>ℹ Nouveau Cockpit Professionnel Unifié disponible :</strong>
+            <span> Pour une expérience optimisée par rôle avec navigation latérale et fil d'Ariane, accédez au cockpit pro.</span>
+          </div>
+          <a routerLink="/pro/admin" class="ui-btn ui-btn--sm ui-btn--primary">Basculer vers /pro/admin &rarr;</a>
+        </div>
+
         <header class="admin-header">
           <div>
             <div class="admin-header__badges">

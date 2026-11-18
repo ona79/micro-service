@@ -18,6 +18,7 @@ import {
   LucideSearch,
   LucideShieldCheck,
   LucideStar,
+  LucideTicket,
   LucideUsers,
 } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
@@ -27,10 +28,11 @@ import { Evenement } from '../../../../core/models/evenement.model';
 import { GuideProfil } from '../../../../core/models/guide.model';
 import { Patrimoine } from '../../../../core/models/patrimoine.model';
 import { SeoService } from '../../../../core/services/seo.service';
+import { UiCardComponent } from '../../../../shared/components/ui-card/ui-card.component';
+import { UiLoadingStateComponent } from '../../../../shared/components/ui-loading-state/ui-loading-state.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
 import { UiPatrimoineImageComponent } from '../../../../shared/components/ui-patrimoine-image/ui-patrimoine-image.component';
-import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skeleton-grid/ui-skeleton-grid.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { DifficulteLabelPipe } from '../../../../shared/pipes/difficulte-label.pipe';
 import { DurationMinutesPipe } from '../../../../shared/pipes/duration-minutes.pipe';
@@ -87,9 +89,11 @@ const ZONES_CASAMANCE: readonly ZoneCasamanceCard[] = [
     LucideSearch,
     LucideShieldCheck,
     LucideStar,
+    LucideTicket,
     LucideUsers,
+    UiCardComponent,
+    UiLoadingStateComponent,
     UiPatrimoineImageComponent,
-    UiSkeletonGridComponent,
     UiErrorBannerComponent,
     UiEmptyStateComponent,
     DateFrPipe,
