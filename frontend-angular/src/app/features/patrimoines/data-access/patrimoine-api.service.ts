@@ -8,6 +8,7 @@ import {
   StatutPublication,
   ZoneCasamance,
 } from '../../../core/models/patrimoine.model';
+import { PatrimoineStats } from '../../../core/models/statistics.model';
 
 export interface PatrimoineSearchParams {
   q?: string;
@@ -84,5 +85,9 @@ export class PatrimoineApiService {
 
   delete(id: number | string): Observable<void> {
     return this.http.delete<void>(`/patrimoines/${id}`);
+  }
+
+  getStatistiques(): Observable<PatrimoineStats> {
+    return this.http.get<PatrimoineStats>('/patrimoines/statistiques');
   }
 }

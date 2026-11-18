@@ -3,6 +3,7 @@ package com.uasz.ms_notification.services;
 import com.uasz.ms_notification.dto.NotificationCompteurDto;
 import com.uasz.ms_notification.dto.NotificationDto;
 import com.uasz.ms_notification.dto.NotificationPageResponseDto;
+import com.uasz.ms_notification.dto.NotificationStatsDto;
 import com.uasz.ms_notification.entities.StatutNotification;
 
 import java.util.List;
@@ -15,6 +16,8 @@ public interface INotificationService {
     List<NotificationDto> getAllNotifications();
 
     NotificationPageResponseDto getAllNotificationsPaged(int page, int size, StatutNotification statut, String typeEvenement);
+
+    NotificationStatsDto getStatistiques();
 
     NotificationPageResponseDto getMesNotifications(int page, int size, boolean nonLuesOnly, String typeEvenement);
 

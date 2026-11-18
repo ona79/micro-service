@@ -397,6 +397,68 @@ public class EvenementService implements IEvenementService {
         evenementRepository.deleteById(id);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public com.uasz.ms_evenement.dto.EvenementStatsDto getStatistiques() {
+        requireAnyPermission(
+                "EVENEMENT:CREER", "EVENEMENT:MODIFIER",
+                "EVENEMENT:PUBLIER", "EVENEMENT:ANNULER", "EVENEMENT:ARCHIVER"
+        );
+        LocalDateTime now = LocalDateTime.now(Evenement.CASAMANCE_ZONE);
+        List<Evenement> all = evenementRepository.findAll();
+
+        long brouillons = 0L;
+        long soumis = 0L;
+        long publies = 0L;
+        long annules = 0L;
+        long termines = 0L;
+        long archives = 0L;
+        long aVenirPublies = 0L;
+        long ouvertsReservation = 0L;
+        java.util.Map<String, Long> parType = new java.util.LinkedHashMap<>();
+        java.util.Map<String, Long> parZone = new java.util.LinkedHashMap<>();
+
+        for (Evenement e : all) {
+            StatutEvenement st = e.getStatutEvenement() != null ? e.getStatutEvenement() : StatutEvenement.PUBLIE;
+            switch (st) {
+                case BROUILLON -> brouillons++;
+                case SOUMIS -> soumis++;
+                case PUBLIE -> {
+                    publies++;
+                    if (e.getDateFin() == null || !e.getDateFin().isBefore(now)) {
+                        aVenirPublies++;
+                        if (e.isOuvertReservation()) {
+                            ouvertsReservation++;
+                        }
+                    }
+                }
+                case ANNULE -> annules++;
+                case TERMINE -> termines++;
+                case ARCHIVE -> archives++;
+            }
+            String type = e.getTypeEvenement() != null ? e.getTypeEvenement().name() : "AUTRE";
+            String zone = (e.getZoneGeographique() != null && !e.getZoneGeographique().isBlank())
+                    ? e.getZoneGeographique()
+                    : "NON_DEFINIE";
+            parType.merge(type, 1L, Long::sum);
+            parZone.merge(zone, 1L, Long::sum);
+        }
+
+        return com.uasz.ms_evenement.dto.EvenementStatsDto.builder()
+                .total(all.size())
+                .brouillons(brouillons)
+                .soumis(soumis)
+                .publies(publies)
+                .annules(annules)
+                .termines(termines)
+                .archives(archives)
+                .aVenirPublies(aVenirPublies)
+                .ouvertsReservation(ouvertsReservation)
+                .parType(parType)
+                .parZone(parZone)
+                .build();
+    }
+
     private Specification<Evenement> buildSpecification(
             String q,
             TypeEvenement type,

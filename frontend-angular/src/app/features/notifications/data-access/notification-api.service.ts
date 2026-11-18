@@ -7,6 +7,7 @@ import {
   NotificationPageResponse,
   StatutNotification,
 } from '../../../core/models/notification.model';
+import { NotificationStats } from '../../../core/models/statistics.model';
 
 @Injectable({ providedIn: 'root' })
 export class NotificationApiService {
@@ -58,5 +59,9 @@ export class NotificationApiService {
 
   forcerRepriseEchecs(): Observable<{ notificationsLivrees: number }> {
     return this.http.post<{ notificationsLivrees: number }>('/notifications/relancer-echecs', {});
+  }
+
+  getStatistiques(): Observable<NotificationStats> {
+    return this.http.get<NotificationStats>('/notifications/statistiques');
   }
 }

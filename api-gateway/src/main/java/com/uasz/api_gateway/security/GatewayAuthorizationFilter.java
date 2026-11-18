@@ -198,13 +198,31 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
         }
 
         // 1. Routes de gestion des utilisateurs (/api/utilisateurs)
+        if (path.startsWith("/api/utilisateurs/internal/") || path.equals("/api/utilisateurs/internal")) {
+            writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                    "Accès interdit : les endpoints internes utilisateurs ne sont pas accessibles via la Gateway.");
+            return;
+        }
         if (path.equals("/api/utilisateurs/me")) {
             if (token == null) {
                 writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
                         tokenError != null ? tokenError : "Authentification requise pour accéder à votre profil.");
                 return;
             }
-        } else if (path.equals("/api/utilisateurs") && "GET".equalsIgnoreCase(method)) {
+        } else if (path.equals("/api/utilisateurs/audit")) {
+            if (token == null) {
+                writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                        tokenError != null ? tokenError : "Authentification requise.");
+                return;
+            }
+            if (!token.hasPermission("AUDIT:LIRE")) {
+                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                        "Accès interdit : permission AUDIT:LIRE requise.");
+                return;
+            }
+        } else if ((path.equals("/api/utilisateurs")
+                || path.equals("/api/utilisateurs/recherche")
+                || path.equals("/api/utilisateurs/statistiques")) && "GET".equalsIgnoreCase(method)) {
             if (token == null) {
                 writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
                         tokenError != null ? tokenError : "Authentification requise.");
@@ -213,6 +231,17 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
             if (!token.hasPermission("UTILISATEUR:LIRE_TOUT")) {
                 writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
                         "Accès interdit : permission UTILISATEUR:LIRE_TOUT requise.");
+                return;
+            }
+        } else if (path.startsWith("/api/utilisateurs/") && path.endsWith("/revoquer-sessions")) {
+            if (token == null) {
+                writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                        tokenError != null ? tokenError : "Authentification requise.");
+                return;
+            }
+            if (!token.hasPermission("UTILISATEUR:GERER_ROLES")) {
+                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                        "Accès interdit : permission UTILISATEUR:GERER_ROLES requise.");
                 return;
             }
         } else if (path.equals("/api/utilisateurs/admin") && "POST".equalsIgnoreCase(method)) {
@@ -266,6 +295,45 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
                     tokenError != null ? tokenError : "Authentification requise.");
             return;
         }
+        if (isPatrimoinePath && path.equals("/api/patrimoines/statistiques")) {
+            if (token == null) {
+                writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                        tokenError != null ? tokenError : "Authentification requise.");
+                return;
+            }
+            if ("TOURISTE".equals(token.role())) {
+                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                        "Accès interdit : statistiques réservées à l'espace professionnel.");
+                return;
+            }
+        }
+        if (isCircuitPath && path.equals("/api/circuits/statistiques")) {
+            if (token == null) {
+                writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                        tokenError != null ? tokenError : "Authentification requise.");
+                return;
+            }
+            if (!token.hasPermission("CIRCUIT:CREER")
+                    && !token.hasPermission("CIRCUIT:MODIFIER")
+                    && !token.hasPermission("CIRCUIT:PUBLIER")) {
+                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                        "Accès interdit : permission de gestion ou d'édition des circuits requise.");
+                return;
+            }
+        }
+        if (isEvenementPath && path.equals("/api/evenements/statistiques")) {
+            if (token == null) {
+                writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                        tokenError != null ? tokenError : "Authentification requise.");
+                return;
+            }
+            if (!token.hasPermission("EVENEMENT:CREER")
+                    && !token.hasPermission("EVENEMENT:PUBLIER")) {
+                writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                        "Accès interdit : permission EVENEMENT:CREER ou EVENEMENT:PUBLIER requise.");
+                return;
+            }
+        }
 
         // 2b. Protection RBAC des routes P05 (Guides, Avis, Modération)
         boolean isGuidePath = path.equals("/api/guides") || path.startsWith("/api/guides/");
@@ -279,7 +347,9 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
                 return;
             }
             boolean isGuideWorkspace = path.equals("/api/guides/mon-profil") || path.startsWith("/api/guides/mon-profil/");
-            boolean isGuideAdminList = path.equals("/api/guides/admin") || path.startsWith("/api/guides/admin/");
+            boolean isGuideAdminList = path.equals("/api/guides/admin")
+                    || path.startsWith("/api/guides/admin/")
+                    || path.equals("/api/guides/statistiques");
             boolean isGuideValidationDecision = path.endsWith("/valider") || path.endsWith("/rejeter") || path.endsWith("/reactiver");
             boolean isGuideSuspensionDecision = path.endsWith("/suspendre") || path.endsWith("/desactiver");
             boolean isGuideHistory = path.endsWith("/historique");
@@ -556,6 +626,12 @@ public class GatewayAuthorizationFilter extends OncePerRequestFilter {
     private String resolveRequiredCatalogPermission(boolean isPatrimoine, boolean isCircuit, String method, String path) {
         String domain = isPatrimoine ? "PATRIMOINE" : (isCircuit ? "CIRCUIT" : "EVENEMENT");
         if (path != null) {
+            if (path.endsWith("/soumettre")) {
+                return domain + ":MODIFIER";
+            }
+            if (path.endsWith("/terminer") && "EVENEMENT".equals(domain)) {
+                return "EVENEMENT:MODIFIER";
+            }
             if (path.endsWith("/publier")) {
                 return domain + ":PUBLIER";
             }

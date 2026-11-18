@@ -350,10 +350,14 @@ test.describe('Patrimoine du Sénégal — Parcours E2E, Responsive & Accessibil
     await page.locator('.btn-logout').first().click();
     await expect(page).toHaveURL(/\/connexion/, { timeout: 8000 });
 
-    // 7. Connexion en tant qu’Administrateur via le formulaire (redirection automatique vers /administration)
+    // 7. Connexion en tant qu’Administrateur via le formulaire (redirection P07 vers /pro/tableau-de-bord)
     await page.locator('#login-email').fill('lamine.faty@univ-zig.sn');
     await page.locator('#login-password').fill('Admin2026!');
     await page.getByRole('button', { name: 'Se connecter' }).click();
+    await expect(page).toHaveURL(/\/pro\/tableau-de-bord/, { timeout: 10000 });
+
+    // Compatibilité /administration : toujours accessible pour ADMINISTRATEUR avec onglets RBAC
+    await page.goto('/administration');
     await expect(page).toHaveURL(/\/administration/, { timeout: 10000 });
     await expect(page.getByRole('heading', { name: /Administration du Patrimoine/ })).toBeVisible();
 

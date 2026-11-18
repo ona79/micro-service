@@ -3,6 +3,7 @@ package com.uasz.ms_utilisateur.services;
 import com.uasz.ms_utilisateur.dto.GuideHistoriqueDto;
 import com.uasz.ms_utilisateur.dto.GuideProfilDto;
 import com.uasz.ms_utilisateur.dto.GuideSelfUpdateRequest;
+import com.uasz.ms_utilisateur.dto.GuideStatsDto;
 import com.uasz.ms_utilisateur.dto.GuideVerificationDto;
 import com.uasz.ms_utilisateur.entities.StatutValidationGuide;
 
@@ -27,6 +28,8 @@ public interface IGuideService {
     GuideProfilDto desactiverMonProfil(String motif);
 
     List<GuideProfilDto> getAllAdmin(StatutValidationGuide statut);
+
+    GuideStatsDto getStatistiques();
 
     List<GuideHistoriqueDto> getHistorique(Long guideId);
 

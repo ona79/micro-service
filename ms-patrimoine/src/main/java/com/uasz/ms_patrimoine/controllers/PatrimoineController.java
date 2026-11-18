@@ -60,6 +60,11 @@ public class PatrimoineController {
                 q, categorie, zone, localite, statut, capaciteMin, tarifMax, inclureNonPublies, page, size, sortBy, sortDir));
     }
 
+    @GetMapping("/statistiques")
+    public ResponseEntity<com.uasz.ms_patrimoine.dto.PatrimoineStatsDto> getStatistiques() {
+        return ResponseEntity.ok(patrimoineService.getStatistiques());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<PatrimoineDto> getByIdPatrimoine(@PathVariable Long id) {
         return ResponseEntity.ok(patrimoineService.getByIdPatrimoine(id));

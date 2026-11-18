@@ -2,6 +2,7 @@ package com.uasz.ms_patrimoine.services;
 
 import com.uasz.ms_patrimoine.dto.PageResponseDto;
 import com.uasz.ms_patrimoine.dto.PatrimoineDto;
+import com.uasz.ms_patrimoine.dto.PatrimoineStatsDto;
 import com.uasz.ms_patrimoine.entities.CategoriePatrimoine;
 import com.uasz.ms_patrimoine.entities.StatutPublication;
 import com.uasz.ms_patrimoine.entities.ZoneCasamance;
@@ -38,6 +39,8 @@ public interface IPatrimoineService {
     PatrimoineDto publierPatrimoine(Long id);
 
     PatrimoineDto archiverPatrimoine(Long id, String motif);
+
+    PatrimoineStatsDto getStatistiques();
 
     void deletePatrimoine(Long id);
 }

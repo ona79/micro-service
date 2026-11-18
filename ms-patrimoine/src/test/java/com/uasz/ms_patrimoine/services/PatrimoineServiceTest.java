@@ -316,4 +316,35 @@ class PatrimoineServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
         verify(patrimoineRepository, never()).deleteById(any());
     }
+
+    @Test
+    void getStatistiques_calculeSelonRoleEtBloqueTouriste() {
+        Patrimoine pub = Patrimoine.builder()
+                .id(1L).nomPatrimoine("Musée").codePatrimoine("P1").capacitePatrimoine(40).tarifEntree(2000.0)
+                .statutPublication(com.uasz.ms_patrimoine.entities.StatutPublication.PUBLIE).build();
+        Patrimoine draft = Patrimoine.builder()
+                .id(2L).nomPatrimoine("Site Brouillon").codePatrimoine("P2").capacitePatrimoine(20).tarifEntree(0.0)
+                .statutPublication(com.uasz.ms_patrimoine.entities.StatutPublication.BROUILLON).build();
+
+        com.uasz.ms_patrimoine.security.SecurityUserContextHolder.setContext(
+                new com.uasz.ms_patrimoine.security.SecurityUserContext(2L, "TOURISTE", "t@uasz.sn", false, null));
+        assertThatThrownBy(() -> patrimoineService.getStatistiques())
+                .isInstanceOf(com.uasz.ms_patrimoine.exceptions.ForbiddenException.class);
+
+        when(patrimoineRepository.findAll()).thenReturn(List.of(pub, draft));
+        com.uasz.ms_patrimoine.security.SecurityUserContextHolder.setContext(
+                new com.uasz.ms_patrimoine.security.SecurityUserContext(3L, "GESTIONNAIRE_SITE", "g@uasz.sn", false, null));
+        var pubOnlyStats = patrimoineService.getStatistiques();
+        assertThat(pubOnlyStats.getScope()).isEqualTo("PUBLIE_UNIQUEMENT");
+        assertThat(pubOnlyStats.getTotal()).isEqualTo(1L);
+        assertThat(pubOnlyStats.getBrouillons()).isEqualTo(0L);
+
+        com.uasz.ms_patrimoine.security.SecurityUserContextHolder.setContext(
+                new com.uasz.ms_patrimoine.security.SecurityUserContext(4L, "CONSERVATEUR", "c@uasz.sn", false, null));
+        var fullStats = patrimoineService.getStatistiques();
+        assertThat(fullStats.getScope()).isEqualTo("GLOBAL");
+        assertThat(fullStats.getTotal()).isEqualTo(2L);
+        assertThat(fullStats.getBrouillons()).isEqualTo(1L);
+        assertThat(fullStats.getPublies()).isEqualTo(1L);
+    }
 }

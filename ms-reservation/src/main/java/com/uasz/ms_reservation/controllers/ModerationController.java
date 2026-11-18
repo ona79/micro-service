@@ -3,6 +3,7 @@ package com.uasz.ms_reservation.controllers;
 import com.uasz.ms_reservation.dto.AvisDto;
 import com.uasz.ms_reservation.dto.AvisModerationHistoriqueDto;
 import com.uasz.ms_reservation.dto.ModerationDecisionRequest;
+import com.uasz.ms_reservation.dto.ModerationStatsDto;
 import com.uasz.ms_reservation.dto.SignalementDecisionRequest;
 import com.uasz.ms_reservation.dto.SignalementDto;
 import com.uasz.ms_reservation.entities.CibleAvis;
@@ -42,6 +43,11 @@ public class ModerationController {
             @RequestParam(required = false) StatutSignalement statut
     ) {
         return ResponseEntity.ok(avisModerationService.getSignalementsModeration(statut));
+    }
+
+    @GetMapping("/statistiques")
+    public ResponseEntity<ModerationStatsDto> getStatistiques() {
+        return ResponseEntity.ok(avisModerationService.getStatistiques());
     }
 
     @GetMapping("/avis/{avisId}/historique")

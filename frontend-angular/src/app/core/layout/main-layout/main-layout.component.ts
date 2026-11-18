@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, effect, HostListener, inject, signa
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import {
-  LucideAward,
   LucideBell,
   LucideCompass,
   LucideLogOut,
@@ -42,7 +41,6 @@ interface NavItem {
     LucideLogOut,
     LucideX,
     LucideBell,
-    LucideAward,
   ],
   templateUrl: './main-layout.component.html',
   styleUrl: './main-layout.component.css',

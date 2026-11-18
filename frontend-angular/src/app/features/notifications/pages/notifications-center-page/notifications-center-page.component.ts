@@ -106,7 +106,7 @@ import { NotificationStore } from '../../data-access/notification.store';
         } @else if (items().length === 0) {
           <app-ui-empty-state
             title="Aucune notification"
-            message="Vous n'avez aucune notification correspondant aux filtres sélectionnés."
+            description="Vous n'avez aucune notification correspondant aux filtres sélectionnés."
           />
         } @else {
           <ul class="notif-list">
@@ -138,7 +138,7 @@ import { NotificationStore } from '../../data-access/notification.store';
                     } @else if (n.reservationId) {
                       <a routerLink="/mon-espace" class="deep-link">Voir ma réservation</a>
                     } @else if (n.cibleType === 'GUIDE') {
-                      <a routerLink="/espace-guide" class="deep-link">Mon espace guide</a>
+                      <a routerLink="/pro/mon-profil-guide" class="deep-link">Mon espace guide</a>
                     }
                   </div>
 

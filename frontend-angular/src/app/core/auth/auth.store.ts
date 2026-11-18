@@ -1,7 +1,10 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { normalizeHttpError } from '../interceptors/http-error.interceptor';
+import { AuditSecuriteItem } from '../models/audit.model';
+import { PageResponse } from '../models/patrimoine.model';
+import { UtilisateurStats } from '../models/statistics.model';
 import {
   ConnexionPayload,
   InscriptionPayload,
@@ -35,6 +38,15 @@ export class AuthStore {
   readonly isStaff = computed(() => {
     const role = this._user()?.role;
     return role === 'ADMINISTRATEUR' || role === 'GESTIONNAIRE_SITE' || role === 'CONSERVATEUR';
+  });
+  readonly isBackOfficeRole = computed(() => {
+    const role = this._user()?.role;
+    return (
+      role === 'ADMINISTRATEUR' ||
+      role === 'GESTIONNAIRE_SITE' ||
+      role === 'CONSERVATEUR' ||
+      role === 'GUIDE'
+    );
   });
 
   readonly fullName = computed(() => {
@@ -187,6 +199,64 @@ export class AuthStore {
   async deleteUser(id: number): Promise<void> {
     await firstValueFrom(
       this.http.delete<void>(`/api/utilisateurs/${id}`, { withCredentials: true })
+    );
+  }
+
+  async rechercherUsers(
+    filters: {
+      q?: string;
+      role?: RoleUtilisateur | '';
+      actif?: boolean | null;
+      page?: number;
+      size?: number;
+    } = {}
+  ): Promise<PageResponse<Utilisateur>> {
+    let params = new HttpParams();
+    if (filters.q) params = params.set('q', filters.q);
+    if (filters.role) params = params.set('role', filters.role);
+    if (filters.actif != null) params = params.set('actif', String(filters.actif));
+    if (filters.page != null) params = params.set('page', String(filters.page));
+    if (filters.size != null) params = params.set('size', String(filters.size));
+    return firstValueFrom(
+      this.http.get<PageResponse<Utilisateur>>('/api/utilisateurs/recherche', {
+        params,
+        withCredentials: true,
+      })
+    );
+  }
+
+  async getUserStats(): Promise<UtilisateurStats> {
+    return firstValueFrom(
+      this.http.get<UtilisateurStats>('/api/utilisateurs/statistiques', { withCredentials: true })
+    );
+  }
+
+  async revoquerSessions(id: number): Promise<void> {
+    await firstValueFrom(
+      this.http.post<void>(`/api/utilisateurs/${id}/revoquer-sessions`, {}, { withCredentials: true })
+    );
+  }
+
+  async getAuditLogs(
+    filters: {
+      eventType?: string;
+      utilisateurId?: number | null;
+      q?: string;
+      page?: number;
+      size?: number;
+    } = {}
+  ): Promise<PageResponse<AuditSecuriteItem>> {
+    let params = new HttpParams();
+    if (filters.eventType) params = params.set('eventType', filters.eventType);
+    if (filters.utilisateurId != null) params = params.set('utilisateurId', String(filters.utilisateurId));
+    if (filters.q) params = params.set('q', filters.q);
+    if (filters.page != null) params = params.set('page', String(filters.page));
+    if (filters.size != null) params = params.set('size', String(filters.size));
+    return firstValueFrom(
+      this.http.get<PageResponse<AuditSecuriteItem>>('/api/utilisateurs/audit', {
+        params,
+        withCredentials: true,
+      })
     );
   }
 }

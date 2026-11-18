@@ -7,6 +7,7 @@ import {
   TypeEvenement,
 } from '../../../core/models/evenement.model';
 import { PageResponse } from '../../../core/models/patrimoine.model';
+import { EvenementStats } from '../../../core/models/statistics.model';
 
 export interface EvenementSearchParams {
   q?: string;
@@ -99,5 +100,9 @@ export class EvenementApiService {
 
   delete(id: number | string): Observable<void> {
     return this.http.delete<void>(`/evenements/${id}`);
+  }
+
+  getStatistiques(): Observable<EvenementStats> {
+    return this.http.get<EvenementStats>('/evenements/statistiques');
   }
 }

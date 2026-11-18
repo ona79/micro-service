@@ -49,6 +49,11 @@ public class NotificationController {
         return ResponseEntity.ok(notificationService.getAllNotificationsPaged(page, size, statut, typeEvenement));
     }
 
+    @GetMapping("/statistiques")
+    public ResponseEntity<com.uasz.ms_notification.dto.NotificationStatsDto> getStatistiques() {
+        return ResponseEntity.ok(notificationService.getStatistiques());
+    }
+
     @GetMapping("/mes-notifications")
     public ResponseEntity<NotificationPageResponseDto> getMesNotifications(
             @RequestParam(defaultValue = "0") int page,

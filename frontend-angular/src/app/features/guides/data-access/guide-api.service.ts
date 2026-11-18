@@ -7,6 +7,7 @@ import {
   GuideSelfUpdatePayload,
   StatutValidationGuide,
 } from '../../../core/models/guide.model';
+import { GuideStats } from '../../../core/models/statistics.model';
 
 @Injectable({ providedIn: 'root' })
 export class GuideApiService {
@@ -79,5 +80,9 @@ export class GuideApiService {
 
   desactiverProfilParAdmin(guideId: number | string, motif?: string): Observable<GuideProfil> {
     return this.http.post<GuideProfil>(`/guides/${guideId}/desactiver`, motif ? { motif } : {});
+  }
+
+  getStatistiques(): Observable<GuideStats> {
+    return this.http.get<GuideStats>('/guides/statistiques');
   }
 }

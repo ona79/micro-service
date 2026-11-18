@@ -155,18 +155,23 @@ public class CircuitService implements ICircuitService {
     @Transactional(readOnly = true)
     public List<CircuitDto> getAllCircuits() {
         SecurityUserContext caller = SecurityUserContextHolder.getContext();
-        boolean canSeeDrafts = caller != null
+        boolean isGuide = caller != null && "GUIDE".equals(caller.role());
+        boolean canSeeAllDrafts = caller != null && !isGuide
                 && (caller.hasPermission("CIRCUIT:CREER")
-                || caller.hasPermission("CIRCUIT:MODIFIER")
-                || caller.hasPermission("CIRCUIT:PUBLIER"));
+                || caller.hasPermission("CIRCUIT:PUBLIER")
+                || caller.hasPermission("CIRCUIT:ARCHIVER"));
 
         return circuitRepository.findAll().stream()
                 .filter(c -> {
                     StatutCircuit statut = c.getStatutCircuit() != null ? c.getStatutCircuit() : StatutCircuit.PUBLIE;
+                    if (statut == StatutCircuit.PUBLIE) {
+                        return true;
+                    }
                     if (statut == StatutCircuit.ARCHIVE) {
                         return false;
                     }
-                    return canSeeDrafts || statut == StatutCircuit.PUBLIE;
+                    return canSeeAllDrafts
+                            || (isGuide && caller.userId() != null && caller.userId().equals(c.getGuideResponsableId()));
                 })
                 .map(circuitMapper::toDto)
                 .toList();
@@ -190,6 +195,7 @@ public class CircuitService implements ICircuitService {
             String sortDir
     ) {
         SecurityUserContext caller = SecurityUserContextHolder.getContext();
+        boolean isGuide = caller != null && "GUIDE".equals(caller.role());
         boolean isAuthorizedStaff = caller != null
                 && (caller.hasPermission("CIRCUIT:CREER")
                 || caller.hasPermission("CIRCUIT:MODIFIER")
@@ -200,13 +206,14 @@ public class CircuitService implements ICircuitService {
             throw new ForbiddenException("Accès interdit : seuls les gestionnaires, guides et administrateurs peuvent consulter les circuits non publiés.");
         }
 
+        Long callerGuideUserId = isGuide ? caller.userId() : null;
         int safePage = Math.max(0, page);
         int safeSize = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
         Sort sort = buildSafeSort(sortBy, sortDir);
         Pageable pageable = PageRequest.of(safePage, safeSize, sort);
 
         Specification<Circuit> spec = buildSpecification(
-                q, difficulte, moyenTransport, zone, statut, dureeMax, distanceMax, prixMax, inclureNonPublies);
+                q, difficulte, moyenTransport, zone, statut, dureeMax, distanceMax, prixMax, inclureNonPublies, callerGuideUserId);
 
         Page<Circuit> dbPage = circuitRepository.findAll(spec, pageable);
         if (dbPage != null) {
@@ -225,7 +232,7 @@ public class CircuitService implements ICircuitService {
 
         return rechercherEnMemoireFallback(
                 q, difficulte, moyenTransport, zone, statut, dureeMax, distanceMax, prixMax,
-                inclureNonPublies, safePage, safeSize, sortBy, sortDir);
+                inclureNonPublies, callerGuideUserId, safePage, safeSize, sortBy, sortDir);
     }
 
     @Override
@@ -234,14 +241,20 @@ public class CircuitService implements ICircuitService {
         Circuit circuit = findCircuit(id);
         StatutCircuit statut = circuit.getStatutCircuit() != null ? circuit.getStatutCircuit() : StatutCircuit.PUBLIE;
         SecurityUserContext caller = SecurityUserContextHolder.getContext();
+        boolean isGuide = caller != null && "GUIDE".equals(caller.role());
         boolean isAuthorizedStaff = caller != null && (caller.isServiceCall()
                 || caller.hasPermission("CIRCUIT:CREER")
                 || caller.hasPermission("CIRCUIT:MODIFIER")
                 || caller.hasPermission("CIRCUIT:PUBLIER")
                 || caller.hasPermission("CIRCUIT:ARCHIVER"));
 
-        if (statut != StatutCircuit.PUBLIE && !isAuthorizedStaff) {
-            throw new ForbiddenException("Ce circuit n'est pas publié ou a été archivé.");
+        if (statut != StatutCircuit.PUBLIE) {
+            if (!isAuthorizedStaff) {
+                throw new ForbiddenException("Ce circuit n'est pas publié ou a été archivé.");
+            }
+            if (isGuide && (caller.userId() == null || !caller.userId().equals(circuit.getGuideResponsableId()))) {
+                throw new ForbiddenException("Accès interdit (BOLA) : vous ne pouvez consulter les circuits non publiés que lorsqu'ils vous sont rattachés.");
+            }
         }
 
         Map<Long, PatrimoineDto> patrimoines = new HashMap<>();
@@ -434,6 +447,82 @@ public class CircuitService implements ICircuitService {
 
     @Override
     @Transactional(readOnly = true)
+    public com.uasz.ms_circuit.dto.CircuitStatsDto getStatistiques() {
+        SecurityUserContext caller = SecurityUserContextHolder.getContext();
+        if (caller == null || caller.userId() == null) {
+            throw new UnauthorizedException("Authentification requise.");
+        }
+        boolean isGuide = "GUIDE".equals(caller.role());
+        boolean isManager = caller.hasPermission("CIRCUIT:CREER")
+                || caller.hasPermission("CIRCUIT:PUBLIER")
+                || caller.hasPermission("CIRCUIT:ARCHIVER");
+        if (!isGuide && !isManager) {
+            throw new ForbiddenException("Accès interdit : statistiques réservées aux gestionnaires, guides et administrateurs.");
+        }
+
+        List<Circuit> source = isGuide
+                ? circuitRepository.findByGuideResponsableIdOrderByIdDesc(caller.userId())
+                : circuitRepository.findAll();
+
+        long brouillons = 0L;
+        long soumis = 0L;
+        long publies = 0L;
+        long archives = 0L;
+        long avecGuide = 0L;
+        long sansGuide = 0L;
+        double prixSumPublie = 0.0;
+        long dureeSum = 0L;
+        java.util.Map<String, Long> parDifficulte = new java.util.LinkedHashMap<>();
+        java.util.Map<String, Long> parTransport = new java.util.LinkedHashMap<>();
+        java.util.Map<String, Long> parZone = new java.util.LinkedHashMap<>();
+
+        for (Circuit c : source) {
+            StatutCircuit st = c.getStatutCircuit() != null ? c.getStatutCircuit() : StatutCircuit.PUBLIE;
+            switch (st) {
+                case BROUILLON -> brouillons++;
+                case SOUMIS -> soumis++;
+                case PUBLIE -> {
+                    publies++;
+                    prixSumPublie += Math.max(0.0, c.getPrix());
+                }
+                case ARCHIVE -> archives++;
+            }
+            if (c.getGuideResponsableId() != null) {
+                avecGuide++;
+            } else {
+                sansGuide++;
+            }
+            dureeSum += Math.max(0, c.getDureeEstimee());
+            parDifficulte.merge(c.getDifficulte() != null ? c.getDifficulte().name() : "NON_DEFINIE", 1L, Long::sum);
+            parTransport.merge(c.getMoyenTransport() != null ? c.getMoyenTransport().name() : "MIXTE", 1L, Long::sum);
+            String zone = (c.getZoneGeographique() != null && !c.getZoneGeographique().isBlank())
+                    ? c.getZoneGeographique()
+                    : "NON_DEFINIE";
+            parZone.merge(zone, 1L, Long::sum);
+        }
+
+        double prixMoy = publies > 0 ? Math.round((prixSumPublie / publies) * 100.0) / 100.0 : 0.0;
+        double dureeMoy = !source.isEmpty() ? Math.round(((double) dureeSum / source.size()) * 10.0) / 10.0 : 0.0;
+
+        return com.uasz.ms_circuit.dto.CircuitStatsDto.builder()
+                .total(source.size())
+                .brouillons(brouillons)
+                .soumis(soumis)
+                .publies(publies)
+                .archives(archives)
+                .avecGuideAffecte(avecGuide)
+                .sansGuide(sansGuide)
+                .scope(isGuide ? "GUIDE_PROPRE" : "GLOBAL")
+                .parDifficulte(parDifficulte)
+                .parMoyenTransport(parTransport)
+                .parZone(parZone)
+                .prixMoyenPublie(prixMoy)
+                .dureeMoyenneMinutes(dureeMoy)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public PatrimoineDto testerCommunication(String mode, Long patrimoineId) {
         return switch (mode.toLowerCase()) {
             case "feign" -> recupererPatrimoine(patrimoineId);
@@ -548,7 +637,8 @@ public class CircuitService implements ICircuitService {
             Integer dureeMax,
             Double distanceMax,
             Double prixMax,
-            boolean inclureNonPublies
+            boolean inclureNonPublies,
+            Long callerGuideUserId
     ) {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -556,6 +646,12 @@ public class CircuitService implements ICircuitService {
                 predicates.add(cb.equal(root.get("statutCircuit"), statut));
             } else if (!inclureNonPublies) {
                 predicates.add(cb.equal(root.get("statutCircuit"), StatutCircuit.PUBLIE));
+            }
+            if (callerGuideUserId != null) {
+                predicates.add(cb.or(
+                        cb.equal(root.get("statutCircuit"), StatutCircuit.PUBLIE),
+                        cb.equal(root.get("guideResponsableId"), callerGuideUserId)
+                ));
             }
             if (difficulte != null) {
                 predicates.add(cb.equal(root.get("difficulte"), difficulte));
@@ -614,6 +710,7 @@ public class CircuitService implements ICircuitService {
             Double distanceMax,
             Double prixMax,
             boolean inclureNonPublies,
+            Long callerGuideUserId,
             int safePage,
             int safeSize,
             String sortBy,
@@ -631,6 +728,10 @@ public class CircuitService implements ICircuitService {
                         if (currentStatut != statut) return false;
                     } else if (!inclureNonPublies) {
                         if (currentStatut != StatutCircuit.PUBLIE) return false;
+                    }
+                    if (callerGuideUserId != null && currentStatut != StatutCircuit.PUBLIE
+                            && !callerGuideUserId.equals(c.getGuideResponsableId())) {
+                        return false;
                     }
                     if (difficulte != null && c.getDifficulte() != difficulte) return false;
                     if (moyenTransport != null && c.getMoyenTransport() != moyenTransport) return false;

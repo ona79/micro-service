@@ -73,6 +73,11 @@ public class EvenementController {
                 aVenirUniquement, inclureNonPublies, page, size, sortBy, sortDir));
     }
 
+    @GetMapping("/statistiques")
+    public ResponseEntity<com.uasz.ms_evenement.dto.EvenementStatsDto> getStatistiques() {
+        return ResponseEntity.ok(evenementService.getStatistiques());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<EvenementDto> getByIdEvenement(@PathVariable Long id) {
         return ResponseEntity.ok(evenementService.getByIdEvenement(id));

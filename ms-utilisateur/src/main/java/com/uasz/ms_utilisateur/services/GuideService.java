@@ -3,6 +3,7 @@ package com.uasz.ms_utilisateur.services;
 import com.uasz.ms_utilisateur.dto.GuideHistoriqueDto;
 import com.uasz.ms_utilisateur.dto.GuideProfilDto;
 import com.uasz.ms_utilisateur.dto.GuideSelfUpdateRequest;
+import com.uasz.ms_utilisateur.dto.GuideStatsDto;
 import com.uasz.ms_utilisateur.dto.GuideVerificationDto;
 import com.uasz.ms_utilisateur.entities.GuideHistoriqueValidation;
 import com.uasz.ms_utilisateur.entities.GuideProfil;
@@ -33,7 +34,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -275,6 +278,58 @@ public class GuideService implements IGuideService {
         return guideProfilRepository.findAllAdminFiltered(statut).stream()
                 .map(this::toDetailedDto)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public GuideStatsDto getStatistiques() {
+        requireManagerPermission("GUIDE:VALIDER");
+        long brouillons = guideProfilRepository.countByStatutValidation(StatutValidationGuide.BROUILLON);
+        long enAttente = guideProfilRepository.countByStatutValidation(StatutValidationGuide.EN_ATTENTE_VALIDATION);
+        long valides = guideProfilRepository.countByStatutValidation(StatutValidationGuide.VALIDE);
+        long rejetes = guideProfilRepository.countByStatutValidation(StatutValidationGuide.REJETE);
+        long suspendus = guideProfilRepository.countByStatutValidation(StatutValidationGuide.SUSPENDU);
+        long desactives = guideProfilRepository.countByStatutValidation(StatutValidationGuide.DESACTIVE);
+        long disponibles = guideProfilRepository.countByStatutValidationAndDisponibleTrue(StatutValidationGuide.VALIDE);
+        long visibles = guideProfilRepository.countByStatutValidationAndVisibilitePubliqueTrue(StatutValidationGuide.VALIDE);
+
+        Map<String, Long> parZone = new LinkedHashMap<>();
+        Map<String, Long> parLangue = new LinkedHashMap<>();
+        List<GuideProfil> all = guideProfilRepository.findAllAdminOrderByUpdatedDesc();
+        for (GuideProfil profil : all) {
+            incrementTokens(parZone, profil.getZonesIntervention());
+            incrementTokens(parLangue, profil.getLanguesParlees());
+        }
+
+        long total = brouillons + enAttente + valides + rejetes + suspendus + desactives;
+        if (total == 0 && !all.isEmpty()) {
+            total = all.size();
+        }
+        return GuideStatsDto.builder()
+                .total(total)
+                .brouillons(brouillons)
+                .enAttenteValidation(enAttente)
+                .valides(valides)
+                .rejetes(rejetes)
+                .suspendus(suspendus)
+                .desactives(desactives)
+                .disponiblesEtValides(disponibles)
+                .visiblesPublic(visibles)
+                .parZone(parZone)
+                .parLangue(parLangue)
+                .build();
+    }
+
+    private static void incrementTokens(Map<String, Long> bucket, String csv) {
+        if (csv == null || csv.isBlank()) {
+            return;
+        }
+        for (String part : csv.split("[,;/]")) {
+            String token = part.trim();
+            if (!token.isEmpty()) {
+                bucket.merge(token, 1L, Long::sum);
+            }
+        }
     }
 
     @Override

@@ -206,4 +206,23 @@ class NotificationServiceTest {
         assertThat(page.getUnreadCount()).isEqualTo(1);
         assertThat(compteur.getUnreadCount()).isEqualTo(1);
     }
+
+    @Test
+    void getStatistiques_agregeNotificationsPourAdmin() {
+        SecurityUserContextHolder.setContext(new SecurityUserContext(
+                1L, "ADMINISTRATEUR", "admin@uasz.sn", false, null));
+        NotificationService service = new NotificationService(notificationRepository, mapper);
+        when(notificationRepository.findAll()).thenReturn(List.of(
+                Notification.builder().id(1L).canal(CanalNotification.EMAIL).statut(StatutNotification.ENVOYEE).lue(false).typeEvenement("PAIEMENT_VALIDE").build(),
+                Notification.builder().id(2L).canal(CanalNotification.SMS).statut(StatutNotification.ECHEC).lue(true).typeEvenement("RESERVATION_CONFIRMEE").build()
+        ));
+
+        var stats = service.getStatistiques();
+
+        assertThat(stats.getTotal()).isEqualTo(2L);
+        assertThat(stats.getEnvoyees()).isEqualTo(1L);
+        assertThat(stats.getEchecsDefinitifs()).isEqualTo(1L);
+        assertThat(stats.getNonLuesTotal()).isEqualTo(1L);
+        assertThat(stats.getParCanal()).containsEntry("EMAIL", 1L).containsEntry("SMS", 1L);
+    }
 }

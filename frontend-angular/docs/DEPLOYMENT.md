@@ -20,8 +20,8 @@ npx playwright test              # Exécute la suite E2E, responsive et A11y (Ch
 ```
 
 ## 4. Déploiement Docker / Nginx
-Un `Dockerfile` multi-stage et un `nginx.conf` (fallback SPA `try_files` + reverse-proxy `/api/` vers `http://api-gateway:8090/api/`) sont intégrés au `docker-compose.yml` racine.
+Un `Dockerfile` multi-stage et un `nginx.conf` (fallback SPA `try_files` incluant l'espace professionnel `/pro/**` et reverse-proxy `/api/` vers `http://api-gateway:8090/api/` avec tampons d'en-têtes `16k`/`32k` pour les cookies de session HttpOnly RBAC) sont intégrés au `docker-compose.yml` racine.
 ```bash
 docker compose up -d --build
 ```
-L'application est servie sur `http://localhost` (port `80` exposé par `frontend-angular`). En configuration Compose standard, les microservices restent privés sur `app-net` / `data-net`.
+L'application est servie sur `http://localhost` (port `80` exposé par `frontend-angular` ; back-office accessible sur `http://localhost/pro/tableau-de-bord`). En configuration Compose standard, les microservices restent privés sur `app-net` / `data-net`.
