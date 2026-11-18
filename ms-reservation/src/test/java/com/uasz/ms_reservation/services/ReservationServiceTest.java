@@ -11,6 +11,9 @@ import com.uasz.ms_reservation.entities.TypeReservation;
 import com.uasz.ms_reservation.exceptions.BadRequestException;
 import com.uasz.ms_reservation.mappers.ReservationMapper;
 import com.uasz.ms_reservation.repositories.ReservationRepository;
+import com.uasz.ms_reservation.security.SecurityUserContext;
+import com.uasz.ms_reservation.security.SecurityUserContextHolder;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,6 +47,12 @@ class ReservationServiceTest {
     @BeforeEach
     void setUp() {
         reservationService = new ReservationService(reservationRepository, reservationMapper, circuitClient, evenementClient);
+        SecurityUserContextHolder.setContext(new SecurityUserContext(2L, "TOURISTE", "moussa@uasz.sn", false, null));
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityUserContextHolder.clear();
     }
 
     @Test
@@ -63,6 +72,7 @@ class ReservationServiceTest {
         ReservationDto saved = reservationService.saveReservation(dto);
 
         assertThat(saved.getId()).isEqualTo(1L);
+        assertThat(saved.getUtilisateurId()).isEqualTo(2L);
         assertThat(saved.getStatut()).isEqualTo(StatutReservation.CONFIRMEE);
         assertThat(saved.getMontantTotal()).isEqualTo(20000.0);
         assertThat(saved.getCircuit().getNomCircuit()).isEqualTo("Circuit Gorée");
@@ -105,4 +115,3 @@ class ReservationServiceTest {
         assertThat(saved.getEvenement().getNomEvenement()).isEqualTo("Expo Gorée");
     }
 }
-

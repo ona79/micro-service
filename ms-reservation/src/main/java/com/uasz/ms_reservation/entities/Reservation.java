@@ -24,6 +24,8 @@ public class Reservation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private Long utilisateurId;
+
     private String nomClient;
 
     private String emailClient;

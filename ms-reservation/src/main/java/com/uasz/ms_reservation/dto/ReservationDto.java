@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -15,9 +16,12 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class ReservationDto {
 
     private Long id;
+
+    private Long utilisateurId;
 
     @NotBlank(message = "Le nom du client est obligatoire")
     private String nomClient;
@@ -49,5 +53,13 @@ public class ReservationDto {
 
     /** Détails de l'événement récupérés via OpenFeign (si typeReservation == EVENEMENT) */
     private EvenementDto evenement;
+
+    public ReservationDto(Long id, String nomClient, String emailClient, String telephoneClient,
+                          int nombrePlaces, LocalDateTime dateReservation, TypeReservation typeReservation,
+                          StatutReservation statut, double montantTotal, Long circuitId, Long evenementId,
+                          CircuitDto circuit, EvenementDto evenement) {
+        this(id, null, nomClient, emailClient, telephoneClient, nombrePlaces, dateReservation,
+                typeReservation, statut, montantTotal, circuitId, evenementId, circuit, evenement);
+    }
 }
 

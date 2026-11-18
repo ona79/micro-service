@@ -48,6 +48,8 @@ services:
       - DB_USER=patrimoine_user
       - "DB_PASSWORD=${PATRIMOINE_DB_PASSWORD:?Erreur_PATRIMOINE_DB_PASSWORD_obligatoire}"
       - EUREKA_URI=http://discovery-server:8761/eureka
+      - "SECURITY_SESSION_SECRET=${SECURITY_SESSION_SECRET:?Erreur_SECURITY_SESSION_SECRET_obligatoire}"
+      - "SECURITY_INTERSERVICE_SECRET=${SECURITY_INTERSERVICE_SECRET:?Erreur_SECURITY_INTERSERVICE_SECRET_obligatoire}"
     networks:
       - app-net
       - data-net
@@ -69,6 +71,8 @@ services:
       - DB_USER=circuit_user
       - "DB_PASSWORD=${CIRCUIT_DB_PASSWORD:?Erreur_CIRCUIT_DB_PASSWORD_obligatoire}"
       - EUREKA_URI=http://discovery-server:8761/eureka
+      - "SECURITY_SESSION_SECRET=${SECURITY_SESSION_SECRET:?Erreur_SECURITY_SESSION_SECRET_obligatoire}"
+      - "SECURITY_INTERSERVICE_SECRET=${SECURITY_INTERSERVICE_SECRET:?Erreur_SECURITY_INTERSERVICE_SECRET_obligatoire}"
     networks:
       - app-net
       - data-net
@@ -92,6 +96,8 @@ services:
       - DB_USER=evenement_user
       - "DB_PASSWORD=${EVENEMENT_DB_PASSWORD:?Erreur_EVENEMENT_DB_PASSWORD_obligatoire}"
       - EUREKA_URI=http://discovery-server:8761/eureka
+      - "SECURITY_SESSION_SECRET=${SECURITY_SESSION_SECRET:?Erreur_SECURITY_SESSION_SECRET_obligatoire}"
+      - "SECURITY_INTERSERVICE_SECRET=${SECURITY_INTERSERVICE_SECRET:?Erreur_SECURITY_INTERSERVICE_SECRET_obligatoire}"
     networks:
       - app-net
       - data-net
@@ -115,6 +121,8 @@ services:
       - DB_USER=reservation_user
       - "DB_PASSWORD=${RESERVATION_DB_PASSWORD:?Erreur_RESERVATION_DB_PASSWORD_obligatoire}"
       - EUREKA_URI=http://discovery-server:8761/eureka
+      - "SECURITY_SESSION_SECRET=${SECURITY_SESSION_SECRET:?Erreur_SECURITY_SESSION_SECRET_obligatoire}"
+      - "SECURITY_INTERSERVICE_SECRET=${SECURITY_INTERSERVICE_SECRET:?Erreur_SECURITY_INTERSERVICE_SECRET_obligatoire}"
     networks:
       - app-net
       - data-net
@@ -141,6 +149,7 @@ services:
       - "DB_PASSWORD=${UTILISATEUR_DB_PASSWORD:?Erreur_UTILISATEUR_DB_PASSWORD_obligatoire}"
       - EUREKA_URI=http://discovery-server:8761/eureka
       - "SECURITY_SESSION_SECRET=${SECURITY_SESSION_SECRET:?Erreur_SECURITY_SESSION_SECRET_obligatoire}"
+      - "SECURITY_INTERSERVICE_SECRET=${SECURITY_INTERSERVICE_SECRET:?Erreur_SECURITY_INTERSERVICE_SECRET_obligatoire}"
     networks:
       - app-net
       - data-net
@@ -162,6 +171,8 @@ services:
       - DB_USER=notification_user
       - "DB_PASSWORD=${NOTIFICATION_DB_PASSWORD:?Erreur_NOTIFICATION_DB_PASSWORD_obligatoire}"
       - EUREKA_URI=http://discovery-server:8761/eureka
+      - "SECURITY_SESSION_SECRET=${SECURITY_SESSION_SECRET:?Erreur_SECURITY_SESSION_SECRET_obligatoire}"
+      - "SECURITY_INTERSERVICE_SECRET=${SECURITY_INTERSERVICE_SECRET:?Erreur_SECURITY_INTERSERVICE_SECRET_obligatoire}"
     networks:
       - app-net
       - data-net
@@ -183,6 +194,8 @@ services:
       - DB_USER=paiement_user
       - "DB_PASSWORD=${PAIEMENT_DB_PASSWORD:?Erreur_PAIEMENT_DB_PASSWORD_obligatoire}"
       - EUREKA_URI=http://discovery-server:8761/eureka
+      - "SECURITY_SESSION_SECRET=${SECURITY_SESSION_SECRET:?Erreur_SECURITY_SESSION_SECRET_obligatoire}"
+      - "SECURITY_INTERSERVICE_SECRET=${SECURITY_INTERSERVICE_SECRET:?Erreur_SECURITY_INTERSERVICE_SECRET_obligatoire}"
     networks:
       - app-net
       - data-net
@@ -204,6 +217,7 @@ services:
       - PORT=8090
       - EUREKA_URI=http://discovery-server:8761/eureka
       - "SECURITY_SESSION_SECRET=${SECURITY_SESSION_SECRET:?Erreur_SECURITY_SESSION_SECRET_obligatoire}"
+      - "SECURITY_INTERSERVICE_SECRET=${SECURITY_INTERSERVICE_SECRET:?Erreur_SECURITY_INTERSERVICE_SECRET_obligatoire}"
     networks:
       - app-net
     depends_on:

@@ -25,6 +25,8 @@ public class Paiement {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private Long utilisateurId;
+
     @Column(unique = true)
     private String referenceTransaction;
 

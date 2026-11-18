@@ -3,10 +3,10 @@ package com.uasz.ms_patrimoine.exceptions;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.web.ErrorResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -19,13 +19,21 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /** Ressource introuvable : 404 {"erreur": "..."} */
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Map<String, String>> handleResourceNotFound(ResourceNotFoundException ex) {
         return erreur(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
-    /** Échec de validation (@Valid) : 400 {"erreur": "champ : message, ..."} */
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<Map<String, String>> handleUnauthorized(UnauthorizedException ex) {
+        return erreur(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<Map<String, String>> handleForbidden(ForbiddenException ex) {
+        return erreur(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException ex) {
         String message = ex.getBindingResult().getFieldErrors().stream()
@@ -35,20 +43,17 @@ public class GlobalExceptionHandler {
         return erreur(HttpStatus.BAD_REQUEST, message);
     }
 
-    /** Corps JSON absent ou mal formé : 400 */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, String>> handleNotReadable(HttpMessageNotReadableException ex) {
         return erreur(HttpStatus.BAD_REQUEST, "Corps de la requête JSON absent ou invalide");
     }
 
-    /** Id non numérique dans l'URL (ex. /api/patrimoines/abc) : 400 */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Map<String, String>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         return erreur(HttpStatus.BAD_REQUEST,
                 "Valeur invalide pour le paramètre '" + ex.getName() + "' : " + ex.getValue());
     }
 
-    /** Toute autre erreur : on garde le statut des erreurs Spring (404 route, 405...), sinon 500 */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, String>> handleOther(Exception ex) {
         if (ex instanceof ErrorResponse errorResponse) {

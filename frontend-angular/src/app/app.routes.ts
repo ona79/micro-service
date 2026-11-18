@@ -101,7 +101,7 @@ export const routes: Routes = [
       {
         path: 'administration',
         title: 'Administration & Gestion',
-        canActivate: [authGuard, roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE'])],
+        canActivate: [authGuard, roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE', 'CONSERVATEUR'])],
         loadComponent: () =>
           import(
             './features/admin/pages/admin-dashboard-page/admin-dashboard-page.component'

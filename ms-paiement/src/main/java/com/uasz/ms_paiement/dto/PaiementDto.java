@@ -4,6 +4,7 @@ import com.uasz.ms_paiement.entities.ModePaiement;
 import com.uasz.ms_paiement.entities.StatutPaiement;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -12,9 +13,12 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class PaiementDto {
 
     private Long id;
+
+    private Long utilisateurId;
 
     private String referenceTransaction;
 
@@ -31,5 +35,11 @@ public class PaiementDto {
     private LocalDateTime datePaiement;
 
     private ReservationDto reservation;
+
+    public PaiementDto(Long id, String referenceTransaction, Long reservationId, double montant,
+                       ModePaiement modePaiement, StatutPaiement statut, LocalDateTime datePaiement,
+                       ReservationDto reservation) {
+        this(id, null, referenceTransaction, reservationId, montant, modePaiement, statut, datePaiement, reservation);
+    }
 }
 

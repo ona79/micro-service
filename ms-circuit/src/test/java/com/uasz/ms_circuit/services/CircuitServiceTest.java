@@ -8,13 +8,17 @@ import com.uasz.ms_circuit.entities.Circuit;
 import com.uasz.ms_circuit.entities.Difficulte;
 import com.uasz.ms_circuit.entities.Etape;
 import com.uasz.ms_circuit.exceptions.BadRequestException;
+import com.uasz.ms_circuit.exceptions.ForbiddenException;
 import com.uasz.ms_circuit.exceptions.ResourceNotFoundException;
 import com.uasz.ms_circuit.exceptions.ServiceIndisponibleException;
 import com.uasz.ms_circuit.mappers.CircuitMapper;
 import com.uasz.ms_circuit.repositories.CircuitRepository;
+import com.uasz.ms_circuit.security.SecurityUserContext;
+import com.uasz.ms_circuit.security.SecurityUserContextHolder;
 import feign.FeignException;
 import feign.Request;
 import feign.RequestTemplate;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,10 +54,16 @@ class CircuitServiceTest {
     @BeforeEach
     void setUp() {
         circuitService = new CircuitService(circuitRepository, circuitMapper, patrimoineClient);
+        SecurityUserContextHolder.setContext(new SecurityUserContext(3L, "GESTIONNAIRE_SITE", "awa@uasz.sn", false, null));
         p1 = new PatrimoineDto(1L, "Mémorial du Joola", "PAT-ZIG-001", "Desc 1", "Hist 1",
                 "Ziguinchor", 250, 12.5833f, -16.2719f);
         p2 = new PatrimoineDto(2L, "Comptoir de Carabane", "PAT-CRB-002", "Desc 2", "Hist 2",
                 "Carabane", 200, 12.5358f, -16.6978f);
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityUserContextHolder.clear();
     }
 
     @Test
@@ -81,6 +91,22 @@ class CircuitServiceTest {
         assertThat(saved.getEtapes().get(0).getPatrimoine().getNomPatrimoine()).isEqualTo("Mémorial du Joola");
         assertThat(saved.getEtapes().get(1).getOrdre()).isEqualTo(2);
         assertThat(saved.getEtapes().get(1).getPatrimoine().getNomPatrimoine()).isEqualTo("Comptoir de Carabane");
+    }
+
+    @Test
+    void rbac_verificationPermissionsCinqRolesSurCircuits() {
+        EtapeDto e1 = new EtapeDto(null, 1, 60, 1L, null);
+        CircuitDto input = new CircuitDto(null, "Circuit", "Desc", Difficulte.FACILE, 0, 0.0, 20, 3000.0, List.of(e1));
+
+        // 1. CONSERVATEUR ne possède pas CIRCUIT:CREER ni CIRCUIT:MODIFIER -> 403
+        SecurityUserContextHolder.setContext(new SecurityUserContext(4L, "CONSERVATEUR", "fatou@uasz.sn", false, null));
+        assertThatThrownBy(() -> circuitService.saveCircuit(input)).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> circuitService.updateCircuit(1L, input)).isInstanceOf(ForbiddenException.class);
+
+        // 2. GUIDE possède CIRCUIT:MODIFIER mais pas CIRCUIT:CREER ni CIRCUIT:SUPPRIMER
+        SecurityUserContextHolder.setContext(new SecurityUserContext(5L, "GUIDE", "guide@uasz.sn", false, null));
+        assertThatThrownBy(() -> circuitService.saveCircuit(input)).isInstanceOf(ForbiddenException.class);
+        assertThatThrownBy(() -> circuitService.deleteCircuit(1L)).isInstanceOf(ForbiddenException.class);
     }
 
     @Test
@@ -137,4 +163,3 @@ class CircuitServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 }
-

@@ -5,10 +5,14 @@ import com.uasz.ms_evenement.dto.EvenementDto;
 import com.uasz.ms_evenement.dto.PatrimoineDto;
 import com.uasz.ms_evenement.entities.Evenement;
 import com.uasz.ms_evenement.exceptions.BadRequestException;
+import com.uasz.ms_evenement.exceptions.ForbiddenException;
 import com.uasz.ms_evenement.exceptions.ResourceNotFoundException;
 import com.uasz.ms_evenement.exceptions.ServiceIndisponibleException;
+import com.uasz.ms_evenement.exceptions.UnauthorizedException;
 import com.uasz.ms_evenement.mappers.EvenementMapper;
 import com.uasz.ms_evenement.repositories.EvenementRepository;
+import com.uasz.ms_evenement.security.SecurityUserContext;
+import com.uasz.ms_evenement.security.SecurityUserContextHolder;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +33,7 @@ public class EvenementService implements IEvenementService {
 
     @Override
     public EvenementDto saveEvenement(EvenementDto evenementDto) {
+        requirePermission("EVENEMENT:CREER");
         PatrimoineDto patrimoine = validerEvenementEtRecupererPatrimoine(evenementDto);
         Evenement evenement = evenementMapper.toEntity(evenementDto);
         evenement.setId(null);
@@ -64,6 +69,7 @@ public class EvenementService implements IEvenementService {
 
     @Override
     public EvenementDto updateEvenement(Long id, EvenementDto evenementDto) {
+        requirePermission("EVENEMENT:MODIFIER");
         Evenement evenement = findEvenement(id);
         PatrimoineDto patrimoine = validerEvenementEtRecupererPatrimoine(evenementDto);
         evenementMapper.updateEntity(evenementDto, evenement);
@@ -77,10 +83,24 @@ public class EvenementService implements IEvenementService {
 
     @Override
     public void deleteEvenement(Long id) {
+        requirePermission("EVENEMENT:SUPPRIMER");
         if (!evenementRepository.existsById(id)) {
             throw new ResourceNotFoundException("Événement introuvable avec l'id : " + id);
         }
         evenementRepository.deleteById(id);
+    }
+
+    private void requirePermission(String permission) {
+        SecurityUserContext caller = SecurityUserContextHolder.getContext();
+        if (caller == null || caller.userId() == null) {
+            throw new UnauthorizedException("Authentification requise pour modifier les événements.");
+        }
+        if (caller.isServiceCall()) {
+            throw new ForbiddenException("Accès interdit : un appel de service ne peut pas modifier les événements.");
+        }
+        if (!caller.hasPermission(permission)) {
+            throw new ForbiddenException("Accès interdit : votre rôle (" + caller.role() + ") ne possède pas la permission " + permission + ".");
+        }
     }
 
     private Evenement findEvenement(Long id) {
@@ -108,4 +128,3 @@ public class EvenementService implements IEvenementService {
         return patrimoine;
     }
 }
-

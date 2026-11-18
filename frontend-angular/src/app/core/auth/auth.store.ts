@@ -27,9 +27,13 @@ export class AuthStore {
 
   readonly isAuthenticated = computed(() => this._user() !== null);
   readonly isAdmin = computed(() => this._user()?.role === 'ADMINISTRATEUR');
+  readonly isSiteManager = computed(() => this._user()?.role === 'GESTIONNAIRE_SITE');
+  readonly isConservateur = computed(() => this._user()?.role === 'CONSERVATEUR');
+  readonly isGuide = computed(() => this._user()?.role === 'GUIDE');
+  readonly isTouriste = computed(() => this._user()?.role === 'TOURISTE');
   readonly isStaff = computed(() => {
     const role = this._user()?.role;
-    return role === 'ADMINISTRATEUR' || role === 'GESTIONNAIRE_SITE';
+    return role === 'ADMINISTRATEUR' || role === 'GESTIONNAIRE_SITE' || role === 'CONSERVATEUR';
   });
 
   readonly fullName = computed(() => {
@@ -137,6 +141,19 @@ export class AuthStore {
     }
   }
 
+  async refreshToken(): Promise<boolean> {
+    try {
+      await firstValueFrom(
+        this.http.post<void>('/api/utilisateurs/refresh', {}, { withCredentials: true })
+      );
+      await this.refreshSession();
+      return true;
+    } catch {
+      this._user.set(null);
+      return false;
+    }
+  }
+
   clearSessionLocally(): void {
     this._user.set(null);
   }
@@ -176,6 +193,10 @@ export function formatRoleLabel(role: RoleUtilisateur | null | undefined): strin
       return 'Administrateur';
     case 'GESTIONNAIRE_SITE':
       return 'Gestionnaire de site';
+    case 'CONSERVATEUR':
+      return 'Conservateur du patrimoine';
+    case 'GUIDE':
+      return 'Guide touristique local';
     case 'TOURISTE':
     default:
       return 'Visiteur / Touriste';

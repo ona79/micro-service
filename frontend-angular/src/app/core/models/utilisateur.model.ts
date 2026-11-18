@@ -1,4 +1,9 @@
-export type RoleUtilisateur = 'TOURISTE' | 'GESTIONNAIRE_SITE' | 'ADMINISTRATEUR';
+export type RoleUtilisateur =
+  | 'TOURISTE'
+  | 'GUIDE'
+  | 'CONSERVATEUR'
+  | 'GESTIONNAIRE_SITE'
+  | 'ADMINISTRATEUR';
 
 export interface Utilisateur {
   id: number;
