@@ -24,6 +24,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -33,6 +36,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -84,6 +89,41 @@ class EvenementServiceTest {
         assertThat(saved.getFuseauHoraire()).isEqualTo("Africa/Dakar");
     }
 
+    // =========================================================================
+    // Test 5 : Événement publié + patrimoine non publié (BROUILLON/SOUMIS/ARCHIVE) : refusé
+    // =========================================================================
+    @Test
+    void saveOuPublierEvenement_avecPatrimoineNonPublie_refuse() {
+        PatrimoineDto patBrouillon = new PatrimoineDto(2L, "Site Brouillon", "PAT-BR-002", "Desc", "Hist",
+                "Oussouye", 150, 12.48f, -16.54f);
+        patBrouillon.setStatutPublication("BROUILLON");
+        when(patrimoineClient.getPatrimoineById(2L)).thenReturn(patBrouillon);
+
+        EvenementDto dtoPublie = new EvenementDto(null, "Festival Public", "Desc",
+                TypeEvenement.FESTIVAL, LocalDateTime.of(2026, 12, 10, 9, 0),
+                LocalDateTime.of(2026, 12, 10, 18, 0), "Oussouye", 100, 2000.0, 2L, null);
+        dtoPublie.setStatutEvenement(StatutEvenement.PUBLIE);
+
+        assertThatThrownBy(() -> evenementService.saveEvenement(dtoPublie))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("BROUILLON");
+
+        Evenement evBrouillon = Evenement.builder()
+                .id(5L).nomEvenement("Festival").typeEvenement(TypeEvenement.FESTIVAL)
+                .dateDebut(LocalDateTime.of(2026, 12, 10, 9, 0))
+                .dateFin(LocalDateTime.of(2026, 12, 10, 18, 0))
+                .lieu("Oussouye").capaciteMax(100).patrimoineId(2L)
+                .statutEvenement(StatutEvenement.BROUILLON).build();
+        when(evenementRepository.findById(5L)).thenReturn(Optional.of(evBrouillon));
+
+        assertThatThrownBy(() -> evenementService.publierEvenement(5L))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("BROUILLON");
+    }
+
+    // =========================================================================
+    // Test 6 : Événement avec lieu explicite et sans patrimoine : accepté
+    // =========================================================================
     @Test
     void saveEvenement_sansPatrimoineMaisAvecLieu_autoriseCreation() {
         when(evenementRepository.save(any(Evenement.class))).thenAnswer(inv -> {
@@ -111,6 +151,28 @@ class EvenementServiceTest {
         assertThatThrownBy(() -> evenementService.saveEvenement(dto))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("lieu");
+    }
+
+    // =========================================================================
+    // Test 11 & Test 12 : Suppression événement publié refusée & Permission PUBLIER
+    // =========================================================================
+    @Test
+    void suppressionEvenementPublieRefusee_etUtilisateurSansPermissionPublierRefuse() {
+        Evenement evPublie = Evenement.builder()
+                .id(1L).nomEvenement("Festival Publié").statutEvenement(StatutEvenement.PUBLIE).build();
+        when(evenementRepository.findById(1L)).thenReturn(Optional.of(evPublie));
+
+        assertThatThrownBy(() -> evenementService.deleteEvenement(1L))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Suppression physique refusée");
+        verify(evenementRepository, never()).deleteById(any());
+
+        SecurityUserContextHolder.setContext(new SecurityUserContext(
+                31L, "GESTIONNAIRE_SITE", List.of("EVENEMENT:LIRE", "EVENEMENT:CREER", "EVENEMENT:MODIFIER"),
+                "operateur@uasz.sn", false, null));
+        assertThatThrownBy(() -> evenementService.publierEvenement(1L))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessageContaining("EVENEMENT:PUBLIER");
     }
 
     @Test
@@ -159,7 +221,8 @@ class EvenementServiceTest {
 
         when(evenementRepository.findById(1L)).thenReturn(Optional.of(ev));
         when(evenementRepository.save(any(Evenement.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(evenementRepository.findAll()).thenReturn(List.of(ev));
+        when(evenementRepository.findAll(any(Specification.class), any(Pageable.class)))
+                .thenAnswer(inv -> new PageImpl<>(List.of(ev), inv.getArgument(1), 1));
 
         PageResponseDto<EvenementDto> page = evenementService.rechercherEvenements(
                 "UASZ", TypeEvenement.CONFERENCE, "BASSE_CASAMANCE", null,

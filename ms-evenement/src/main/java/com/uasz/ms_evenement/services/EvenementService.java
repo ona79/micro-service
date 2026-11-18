@@ -17,21 +17,31 @@ import com.uasz.ms_evenement.repositories.EvenementRepository;
 import com.uasz.ms_evenement.security.SecurityUserContext;
 import com.uasz.ms_evenement.security.SecurityUserContextHolder;
 import feign.FeignException;
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class EvenementService implements IEvenementService {
+
+    private static final int MAX_PAGE_SIZE = 50;
 
     private final EvenementRepository evenementRepository;
     private final EvenementMapper evenementMapper;
@@ -40,7 +50,17 @@ public class EvenementService implements IEvenementService {
     @Override
     public EvenementDto saveEvenement(EvenementDto evenementDto) {
         SecurityUserContext caller = requirePermission("EVENEMENT:CREER");
-        PatrimoineDto patrimoine = validerEvenementEtRecupererPatrimoine(evenementDto);
+        StatutEvenement requestedStatut = (evenementDto != null && evenementDto.getStatutEvenement() != null)
+                ? evenementDto.getStatutEvenement()
+                : StatutEvenement.PUBLIE;
+
+        if (requestedStatut == StatutEvenement.PUBLIE && !caller.hasPermission("EVENEMENT:PUBLIER")) {
+            throw new ForbiddenException("Accès interdit : la permission EVENEMENT:PUBLIER est requise pour publier directement un événement.");
+        }
+
+        boolean requirePublishedPatrimoine = requestedStatut == StatutEvenement.PUBLIE
+                || requestedStatut == StatutEvenement.SOUMIS;
+        PatrimoineDto patrimoine = validerEvenementEtRecupererPatrimoine(evenementDto, requirePublishedPatrimoine);
 
         Evenement evenement = evenementMapper.toEntity(evenementDto);
         evenement.setId(null);
@@ -95,11 +115,14 @@ public class EvenementService implements IEvenementService {
     @Transactional(readOnly = true)
     public List<EvenementDto> getEvenementsAVenir() {
         LocalDateTime now = LocalDateTime.now(Evenement.CASAMANCE_ZONE);
+        List<Evenement> dbResults = evenementRepository
+                .findByStatutEvenementAndDateFinGreaterThanEqualOrderByDateDebutAsc(StatutEvenement.PUBLIE, now);
+        if (dbResults != null && !dbResults.isEmpty()) {
+            return dbResults.stream().map(evenementMapper::toDto).toList();
+        }
         return evenementRepository.findAll().stream()
                 .filter(e -> {
                     StatutEvenement statut = e.getStatutEvenement() != null ? e.getStatutEvenement() : StatutEvenement.PUBLIE;
-                    // Règle métier obligatoire : un événement annulé, terminé, archivé ou en brouillon
-                    // ne doit jamais être présenté comme un événement à venir confirmé.
                     if (statut != StatutEvenement.PUBLIE) {
                         return false;
                     }
@@ -142,76 +165,33 @@ public class EvenementService implements IEvenementService {
             throw new ForbiddenException("Accès interdit : seuls les gestionnaires et administrateurs peuvent consulter les événements non publiés, annulés ou archivés.");
         }
 
-        LocalDateTime now = LocalDateTime.now(Evenement.CASAMANCE_ZONE);
-        String normalizedQ = q != null ? q.trim().toLowerCase(Locale.ROOT) : "";
-        String normalizedZone = zone != null ? zone.trim().toLowerCase(Locale.ROOT) : "";
-
-        Comparator<Evenement> comparator = buildComparator(sortBy, sortDir);
-
-        List<EvenementDto> filtered = evenementRepository.findAll()
-                .stream()
-                .filter(e -> {
-                    StatutEvenement currentStatut = e.getStatutEvenement() != null ? e.getStatutEvenement() : StatutEvenement.PUBLIE;
-                    if (aVenirUniquement) {
-                        if (currentStatut != StatutEvenement.PUBLIE) return false;
-                        if (e.getDateFin() == null || e.getDateFin().isBefore(now)) return false;
-                    } else if (statut != null) {
-                        if (currentStatut != statut) return false;
-                    } else if (!inclureNonPublies) {
-                        if (currentStatut != StatutEvenement.PUBLIE && currentStatut != StatutEvenement.TERMINE) {
-                            return false;
-                        }
-                    }
-
-                    if (type != null && e.getTypeEvenement() != type) {
-                        return false;
-                    }
-                    if (patrimoineId != null && !patrimoineId.equals(e.getPatrimoineId())) {
-                        return false;
-                    }
-                    if (!normalizedZone.isEmpty()) {
-                        String z = ((e.getZoneGeographique() != null ? e.getZoneGeographique() : "") + " "
-                                + (e.getLocalite() != null ? e.getLocalite() : "")).toLowerCase(Locale.ROOT);
-                        if (!z.contains(normalizedZone)) return false;
-                    }
-                    if (dateMin != null && e.getDateFin() != null && e.getDateFin().isBefore(dateMin)) {
-                        return false;
-                    }
-                    if (dateMax != null && e.getDateDebut() != null && e.getDateDebut().isAfter(dateMax)) {
-                        return false;
-                    }
-                    if (prixMax != null && e.getPrix() > prixMax) {
-                        return false;
-                    }
-                    if (!normalizedQ.isEmpty()) {
-                        String haystack = ((e.getNomEvenement() != null ? e.getNomEvenement() : "") + " "
-                                + (e.getDescriptionEvenement() != null ? e.getDescriptionEvenement() : "") + " "
-                                + (e.getLieu() != null ? e.getLieu() : "") + " "
-                                + (e.getOrganisateur() != null ? e.getOrganisateur() : "") + " "
-                                + (e.getLocalite() != null ? e.getLocalite() : "")).toLowerCase(Locale.ROOT);
-                        if (!haystack.contains(normalizedQ)) return false;
-                    }
-                    return true;
-                })
-                .sorted(comparator)
-                .map(evenementMapper::toDto)
-                .toList();
-
         int safePage = Math.max(0, page);
-        int safeSize = Math.max(1, Math.min(size, 100));
-        long totalElements = filtered.size();
-        int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / safeSize);
-        int fromIndex = Math.min(safePage * safeSize, filtered.size());
-        int toIndex = Math.min(fromIndex + safeSize, filtered.size());
+        int safeSize = Math.max(1, Math.min(size, MAX_PAGE_SIZE));
+        Sort sort = buildSafeSort(sortBy, sortDir);
+        Pageable pageable = PageRequest.of(safePage, safeSize, sort);
 
-        return PageResponseDto.<EvenementDto>builder()
-                .content(filtered.subList(fromIndex, toIndex))
-                .page(safePage)
-                .size(safeSize)
-                .totalElements(totalElements)
-                .totalPages(totalPages)
-                .last(totalPages == 0 || safePage >= totalPages - 1)
-                .build();
+        LocalDateTime now = LocalDateTime.now(Evenement.CASAMANCE_ZONE);
+        Specification<Evenement> spec = buildSpecification(
+                q, type, zone, patrimoineId, statut, dateMin, dateMax, prixMax, aVenirUniquement, inclureNonPublies, now);
+
+        Page<Evenement> dbPage = evenementRepository.findAll(spec, pageable);
+        if (dbPage != null) {
+            List<EvenementDto> content = dbPage.getContent().stream()
+                    .map(evenementMapper::toDto)
+                    .toList();
+            return PageResponseDto.<EvenementDto>builder()
+                    .content(content)
+                    .page(dbPage.getNumber())
+                    .size(dbPage.getSize())
+                    .totalElements(dbPage.getTotalElements())
+                    .totalPages(dbPage.getTotalPages())
+                    .last(dbPage.isLast())
+                    .build();
+        }
+
+        return rechercherEnMemoireFallback(
+                q, type, zone, patrimoineId, statut, dateMin, dateMax, prixMax,
+                aVenirUniquement, inclureNonPublies, now, safePage, safeSize, sortBy, sortDir);
     }
 
     @Override
@@ -219,24 +199,36 @@ public class EvenementService implements IEvenementService {
     public EvenementDto getByIdEvenement(Long id) {
         Evenement evenement = findEvenement(id);
         StatutEvenement statut = evenement.getStatutEvenement() != null ? evenement.getStatutEvenement() : StatutEvenement.PUBLIE;
-        if (statut == StatutEvenement.BROUILLON || statut == StatutEvenement.SOUMIS || statut == StatutEvenement.ARCHIVE) {
-            SecurityUserContext caller = SecurityUserContextHolder.getContext();
-            boolean allowed = caller != null && (caller.isServiceCall()
-                    || caller.hasPermission("EVENEMENT:CREER")
-                    || caller.hasPermission("EVENEMENT:MODIFIER")
-                    || caller.hasPermission("EVENEMENT:PUBLIER")
-                    || caller.hasPermission("EVENEMENT:ARCHIVER"));
-            if (!allowed) {
-                throw new ForbiddenException("Cet événement n'est pas publié ou a été archivé.");
-            }
+        SecurityUserContext caller = SecurityUserContextHolder.getContext();
+        boolean isAuthorizedStaff = caller != null && (caller.isServiceCall()
+                || caller.hasPermission("EVENEMENT:CREER")
+                || caller.hasPermission("EVENEMENT:MODIFIER")
+                || caller.hasPermission("EVENEMENT:PUBLIER")
+                || caller.hasPermission("EVENEMENT:ARCHIVER"));
+
+        if ((statut == StatutEvenement.BROUILLON
+                || statut == StatutEvenement.SOUMIS
+                || statut == StatutEvenement.ARCHIVE) && !isAuthorizedStaff) {
+            throw new ForbiddenException("Cet événement n'est pas publié ou a été archivé.");
         }
 
         EvenementDto dto = evenementMapper.toDto(evenement);
         if (evenement.getPatrimoineId() != null) {
             try {
-                dto.setPatrimoine(patrimoineClient.getPatrimoineById(evenement.getPatrimoineId()));
+                PatrimoineDto pat = patrimoineClient.getPatrimoineById(evenement.getPatrimoineId());
+                if (pat != null && pat.getStatutPublication() != null
+                        && !"PUBLIE".equalsIgnoreCase(pat.getStatutPublication())
+                        && !isAuthorizedStaff) {
+                    dto.setPatrimoine(null);
+                } else {
+                    dto.setPatrimoine(pat);
+                }
+            } catch (FeignException.NotFound | FeignException.Forbidden ex) {
+                log.warn("Patrimoine {} non accessible ou non publié pour l'événement {} : {}",
+                        evenement.getPatrimoineId(), id, ex.status());
             } catch (FeignException ex) {
-                log.warn("Impossible de récupérer le patrimoine {} : {}", evenement.getPatrimoineId(), ex.getMessage());
+                log.error("Service ms-patrimoine indisponible lors de la lecture de l'événement {}", id, ex);
+                throw new ServiceIndisponibleException("Le service ms-patrimoine est indisponible");
             }
         }
         return dto;
@@ -246,7 +238,20 @@ public class EvenementService implements IEvenementService {
     public EvenementDto updateEvenement(Long id, EvenementDto evenementDto) {
         SecurityUserContext caller = requirePermission("EVENEMENT:MODIFIER");
         Evenement evenement = findEvenement(id);
-        PatrimoineDto patrimoine = validerEvenementEtRecupererPatrimoine(evenementDto);
+        StatutEvenement previousStatut = evenement.getStatutEvenement();
+        StatutEvenement targetStatut = (evenementDto != null && evenementDto.getStatutEvenement() != null)
+                ? evenementDto.getStatutEvenement()
+                : (previousStatut != null ? previousStatut : StatutEvenement.PUBLIE);
+
+        if (targetStatut == StatutEvenement.PUBLIE
+                && previousStatut != StatutEvenement.PUBLIE
+                && !caller.hasPermission("EVENEMENT:PUBLIER")) {
+            throw new ForbiddenException("Accès interdit : la permission EVENEMENT:PUBLIER est requise pour publier un événement.");
+        }
+
+        boolean requirePublishedPatrimoine = targetStatut == StatutEvenement.PUBLIE
+                || targetStatut == StatutEvenement.SOUMIS;
+        PatrimoineDto patrimoine = validerEvenementEtRecupererPatrimoine(evenementDto, requirePublishedPatrimoine);
 
         evenementMapper.updateEntity(evenementDto, evenement);
         normaliserValeursParDefaut(evenement);
@@ -274,6 +279,14 @@ public class EvenementService implements IEvenementService {
     public EvenementDto soumettreEvenement(Long id) {
         SecurityUserContext caller = requireAnyPermission("EVENEMENT:MODIFIER", "EVENEMENT:CREER");
         Evenement evenement = findEvenement(id);
+        if (evenement.getStatutEvenement() == StatutEvenement.ARCHIVE) {
+            throw new BadRequestException("Impossible de soumettre un événement archivé.");
+        }
+        validerConditionsPublication(evenement);
+        if (evenement.getPatrimoineId() != null) {
+            verifierPatrimoineAssocie(evenement.getPatrimoineId(), evenement.getCapaciteMax(), true);
+        }
+
         evenement.setStatutEvenement(StatutEvenement.SOUMIS);
         evenement.setModifieParId(caller.userId());
         evenement.setDateModification(LocalDateTime.now(Evenement.CASAMANCE_ZONE));
@@ -282,9 +295,14 @@ public class EvenementService implements IEvenementService {
 
     @Override
     public EvenementDto publierEvenement(Long id) {
-        SecurityUserContext caller = requireAnyPermission("EVENEMENT:PUBLIER", "EVENEMENT:MODIFIER", "EVENEMENT:CREER");
+        SecurityUserContext caller = requirePermission("EVENEMENT:PUBLIER");
         Evenement evenement = findEvenement(id);
         validerConditionsPublication(evenement);
+
+        PatrimoineDto patrimoine = null;
+        if (evenement.getPatrimoineId() != null) {
+            patrimoine = verifierPatrimoineAssocie(evenement.getPatrimoineId(), evenement.getCapaciteMax(), true);
+        }
 
         LocalDateTime now = LocalDateTime.now(Evenement.CASAMANCE_ZONE);
         evenement.setStatutEvenement(StatutEvenement.PUBLIE);
@@ -293,12 +311,15 @@ public class EvenementService implements IEvenementService {
         evenement.setDatePublication(now);
         evenement.setDateModification(now);
         evenement.setMotifAnnulation(null);
-        return evenementMapper.toDto(evenementRepository.save(evenement));
+
+        EvenementDto dto = evenementMapper.toDto(evenementRepository.save(evenement));
+        dto.setPatrimoine(patrimoine);
+        return dto;
     }
 
     @Override
     public EvenementDto annulerEvenement(Long id, String motif) {
-        SecurityUserContext caller = requireAnyPermission("EVENEMENT:ANNULER", "EVENEMENT:MODIFIER", "EVENEMENT:SUPPRIMER");
+        SecurityUserContext caller = requirePermission("EVENEMENT:ANNULER");
         Evenement evenement = findEvenement(id);
 
         LocalDateTime now = LocalDateTime.now(Evenement.CASAMANCE_ZONE);
@@ -323,7 +344,7 @@ public class EvenementService implements IEvenementService {
 
     @Override
     public EvenementDto archiverEvenement(Long id, String motif) {
-        SecurityUserContext caller = requireAnyPermission("EVENEMENT:ARCHIVER", "EVENEMENT:SUPPRIMER", "EVENEMENT:MODIFIER");
+        SecurityUserContext caller = requirePermission("EVENEMENT:ARCHIVER");
         Evenement evenement = findEvenement(id);
 
         evenement.setStatutEvenement(StatutEvenement.ARCHIVE);
@@ -338,10 +359,165 @@ public class EvenementService implements IEvenementService {
     @Override
     public void deleteEvenement(Long id) {
         requirePermission("EVENEMENT:SUPPRIMER");
-        if (!evenementRepository.existsById(id)) {
+        Optional<Evenement> existingOpt = evenementRepository.findById(id);
+        if (existingOpt.isEmpty() && !evenementRepository.existsById(id)) {
             throw new ResourceNotFoundException("Événement introuvable avec l'id : " + id);
         }
+        if (existingOpt.isPresent()) {
+            Evenement existing = existingOpt.get();
+            if (existing.getStatutEvenement() == StatutEvenement.PUBLIE
+                    || existing.getStatutEvenement() == StatutEvenement.SOUMIS
+                    || existing.getStatutEvenement() == StatutEvenement.TERMINE) {
+                throw new BadRequestException(
+                        "Suppression physique refusée : l'événement #" + id
+                                + " est publié, soumis ou terminé. Pour préserver l'intégrité référentielle et l'historique, veuillez l'archiver.");
+            }
+        }
         evenementRepository.deleteById(id);
+    }
+
+    private Specification<Evenement> buildSpecification(
+            String q,
+            TypeEvenement type,
+            String zone,
+            Long patrimoineId,
+            StatutEvenement statut,
+            LocalDateTime dateMin,
+            LocalDateTime dateMax,
+            Double prixMax,
+            boolean aVenirUniquement,
+            boolean inclureNonPublies,
+            LocalDateTime now
+    ) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (aVenirUniquement) {
+                predicates.add(cb.equal(root.get("statutEvenement"), StatutEvenement.PUBLIE));
+                predicates.add(cb.greaterThanOrEqualTo(root.get("dateFin"), now));
+            } else if (statut != null) {
+                predicates.add(cb.equal(root.get("statutEvenement"), statut));
+            } else if (!inclureNonPublies) {
+                predicates.add(root.get("statutEvenement").in(StatutEvenement.PUBLIE, StatutEvenement.TERMINE));
+            }
+
+            if (type != null) {
+                predicates.add(cb.equal(root.get("typeEvenement"), type));
+            }
+            if (patrimoineId != null) {
+                predicates.add(cb.equal(root.get("patrimoineId"), patrimoineId));
+            }
+            if (zone != null && !zone.isBlank()) {
+                String pattern = "%" + zone.trim().toLowerCase(Locale.ROOT) + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(cb.coalesce(root.get("zoneGeographique"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("localite"), "")), pattern)
+                ));
+            }
+            if (dateMin != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("dateFin"), dateMin));
+            }
+            if (dateMax != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("dateDebut"), dateMax));
+            }
+            if (prixMax != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("prix"), prixMax));
+            }
+            if (q != null && !q.isBlank()) {
+                String pattern = "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(cb.coalesce(root.get("nomEvenement"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("descriptionEvenement"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("lieu"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("organisateur"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("localite"), "")), pattern)
+                ));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    private Sort buildSafeSort(String sortBy, String sortDir) {
+        String field = sortBy != null ? sortBy.trim().toLowerCase(Locale.ROOT) : "datedebut";
+        String entityField = switch (field) {
+            case "nom", "nomevenement" -> "nomEvenement";
+            case "prix" -> "prix";
+            case "capacite", "capacitemax" -> "capaciteMax";
+            case "datecreation" -> "dateCreation";
+            default -> "dateDebut";
+        };
+        Sort.Direction direction = "desc".equalsIgnoreCase(sortDir) ? Sort.Direction.DESC : Sort.Direction.ASC;
+        return Sort.by(direction, entityField);
+    }
+
+    private PageResponseDto<EvenementDto> rechercherEnMemoireFallback(
+            String q,
+            TypeEvenement type,
+            String zone,
+            Long patrimoineId,
+            StatutEvenement statut,
+            LocalDateTime dateMin,
+            LocalDateTime dateMax,
+            Double prixMax,
+            boolean aVenirUniquement,
+            boolean inclureNonPublies,
+            LocalDateTime now,
+            int safePage,
+            int safeSize,
+            String sortBy,
+            String sortDir
+    ) {
+        String normalizedQ = q != null ? q.trim().toLowerCase(Locale.ROOT) : "";
+        String normalizedZone = zone != null ? zone.trim().toLowerCase(Locale.ROOT) : "";
+        Comparator<Evenement> comparator = buildComparator(sortBy, sortDir);
+
+        List<EvenementDto> filtered = evenementRepository.findAll()
+                .stream()
+                .filter(e -> {
+                    StatutEvenement currentStatut = e.getStatutEvenement() != null ? e.getStatutEvenement() : StatutEvenement.PUBLIE;
+                    if (aVenirUniquement) {
+                        if (currentStatut != StatutEvenement.PUBLIE) return false;
+                        if (e.getDateFin() == null || e.getDateFin().isBefore(now)) return false;
+                    } else if (statut != null) {
+                        if (currentStatut != statut) return false;
+                    } else if (!inclureNonPublies) {
+                        if (currentStatut != StatutEvenement.PUBLIE && currentStatut != StatutEvenement.TERMINE) return false;
+                    }
+                    if (type != null && e.getTypeEvenement() != type) return false;
+                    if (patrimoineId != null && !patrimoineId.equals(e.getPatrimoineId())) return false;
+                    if (!normalizedZone.isEmpty()) {
+                        String z = ((e.getZoneGeographique() != null ? e.getZoneGeographique() : "") + " "
+                                + (e.getLocalite() != null ? e.getLocalite() : "")).toLowerCase(Locale.ROOT);
+                        if (!z.contains(normalizedZone)) return false;
+                    }
+                    if (dateMin != null && e.getDateFin() != null && e.getDateFin().isBefore(dateMin)) return false;
+                    if (dateMax != null && e.getDateDebut() != null && e.getDateDebut().isAfter(dateMax)) return false;
+                    if (prixMax != null && e.getPrix() > prixMax) return false;
+                    if (!normalizedQ.isEmpty()) {
+                        String haystack = ((e.getNomEvenement() != null ? e.getNomEvenement() : "") + " "
+                                + (e.getDescriptionEvenement() != null ? e.getDescriptionEvenement() : "") + " "
+                                + (e.getLieu() != null ? e.getLieu() : "") + " "
+                                + (e.getOrganisateur() != null ? e.getOrganisateur() : "")).toLowerCase(Locale.ROOT);
+                        if (!haystack.contains(normalizedQ)) return false;
+                    }
+                    return true;
+                })
+                .sorted(comparator)
+                .map(evenementMapper::toDto)
+                .toList();
+
+        long totalElements = filtered.size();
+        int totalPages = totalElements == 0 ? 0 : (int) Math.ceil((double) totalElements / safeSize);
+        int fromIndex = Math.min(safePage * safeSize, filtered.size());
+        int toIndex = Math.min(fromIndex + safeSize, filtered.size());
+
+        return PageResponseDto.<EvenementDto>builder()
+                .content(filtered.subList(fromIndex, toIndex))
+                .page(safePage)
+                .size(safeSize)
+                .totalElements(totalElements)
+                .totalPages(totalPages)
+                .last(totalPages == 0 || safePage >= totalPages - 1)
+                .build();
     }
 
     private void validerConditionsPublication(Evenement evenement) {
@@ -418,7 +594,7 @@ public class EvenementService implements IEvenementService {
                 .orElseThrow(() -> new ResourceNotFoundException("Événement introuvable avec l'id : " + id));
     }
 
-    private PatrimoineDto validerEvenementEtRecupererPatrimoine(EvenementDto dto) {
+    private PatrimoineDto validerEvenementEtRecupererPatrimoine(EvenementDto dto, boolean requirePublishedPatrimoine) {
         if (dto == null) {
             throw new BadRequestException("Les données de l'événement sont obligatoires.");
         }
@@ -442,22 +618,36 @@ public class EvenementService implements IEvenementService {
             return null;
         }
 
+        return verifierPatrimoineAssocie(dto.getPatrimoineId(), dto.getCapaciteMax(), requirePublishedPatrimoine);
+    }
+
+    private PatrimoineDto verifierPatrimoineAssocie(Long patrimoineId, int capaciteMax, boolean requirePublishedPatrimoine) {
         PatrimoineDto patrimoine;
         try {
-            patrimoine = patrimoineClient.getPatrimoineById(dto.getPatrimoineId());
+            patrimoine = patrimoineClient.getPatrimoineById(patrimoineId);
         } catch (FeignException.NotFound ex) {
-            throw new BadRequestException("Le patrimoine " + dto.getPatrimoineId() + " n'existe pas dans ms-patrimoine");
+            throw new BadRequestException("Le patrimoine " + patrimoineId + " n'existe pas dans ms-patrimoine");
+        } catch (FeignException.Forbidden ex) {
+            throw new BadRequestException("Le patrimoine " + patrimoineId + " n'est pas publié ou n'est pas accessible.");
         } catch (FeignException ex) {
             log.error("Erreur lors de l'appel à ms-patrimoine", ex);
             throw new ServiceIndisponibleException("Le service ms-patrimoine est indisponible");
         }
 
-        if ("ARCHIVE".equalsIgnoreCase(patrimoine.getStatutPublication())) {
-            throw new BadRequestException("Le site patrimonial " + dto.getPatrimoineId()
-                    + " est archivé et ne peut pas accueillir un nouvel événement.");
+        String statutPat = patrimoine.getStatutPublication() != null
+                ? patrimoine.getStatutPublication().trim().toUpperCase(Locale.ROOT)
+                : "PUBLIE";
+
+        if ("ARCHIVE".equals(statutPat)) {
+            throw new BadRequestException("Le site patrimonial " + patrimoineId
+                    + " est archivé et ne peut pas accueillir un événement.");
         }
-        if (patrimoine.getCapacitePatrimoine() > 0 && dto.getCapaciteMax() > patrimoine.getCapacitePatrimoine()) {
-            throw new BadRequestException("La capacité de l'événement (" + dto.getCapaciteMax()
+        if (requirePublishedPatrimoine && !"PUBLIE".equals(statutPat)) {
+            throw new BadRequestException("Un événement publié ou soumis ne peut référencer qu'un patrimoine publié (le patrimoine "
+                    + patrimoineId + " est en statut " + statutPat + ").");
+        }
+        if (patrimoine.getCapacitePatrimoine() > 0 && capaciteMax > patrimoine.getCapacitePatrimoine()) {
+            throw new BadRequestException("La capacité de l'événement (" + capaciteMax
                     + ") dépasse la capacité maximale du site patrimonial (" + patrimoine.getCapacitePatrimoine() + ")");
         }
         return patrimoine;
