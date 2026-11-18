@@ -31,12 +31,21 @@ management:
 reservation:
   url: ${RESERVATION_URL:http://localhost:3004}
 notification:
-  url: ${NOTIFICATION_URL:http://localhost:3006}
+  url: ${NOTIFICATION_URL:http://localhost:3007}
+
+paiement:
+  expiration-minutes: ${PAIEMENT_EXPIRATION_MINUTES:15}
 
 eureka:
   client:
     service-url:
       defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}
+
+security:
+  session:
+    secret: ${SECURITY_SESSION_SECRET:?Variable obligatoire SECURITY_SESSION_SECRET non definie (min 32 octets)}
+  interservice:
+    secret: ${SECURITY_INTERSERVICE_SECRET:?Variable obligatoire SECURITY_INTERSERVICE_SECRET non definie (min 32 octets)}
 
 ---
 # Profil DEV : H2 en mémoire pour le développement local
@@ -105,3 +114,8 @@ management:
     web:
       exposure:
         include: 'health,info'
+
+reservation:
+  url: ${RESERVATION_URL:}
+notification:
+  url: ${NOTIFICATION_URL:}

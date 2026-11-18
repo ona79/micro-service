@@ -7,6 +7,7 @@ on:
       - develop
       - test
       - deploy
+      - 'feature/**'
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     branches:
@@ -41,7 +42,7 @@ jobs:
           fi
 
   # =========================================================================
-  # 1. INTÉGRATION CONTINUE : Compilation & Tests Unitaires (10 services)
+  # 1. INTÉGRATION CONTINUE : Compilation & Tests Unitaires (9 services)
   #    S'exécute sur TOUS les push ET TOUTES les Pull Requests
   # =========================================================================
   build-and-test:
@@ -75,8 +76,36 @@ jobs:
       - name: Compilation, MapStruct et Tests unitaires (${{ matrix.service }})
         working-directory: ./${{ matrix.service }}
         run: |
+          export SECURITY_SESSION_SECRET="$(openssl rand -base64 48 | tr -d '\n')"
+          export SECURITY_INTERSERVICE_SECRET="$(openssl rand -base64 48 | tr -d '\n')"
           chmod +x ./mvnw
-          ./mvnw -B clean test package
+          MVN_CMD=""
+          for attempt in 1 2 3; do
+            if ./mvnw --version >/dev/null 2>&1; then
+              MVN_CMD="./mvnw"
+              break
+            fi
+            echo ">>> Tentative $attempt/3 d'initialisation de ./mvnw échouée, nouvelle tentative..."
+            sleep 5
+          done
+          if [ -d "${HOME}/.m2/repository" ]; then
+            find "${HOME}/.m2/repository" -name "*.lastUpdated" -delete || true
+          fi
+          if [ -z "$MVN_CMD" ]; then
+            echo ">>> Wrapper Maven indisponible sur le réseau, bascule vers Maven système."
+            MVN_CMD="mvn"
+            if [ -d "${HOME}/.m2/repository" ]; then
+              find "${HOME}/.m2/repository" -name "_remote.repositories" -delete || true
+            fi
+          fi
+          "$MVN_CMD" -B clean test package || {
+            echo ">>> Échec Maven transitoire détecté, nouvelle tentative dans 10s..."
+            sleep 10
+            if [ -d "${HOME}/.m2/repository" ]; then
+              find "${HOME}/.m2/repository" \( -name "_remote.repositories" -o -name "*.lastUpdated" \) -delete || true
+            fi
+            "$MVN_CMD" -B -U clean test package
+          }
 
       - name: Conservation de l'artefact JAR (${{ matrix.service }})
         uses: actions/upload-artifact@v4
@@ -84,6 +113,33 @@ jobs:
           name: jar-${{ matrix.service }}
           path: ${{ matrix.service }}/target/*.jar
           if-no-files-found: error
+
+  # =========================================================================
+  # 1b. INTÉGRATION CONTINUE : Build & Tests Front-End (Angular 22 + Vitest)
+  # =========================================================================
+  frontend-test-and-build:
+    name: Build & Test (frontend-angular)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du code source
+        uses: actions/checkout@v4
+
+      - name: Configuration de Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend-angular/package-lock.json
+
+      - name: Installation des dépendances Angular
+        working-directory: ./frontend-angular
+        run: npm ci
+
+      - name: Tests unitaires Vitest et Build Production Angular 22
+        working-directory: ./frontend-angular
+        run: |
+          npx ng test --no-watch
+          npm run build
 
   # =========================================================================
   # 2. TEST D'INTÉGRATION INTER-MICROSERVICES (OpenFeign, RestTemplate, WebClient)
@@ -110,11 +166,14 @@ jobs:
         with:
           path: artifacts
 
-      - name: Démarrage et tests E2E durcis (ms-patrimoine, ms-circuit, ms-evenement, ms-reservation)
+      - name: Démarrage et tests E2E P05 (7 microservices métier)
         run: |
           set -e
           set -u
           set -o pipefail
+
+          export SECURITY_SESSION_SECRET="$(openssl rand -base64 48 | tr -d '\n')"
+          export SECURITY_INTERSERVICE_SECRET="$(openssl rand -base64 48 | tr -d '\n')"
 
           PIDS=()
           CLEANED_UP=0
@@ -149,7 +208,7 @@ jobs:
             echo " [DIAGNOSTIC AUTOMATIQUE] Échec lors de : $FAILED_STEP"
             echo "=================================================================="
             echo ">>> État des processus :"
-            for s in "ms-patrimoine:${PID_PATRIMOINE:-}:3001" "ms-circuit:${PID_CIRCUIT:-}:3002" "ms-evenement:${PID_EVENEMENT:-}:3003" "ms-reservation:${PID_RESERVATION:-}:3004"; do
+            for s in "ms-patrimoine:${PID_PATRIMOINE:-}:3001" "ms-circuit:${PID_CIRCUIT:-}:3002" "ms-evenement:${PID_EVENEMENT:-}:3003" "ms-reservation:${PID_RESERVATION:-}:3004" "ms-utilisateur:${PID_UTILISATEUR:-}:3005" "ms-paiement:${PID_PAIEMENT:-}:3006" "ms-notification:${PID_NOTIFICATION:-}:3007"; do
               NAME="${s%%:*}"
               REST="${s#*:}"
               PID="${REST%%:*}"
@@ -162,13 +221,13 @@ jobs:
             done
 
             echo -e "\n>>> Réponses Actuator /health :"
-            for port in 3001 3002 3003 3004; do
+            for port in 3001 3002 3003 3004 3005 3006 3007; do
               echo "  Port $port :"
               curl -s "http://localhost:$port/actuator/health" || echo "  [Inaccessible]"
             done
 
             echo -e "\n>>> Dernières lignes des journaux applicatifs :"
-            for logf in patrimoine.log circuit.log evenement.log reservation.log; do
+            for logf in patrimoine.log circuit.log evenement.log reservation.log utilisateur.log paiement.log notification.log; do
               echo "--- Journal : $logf ---"
               if [ -f "$logf" ]; then
                 tail -n 35 "$logf"
@@ -183,7 +242,7 @@ jobs:
             local NAME="$1"
             local PORT="$2"
             local PID="$3"
-            local MAX_ATTEMPTS=30
+            local MAX_ATTEMPTS=90
             local SLEEP_SEC=2
 
             echo "Attente de disponibilité de $NAME (: $PORT, PID: $PID)..."
@@ -220,44 +279,132 @@ jobs:
             fi
           }
 
+          # Fonction utilitaire exécutant un appel HTTP muni d'une enveloppe Gateway signée HMAC-SHA256
+          gateway_signed_curl() {
+            local METHOD="$1"
+            local URL="$2"
+            local PATH_URI="$3"
+            local USER_ID="$4"
+            local USER_ROLES="$5"
+            local USER_PERMS="$6"
+            local USER_EMAIL="$7"
+            local BODY="$8"
+            local OUT_FILE="$9"
+            local IDEM_KEY="${10:-}"
+            local AUTH_HEADER="${11:-}"
+
+            local TS
+            TS=$(date +%s)
+            local NONCE
+            NONCE=$(cat /proc/sys/kernel/random/uuid)
+            local SESSION_ID="ci-session-e2e"
+            local BODY_SHA256
+            BODY_SHA256=$(printf '%s' "$BODY" | sha256sum | awk '{print $1}')
+
+            local CANONICAL="${METHOD}|${PATH_URI}|${USER_ID}|${USER_ROLES}|${USER_PERMS}|${USER_EMAIL}|${SESSION_ID}|${TS}|${NONCE}|${BODY_SHA256}"
+            local SIG
+            SIG=$(printf '%s' "$CANONICAL" | openssl dgst -sha256 -hmac "$SECURITY_SESSION_SECRET" -binary | base64 | tr '+/' '-_' | tr -d '=\n\r')
+            local GW_TOKEN="${TS}.${NONCE}.${SIG}"
+
+            local EXTRA_HEADERS=()
+            if [ -n "$IDEM_KEY" ]; then
+              EXTRA_HEADERS+=(-H "Idempotency-Key: $IDEM_KEY")
+            fi
+            if [ -n "$AUTH_HEADER" ]; then
+              EXTRA_HEADERS+=(-H "Authorization: $AUTH_HEADER")
+            fi
+
+            if [ -n "$BODY" ]; then
+              curl -s -w "%{http_code}" -X "$METHOD" "$URL" \
+                -H "Content-Type: application/json" \
+                -H "X-User-Id: $USER_ID" \
+                -H "X-User-Roles: $USER_ROLES" \
+                -H "X-User-Permissions: $USER_PERMS" \
+                -H "X-User-Email: $USER_EMAIL" \
+                -H "X-User-Session-Id: $SESSION_ID" \
+                -H "X-Content-SHA256: $BODY_SHA256" \
+                -H "X-Internal-Gateway-Token: $GW_TOKEN" \
+                "${EXTRA_HEADERS[@]}" \
+                -d "$BODY" \
+                -o "$OUT_FILE"
+            else
+              curl -s -w "%{http_code}" -X "$METHOD" "$URL" \
+                -H "X-User-Id: $USER_ID" \
+                -H "X-User-Roles: $USER_ROLES" \
+                -H "X-User-Permissions: $USER_PERMS" \
+                -H "X-User-Email: $USER_EMAIL" \
+                -H "X-User-Session-Id: $SESSION_ID" \
+                -H "X-Content-SHA256: $BODY_SHA256" \
+                -H "X-Internal-Gateway-Token: $GW_TOKEN" \
+                "${EXTRA_HEADERS[@]}" \
+                -o "$OUT_FILE"
+            fi
+          }
+
           JAR_PATRIMOINE=$(find_jar ms-patrimoine)
           JAR_CIRCUIT=$(find_jar ms-circuit)
           JAR_EVENEMENT=$(find_jar ms-evenement)
           JAR_RESERVATION=$(find_jar ms-reservation)
+          JAR_UTILISATEUR=$(find_jar ms-utilisateur)
+          JAR_PAIEMENT=$(find_jar ms-paiement)
+          JAR_NOTIFICATION=$(find_jar ms-notification)
 
-          if [ -z "$JAR_PATRIMOINE" ] || [ -z "$JAR_CIRCUIT" ] || [ -z "$JAR_EVENEMENT" ] || [ -z "$JAR_RESERVATION" ]; then
-            echo "[ERREUR] Artefact JAR introuvable pour l'un des 4 microservices !" >&2
+          if [ -z "$JAR_PATRIMOINE" ] || [ -z "$JAR_CIRCUIT" ] || [ -z "$JAR_EVENEMENT" ] || [ -z "$JAR_RESERVATION" ] || [ -z "$JAR_UTILISATEUR" ] || [ -z "$JAR_PAIEMENT" ] || [ -z "$JAR_NOTIFICATION" ]; then
+            echo "[ERREUR] Artefact JAR introuvable pour l'un des 7 microservices E2E !" >&2
             exit 1
           fi
 
-          echo "=== Démarrage des 4 microservices ==="
-          java -jar "$JAR_PATRIMOINE" --spring.cloud.discovery.enabled=false > patrimoine.log 2>&1 &
+          echo "=== Démarrage des 7 microservices ==="
+          java -Xms128m -Xmx384m -jar "$JAR_PATRIMOINE" --spring.cloud.discovery.enabled=false > patrimoine.log 2>&1 &
           PID_PATRIMOINE=$!
           PIDS+=("$PID_PATRIMOINE")
 
-          java -jar "$JAR_CIRCUIT" --spring.cloud.discovery.enabled=false > circuit.log 2>&1 &
+          java -Xms128m -Xmx384m -jar "$JAR_CIRCUIT" --spring.cloud.discovery.enabled=false > circuit.log 2>&1 &
           PID_CIRCUIT=$!
           PIDS+=("$PID_CIRCUIT")
 
-          java -jar "$JAR_EVENEMENT" --spring.cloud.discovery.enabled=false > evenement.log 2>&1 &
+          java -Xms128m -Xmx384m -jar "$JAR_EVENEMENT" --spring.cloud.discovery.enabled=false > evenement.log 2>&1 &
           PID_EVENEMENT=$!
           PIDS+=("$PID_EVENEMENT")
 
-          java -jar "$JAR_RESERVATION" --spring.cloud.discovery.enabled=false > reservation.log 2>&1 &
+          java -Xms128m -Xmx384m -jar "$JAR_RESERVATION" --spring.cloud.discovery.enabled=false > reservation.log 2>&1 &
           PID_RESERVATION=$!
           PIDS+=("$PID_RESERVATION")
+
+          java -Xms128m -Xmx384m -jar "$JAR_UTILISATEUR" --spring.cloud.discovery.enabled=false > utilisateur.log 2>&1 &
+          PID_UTILISATEUR=$!
+          PIDS+=("$PID_UTILISATEUR")
+
+          java -Xms128m -Xmx384m -jar "$JAR_PAIEMENT" --spring.cloud.discovery.enabled=false > paiement.log 2>&1 &
+          PID_PAIEMENT=$!
+          PIDS+=("$PID_PAIEMENT")
+
+          java -Xms128m -Xmx384m -jar "$JAR_NOTIFICATION" --spring.cloud.discovery.enabled=false > notification.log 2>&1 &
+          PID_NOTIFICATION=$!
+          PIDS+=("$PID_NOTIFICATION")
 
           wait_for_service "ms-patrimoine" 3001 "$PID_PATRIMOINE"
           wait_for_service "ms-circuit" 3002 "$PID_CIRCUIT"
           wait_for_service "ms-evenement" 3003 "$PID_EVENEMENT"
           wait_for_service "ms-reservation" 3004 "$PID_RESERVATION"
+          wait_for_service "ms-utilisateur" 3005 "$PID_UTILISATEUR"
+          wait_for_service "ms-paiement" 3006 "$PID_PAIEMENT"
+          wait_for_service "ms-notification" 3007 "$PID_NOTIFICATION"
 
           echo -e "\n=================================================================="
-          echo " EXÉCUTION DES TESTS FONCTIONNELS ET ASSERTIONS ROBUSTES"
+          echo " EXÉCUTION DES TESTS FONCTIONNELS ET DE SÉCURITÉ ZERO-TRUST"
           echo "=================================================================="
 
-          echo "1. Vérification des patrimoines initiaux (:3001)"
-          HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/resp_patrimoines.json "http://localhost:3001/api/patrimoines")
+          echo "0. Vérification du rejet des accès directs sans enveloppe signée (:3001 -> 401)"
+          DIRECT_CODE=$(curl -s -w "%{http_code}" -o /tmp/resp_direct.json "http://localhost:3001/api/patrimoines")
+          if [ "$DIRECT_CODE" != "401" ]; then
+            echo "[ÉCHEC SÉCURITÉ] Accès direct non signé a retourné HTTP $DIRECT_CODE (attendu: 401)" >&2
+            exit 1
+          fi
+          echo ">>> Succès : Accès direct non authentifié rejeté avec HTTP 401."
+
+          echo -e "\n1. Vérification des patrimoines initiaux (:3001)"
+          HTTP_CODE=$(gateway_signed_curl "GET" "http://localhost:3001/api/patrimoines" "/api/patrimoines" "ANONYMOUS" "PUBLIC" "" "" "" "/tmp/resp_patrimoines.json")
           if [ "$HTTP_CODE" != "200" ]; then
             echo "[ÉCHEC] GET /api/patrimoines a retourné HTTP $HTTP_CODE (attendu: 200)" >&2
             cat /tmp/resp_patrimoines.json >&2
@@ -274,9 +421,9 @@ jobs:
           fi
           echo ">>> Succès : $PAT_COUNT patrimoines détectés, premier site : '$PAT_FOUND' (PAT-ZIG-001)."
 
-          echo -e "\n2. Vérification des 3 modes de communication TP2 (:3002 -> :3001)"
+          echo -e "\n2. Vérification des 3 modes de communication TP2 signés HMAC (:3002 -> :3001)"
           # 2a. OpenFeign
-          HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/resp_feign.json "http://localhost:3002/api/circuits/communication/feign/patrimoines/1")
+          HTTP_CODE=$(gateway_signed_curl "GET" "http://localhost:3002/api/circuits/communication/feign/patrimoines/1" "/api/circuits/communication/feign/patrimoines/1" "ANONYMOUS" "PUBLIC" "" "" "" "/tmp/resp_feign.json")
           if [ "$HTTP_CODE" != "200" ]; then
             echo "[ÉCHEC] Communication Feign : HTTP $HTTP_CODE" >&2
             cat /tmp/resp_feign.json >&2
@@ -293,7 +440,7 @@ jobs:
           echo "  [2a. OpenFeign] Succès : clientUtilise=FEIGN, patrimoineId=1"
 
           # 2b. RestTemplate
-          HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/resp_rest.json "http://localhost:3002/api/circuits/communication/resttemplate/patrimoines/2")
+          HTTP_CODE=$(gateway_signed_curl "GET" "http://localhost:3002/api/circuits/communication/resttemplate/patrimoines/2" "/api/circuits/communication/resttemplate/patrimoines/2" "ANONYMOUS" "PUBLIC" "" "" "" "/tmp/resp_rest.json")
           if [ "$HTTP_CODE" != "200" ]; then
             echo "[ÉCHEC] Communication RestTemplate : HTTP $HTTP_CODE" >&2
             cat /tmp/resp_rest.json >&2
@@ -310,7 +457,7 @@ jobs:
           echo "  [2b. RestTemplate] Succès : clientUtilise=RESTTEMPLATE, patrimoineId=2"
 
           # 2c. WebClient
-          HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/resp_webclient.json "http://localhost:3002/api/circuits/communication/webclient/patrimoines/3")
+          HTTP_CODE=$(gateway_signed_curl "GET" "http://localhost:3002/api/circuits/communication/webclient/patrimoines/3" "/api/circuits/communication/webclient/patrimoines/3" "ANONYMOUS" "PUBLIC" "" "" "" "/tmp/resp_webclient.json")
           if [ "$HTTP_CODE" != "200" ]; then
             echo "[ÉCHEC] Communication WebClient : HTTP $HTTP_CODE" >&2
             cat /tmp/resp_webclient.json >&2
@@ -327,10 +474,8 @@ jobs:
           echo "  [2c. WebClient] Succès : clientUtilise=WEBCLIENT, patrimoineId=3"
 
           echo -e "\n3. Création d'un circuit via OpenFeign (:3002 -> :3001)"
-          HTTP_CODE=$(curl -s -w "%{http_code}" -X POST "http://localhost:3002/api/circuits" \
-            -H "Content-Type: application/json" \
-            -d '{"nomCircuit":"Circuit CI","descriptionCircuit":"Test E2E","difficulte":"FACILE","placesMax":20,"prix":5000.0,"etapes":[{"ordre":1,"dureeVisite":60,"patrimoineId":1},{"ordre":2,"dureeVisite":45,"patrimoineId":2}]}' \
-            -o /tmp/resp_circuit.json)
+          CIRCUIT_PAYLOAD='{"nomCircuit":"Circuit CI","descriptionCircuit":"Test E2E","difficulte":"FACILE","placesMax":20,"prix":5000.0,"etapes":[{"ordre":1,"dureeVisite":60,"patrimoineId":1},{"ordre":2,"dureeVisite":45,"patrimoineId":2}]}'
+          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3002/api/circuits" "/api/circuits" "3" "GESTIONNAIRE_SITE" "CIRCUIT:CREER,CIRCUIT:PUBLIER,CIRCUIT:LIRE" "awa.sagna@zig.univ.sn" "$CIRCUIT_PAYLOAD" "/tmp/resp_circuit.json")
           if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
             echo "[ÉCHEC] POST /api/circuits a retourné HTTP $HTTP_CODE (attendu: 200 ou 201)" >&2
             cat /tmp/resp_circuit.json >&2
@@ -347,12 +492,10 @@ jobs:
           fi
           echo ">>> Succès : Circuit créé avec id=$CIRCUIT_ID, dureeEstimee=105 min (60min + 45min)."
 
-          echo -e "\n4. Création d'une réservation vérifiant la disponibilité du circuit (:3004 -> :3002)"
+          echo -e "\n4. Création d'une réservation P04 vérifiant disponibilité + tarification serveur (:3004 -> :3002)"
           TARGET_CIRCUIT_ID="${CIRCUIT_ID:-1}"
-          HTTP_CODE=$(curl -s -w "%{http_code}" -X POST "http://localhost:3004/api/reservations" \
-            -H "Content-Type: application/json" \
-            -d "{\"nomClient\":\"Test CI\",\"emailClient\":\"ci@zig.univ.sn\",\"nombrePlaces\":4,\"typeReservation\":\"CIRCUIT\",\"circuitId\":$TARGET_CIRCUIT_ID}" \
-            -o /tmp/resp_reservation.json)
+          RESA_PAYLOAD="{\"nomClient\":\"Test CI\",\"emailClient\":\"ci@zig.univ.sn\",\"nombrePlaces\":4,\"typeReservation\":\"CIRCUIT\",\"circuitId\":$TARGET_CIRCUIT_ID}"
+          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3004/api/reservations" "/api/reservations" "2" "TOURISTE" "RESERVATION:CREER,RESERVATION:LIRE_PROPRE,RESERVATION:ANNULER_PROPRE" "ci@zig.univ.sn" "$RESA_PAYLOAD" "/tmp/resp_reservation.json" "ci-e2e-res-1")
           if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
             echo "[ÉCHEC] POST /api/reservations a retourné HTTP $HTTP_CODE (attendu: 200 ou 201)" >&2
             cat /tmp/resp_reservation.json >&2
@@ -360,17 +503,313 @@ jobs:
             exit 1
           fi
           MONTANT=$(jq -r '.montantTotal // empty' /tmp/resp_reservation.json 2>/dev/null)
+          STATUT_RES=$(jq -r '.statut // empty' /tmp/resp_reservation.json 2>/dev/null)
           RESA_ID=$(jq -r '.id // empty' /tmp/resp_reservation.json 2>/dev/null)
-          if [ "$MONTANT" != "20000.0" ] && [ "$MONTANT" != "20000" ]; then
-            echo "[ÉCHEC] Montant total incorrect : '$MONTANT' (attendu: 20000.0)" >&2
+          if ! jq -e '(.montantTotal | tonumber) == 20000' /tmp/resp_reservation.json >/dev/null 2>&1 || [ "$STATUT_RES" != "EN_ATTENTE_PAIEMENT" ]; then
+            echo "[ÉCHEC] Réservation P04 invalide : montant='$MONTANT' (attendu: 20000.00), statut='$STATUT_RES' (attendu: EN_ATTENTE_PAIEMENT)" >&2
             cat /tmp/resp_reservation.json >&2
-            dump_diagnostics "Création de réservation - vérification montant"
+            dump_diagnostics "Création de réservation - vérification montant/statut"
             exit 1
           fi
-          echo ">>> Succès : Réservation créée avec id=$RESA_ID, montantTotal=$MONTANT (4 places x 5000.0 FCFA)."
+          echo ">>> Succès : Réservation créée id=$RESA_ID, statut=$STATUT_RES, montantTotal=$MONTANT XOF (4 places x 5000.00 FCFA)."
+
+          echo -e "\n5. Initiation du paiement Wave simulé avec idempotence (:3006 -> :3004)"
+          PAY_INIT_PAYLOAD="{\"reservationId\":$RESA_ID,\"modePaiement\":\"WAVE\",\"numeroTelephoneSimule\":\"+221771234567\"}"
+          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3006/api/paiements" "/api/paiements" "2" "TOURISTE" "PAIEMENT:INITIER,PAIEMENT:LIRE_PROPRE" "ci@zig.univ.sn" "$PAY_INIT_PAYLOAD" "/tmp/resp_paiement_init.json" "ci-e2e-pay-1")
+          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
+            echo "[ÉCHEC] POST /api/paiements a retourné HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_paiement_init.json >&2
+            dump_diagnostics "Initiation paiement simulé"
+            exit 1
+          fi
+          PAY_ID=$(jq -r '.id // empty' /tmp/resp_paiement_init.json 2>/dev/null)
+          if ! jq -e '.statut == "EN_COURS" and .estSimule == true and (.montant | tonumber) == 20000' /tmp/resp_paiement_init.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Paiement simulé initié invalide" >&2
+            cat /tmp/resp_paiement_init.json >&2
+            dump_diagnostics "Vérification paiement initié"
+            exit 1
+          fi
+          echo ">>> Succès : Paiement simulé initié id=$PAY_ID (WAVE, EN_COURS, estSimule=true, montant=20000 XOF)."
+
+          echo -e "\n6. Simulation acceptation Wave + confirmation inter-services + notification (:3006 -> :3004 -> :3007)"
+          SIM_PAYLOAD='{"decision":"ACCEPTER","motif":"Validation OTP Wave CI E2E"}'
+          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3006/api/paiements/$PAY_ID/simuler" "/api/paiements/$PAY_ID/simuler" "2" "TOURISTE" "PAIEMENT:INITIER,PAIEMENT:LIRE_PROPRE" "ci@zig.univ.sn" "$SIM_PAYLOAD" "/tmp/resp_paiement_sim.json")
+          if [ "$HTTP_CODE" != "200" ] || ! jq -e '.statut == "ACCEPTE"' /tmp/resp_paiement_sim.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Simulation acceptation paiement échouée : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_paiement_sim.json >&2
+            dump_diagnostics "Simulation acceptation Wave"
+            exit 1
+          fi
+          HTTP_CODE=$(gateway_signed_curl "GET" "http://localhost:3004/api/reservations/$RESA_ID" "/api/reservations/$RESA_ID" "2" "TOURISTE" "RESERVATION:LIRE_PROPRE" "ci@zig.univ.sn" "" "/tmp/resp_resa_after_pay.json")
+          if [ "$HTTP_CODE" != "200" ] || ! jq -e '.statut == "CONFIRMEE"' /tmp/resp_resa_after_pay.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Réservation #$RESA_ID non confirmée après paiement accepté : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_resa_after_pay.json >&2
+            dump_diagnostics "Confirmation réservation post-paiement"
+            exit 1
+          fi
+          echo ">>> Succès : Paiement id=$PAY_ID ACCEPTE et réservation #$RESA_ID automatiquement CONFIRMEE."
+
+          echo -e "\n7. Vérification RBAC remboursement simulé (non-admin 403 -> admin 200 REMBOURSE)"
+          REFUND_BODY='{"motif":"Test CI E2E RBAC remboursement"}'
+          DENIED_CODE=$(gateway_signed_curl "POST" "http://localhost:3006/api/paiements/$PAY_ID/rembourser" "/api/paiements/$PAY_ID/rembourser" "3" "GESTIONNAIRE_SITE" "PAIEMENT:LIRE_TOUT" "awa.sagna@zig.univ.sn" "$REFUND_BODY" "/tmp/resp_refund_denied.json")
+          if [ "$DENIED_CODE" != "403" ]; then
+            echo "[ÉCHEC SÉCURITÉ] Remboursement par GESTIONNAIRE_SITE doit être rejeté 403, reçu HTTP $DENIED_CODE" >&2
+            cat /tmp/resp_refund_denied.json >&2
+            dump_diagnostics "RBAC remboursement non-admin"
+            exit 1
+          fi
+          ADMIN_CODE=$(gateway_signed_curl "POST" "http://localhost:3006/api/paiements/$PAY_ID/rembourser" "/api/paiements/$PAY_ID/rembourser" "1" "ADMINISTRATEUR" "PAIEMENT:REMBOURSER,PAIEMENT:LIRE_TOUT" "admin@zig.univ.sn" "$REFUND_BODY" "/tmp/resp_refund_ok.json")
+          if [ "$ADMIN_CODE" != "200" ] || ! jq -e '.statut == "REMBOURSE"' /tmp/resp_refund_ok.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Remboursement ADMINISTRATEUR a échoué : HTTP $ADMIN_CODE" >&2
+            cat /tmp/resp_refund_ok.json >&2
+            dump_diagnostics "Remboursement ADMINISTRATEUR"
+            exit 1
+          fi
+          echo ">>> Succès : Contrôle RBAC PAIEMENT:REMBOURSER validé (403 -> 200 REMBOURSE)."
+
+          echo -e "\n8. Workflow P05 Guides Touristiques, anti-auto-validation et affectation Circuit (:3005 -> :3002)"
+          HTTP_CODE=$(gateway_signed_curl "GET" "http://localhost:3005/api/guides" "/api/guides" "ANONYMOUS" "PUBLIC" "" "" "" "/tmp/resp_guides_pub.json")
+          if [ "$HTTP_CODE" != "200" ] || ! jq -e 'length >= 1 and .[0].statutValidation == "VALIDE" and .[0].email == null and .[0].telephone == null' /tmp/resp_guides_pub.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Annuaire public /api/guides invalide ou fuite email/téléphone : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_guides_pub.json >&2
+            dump_diagnostics "Annuaire public guides P05"
+            exit 1
+          fi
+
+          DIRECT_INTERNAL_CODE=$(curl -s -w "%{http_code}" -o /tmp/resp_guide_int_direct.json "http://localhost:3005/api/guides/internal/utilisateur/5")
+          if [ "$DIRECT_INTERNAL_CODE" != "401" ]; then
+            echo "[ÉCHEC SÉCURITÉ] Route interne guide accessible sans HMAC : HTTP $DIRECT_INTERNAL_CODE" >&2
+            exit 1
+          fi
+
+          LOGIN_BODY='{"email":"lamine.faty@univ-zig.sn","motDePasse":"Admin2026!"}'
+          LOGIN_TS=$(date +%s)
+          LOGIN_NONCE=$(cat /proc/sys/kernel/random/uuid)
+          LOGIN_SHA=$(printf '%s' "$LOGIN_BODY" | sha256sum | awk '{print $1}')
+          LOGIN_CANONICAL="POST|/api/utilisateurs/connexion|ANONYMOUS|PUBLIC|||ci-session-e2e|${LOGIN_TS}|${LOGIN_NONCE}|${LOGIN_SHA}"
+          LOGIN_SIG=$(printf '%s' "$LOGIN_CANONICAL" | openssl dgst -sha256 -hmac "$SECURITY_SESSION_SECRET" -binary | base64 | tr '+/' '-_' | tr -d '=\n\r')
+          LOGIN_CODE=$(curl -s -D /tmp/admin_login.hdr -w "%{http_code}" -X POST "http://localhost:3005/api/utilisateurs/connexion" \
+            -H "Content-Type: application/json" \
+            -H "X-User-Id: ANONYMOUS" -H "X-User-Roles: PUBLIC" -H "X-User-Permissions: " \
+            -H "X-User-Email: " -H "X-User-Session-Id: ci-session-e2e" \
+            -H "X-Content-SHA256: $LOGIN_SHA" \
+            -H "X-Internal-Gateway-Token: ${LOGIN_TS}.${LOGIN_NONCE}.${LOGIN_SIG}" \
+            -d "$LOGIN_BODY" -o /tmp/resp_admin_login.json)
+          ADMIN_BEARER=$(sed -n 's/^authorization:[[:space:]]*//Ip' /tmp/admin_login.hdr | head -n 1 | tr -d '\r\n' || true)
+          if [ "$LOGIN_CODE" != "200" ] || [ -z "$ADMIN_BEARER" ]; then
+            echo "[ÉCHEC] Connexion admin pour création guide P05 échouée : HTTP $LOGIN_CODE" >&2
+            cat /tmp/resp_admin_login.json >&2
+            dump_diagnostics "Connexion admin P05"
+            exit 1
+          fi
+
+          GUIDE_SIGNUP="{\"nom\":\"Diallo\",\"prenom\":\"Fatou\",\"email\":\"fatou.guide.ci@casamance.sn\",\"motDePasse\":\"GuidePass2026!\",\"telephone\":\"+221775551122\",\"role\":\"GUIDE\",\"actif\":true}"
+          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3005/api/utilisateurs/admin" "/api/utilisateurs/admin" "1" "ADMINISTRATEUR" "UTILISATEUR:CREER_STAFF,UTILISATEUR:GERER_ROLES" "lamine.faty@univ-zig.sn" "$GUIDE_SIGNUP" "/tmp/resp_guide_signup.json" "" "$ADMIN_BEARER")
+          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ] || ! jq -e '.role == "GUIDE" and .actif == true' /tmp/resp_guide_signup.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Création compte guide P05 (/admin) invalide : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_guide_signup.json >&2
+            dump_diagnostics "Création compte guide P05"
+            exit 1
+          fi
+          GUIDE_UID=$(jq -r '.id // empty' /tmp/resp_guide_signup.json)
+
+          GUIDE_PROFIL_BODY='{"presentationCourte":"Guide écotourisme mangrove Basse-Casamance","biographie":"Dix années de guidage culturel et naturaliste entre Karabane et Oussouye.","languesParlees":"Français, Wolof, Diola","specialites":"Écotourisme, Patrimoine Diola","zonesIntervention":"Basse-Casamance","anneesExperience":10,"numeroCarteProfessionnelle":"CG-CI-2026-88","tarifJournalierIndicatif":25000,"disponible":true,"visibilitePublique":true}'
+          HTTP_CODE=$(gateway_signed_curl "PUT" "http://localhost:3005/api/guides/mon-profil" "/api/guides/mon-profil" "$GUIDE_UID" "GUIDE" "GUIDE:LIRE,GUIDE:GERER_PROPRE_PROFIL" "fatou.guide.ci@casamance.sn" "$GUIDE_PROFIL_BODY" "/tmp/resp_guide_draft.json")
+          if [ "$HTTP_CODE" != "200" ] || ! jq -e '.statutValidation == "BROUILLON"' /tmp/resp_guide_draft.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Création brouillon guide échouée : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_guide_draft.json >&2
+            dump_diagnostics "Brouillon profil guide"
+            exit 1
+          fi
+          GUIDE_PROFIL_ID=$(jq -r '.id // empty' /tmp/resp_guide_draft.json)
+
+          TAMPER_BODY='{"presentationCourte":"Tentative","biographie":"Tentative de contournement statut validation","languesParlees":"Français","specialites":"Culture","zonesIntervention":"Ziguinchor","anneesExperience":5,"statutValidation":"VALIDE"}'
+          TAMPER_CODE=$(gateway_signed_curl "PUT" "http://localhost:3005/api/guides/mon-profil" "/api/guides/mon-profil" "$GUIDE_UID" "GUIDE" "GUIDE:LIRE,GUIDE:GERER_PROPRE_PROFIL" "fatou.guide.ci@casamance.sn" "$TAMPER_BODY" "/tmp/resp_guide_tamper.json")
+          if [ "$TAMPER_CODE" != "403" ]; then
+            echo "[ÉCHEC SÉCURITÉ] Altération champs réservés guide non rejetée 403 : HTTP $TAMPER_CODE" >&2
+            cat /tmp/resp_guide_tamper.json >&2
+            exit 1
+          fi
+
+          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3005/api/guides/mon-profil/soumettre" "/api/guides/mon-profil/soumettre" "$GUIDE_UID" "GUIDE" "GUIDE:LIRE,GUIDE:GERER_PROPRE_PROFIL" "fatou.guide.ci@casamance.sn" "{}" "/tmp/resp_guide_submit.json")
+          if [ "$HTTP_CODE" != "200" ] || ! jq -e '.statutValidation == "EN_ATTENTE_VALIDATION"' /tmp/resp_guide_submit.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Soumission guide échouée : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_guide_submit.json >&2
+            exit 1
+          fi
+
+          SELF_VAL_CODE=$(gateway_signed_curl "POST" "http://localhost:3005/api/guides/$GUIDE_PROFIL_ID/valider" "/api/guides/$GUIDE_PROFIL_ID/valider" "$GUIDE_UID" "GUIDE" "GUIDE:LIRE,GUIDE:GERER_PROPRE_PROFIL" "fatou.guide.ci@casamance.sn" '{"motif":"Auto"}' "/tmp/resp_guide_selfval.json")
+          if [ "$SELF_VAL_CODE" != "403" ]; then
+            echo "[ÉCHEC SÉCURITÉ] Auto-validation guide non rejetée 403 : HTTP $SELF_VAL_CODE" >&2
+            cat /tmp/resp_guide_selfval.json >&2
+            exit 1
+          fi
+
+          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3005/api/guides/$GUIDE_PROFIL_ID/valider" "/api/guides/$GUIDE_PROFIL_ID/valider" "1" "ADMINISTRATEUR" "GUIDE:VALIDER,GUIDE:SUSPENDRE,GUIDE:LIRE" "admin@zig.univ.sn" '{"motif":"Dossier CI E2E conforme"}' "/tmp/resp_guide_validated.json")
+          if [ "$HTTP_CODE" != "200" ] || ! jq -e '.statutValidation == "VALIDE"' /tmp/resp_guide_validated.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Validation admin du guide échouée : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_guide_validated.json >&2
+            dump_diagnostics "Validation guide par admin"
+            exit 1
+          fi
+
+          ASSIGN_BODY="{\"guideResponsableId\":$GUIDE_UID}"
+          HTTP_CODE=$(gateway_signed_curl "PATCH" "http://localhost:3002/api/circuits/$TARGET_CIRCUIT_ID/guide" "/api/circuits/$TARGET_CIRCUIT_ID/guide" "1" "ADMINISTRATEUR" "CIRCUIT:MODIFIER,CIRCUIT:LIRE" "admin@zig.univ.sn" "$ASSIGN_BODY" "/tmp/resp_circuit_guide.json")
+          if [ "$HTTP_CODE" != "200" ] || ! jq -e ".guideResponsableId == $GUIDE_UID" /tmp/resp_circuit_guide.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Affectation du guide validé #$GUIDE_UID au circuit #$TARGET_CIRCUIT_ID échouée : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_circuit_guide.json >&2
+            dump_diagnostics "Affectation guide circuit"
+            exit 1
+          fi
+          echo ">>> Succès : Profil guide #$GUIDE_PROFIL_ID (user #$GUIDE_UID) validé et affecté au circuit #$TARGET_CIRCUIT_ID."
+
+          echo -e "\n9. Workflow P05 Avis Vérifiés, éligibilité, doublon 409 & BOLA 403 (:3004)"
+          NEG_AVIS_BODY="{\"cibleType\":\"CIRCUIT\",\"cibleId\":$TARGET_CIRCUIT_ID,\"reservationId\":$RESA_ID,\"note\":4,\"commentaire\":\"Tentative avis sur réservation remboursée\"}"
+          NEG_AVIS_CODE=$(gateway_signed_curl "POST" "http://localhost:3004/api/avis" "/api/avis" "2" "TOURISTE" "AVIS:CREER,AVIS:LIRE" "ci@zig.univ.sn" "$NEG_AVIS_BODY" "/tmp/resp_avis_neg.json")
+          if [ "$NEG_AVIS_CODE" != "403" ]; then
+            echo "[ÉCHEC] Avis sur réservation non confirmée/remboursée devait retourner 403, reçu HTTP $NEG_AVIS_CODE" >&2
+            cat /tmp/resp_avis_neg.json >&2
+            exit 1
+          fi
+
+          TODAY=$(date +%Y-%m-%d)
+          RESA_P05_PAYLOAD="{\"nomClient\":\"Moussa Diop CI\",\"emailClient\":\"moussa.diop@zig.univ.sn\",\"nombrePlaces\":2,\"typeReservation\":\"CIRCUIT\",\"circuitId\":$TARGET_CIRCUIT_ID,\"datePrestation\":\"$TODAY\"}"
+          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3004/api/reservations" "/api/reservations" "4" "TOURISTE" "RESERVATION:CREER,RESERVATION:LIRE_PROPRE" "moussa.diop@zig.univ.sn" "$RESA_P05_PAYLOAD" "/tmp/resp_resa_p05.json" "ci-p05-res-1")
+          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
+            echo "[ÉCHEC] Création réservation P05 a retourné HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_resa_p05.json >&2
+            exit 1
+          fi
+          RESA_P05_ID=$(jq -r '.id // empty' /tmp/resp_resa_p05.json)
+
+          PAY_P05_BODY="{\"reservationId\":$RESA_P05_ID,\"modePaiement\":\"ORANGE_MONEY\",\"numeroTelephoneSimule\":\"+221781112233\"}"
+          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3006/api/paiements" "/api/paiements" "4" "TOURISTE" "PAIEMENT:INITIER,PAIEMENT:LIRE_PROPRE" "moussa.diop@zig.univ.sn" "$PAY_P05_BODY" "/tmp/resp_pay_p05.json" "ci-p05-pay-1")
+          PAY_P05_ID=$(jq -r '.id // empty' /tmp/resp_pay_p05.json)
+          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3006/api/paiements/$PAY_P05_ID/simuler" "/api/paiements/$PAY_P05_ID/simuler" "4" "TOURISTE" "PAIEMENT:INITIER,PAIEMENT:LIRE_PROPRE" "moussa.diop@zig.univ.sn" '{"decision":"ACCEPTER","motif":"OK"}' "/tmp/resp_pay_p05_sim.json")
+          if [ "$HTTP_CODE" != "200" ] || ! jq -e '.statut == "ACCEPTE"' /tmp/resp_pay_p05_sim.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Paiement P05 échoué : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_pay_p05_sim.json >&2
+            exit 1
+          fi
+
+          HTTP_CODE=$(gateway_signed_curl "GET" "http://localhost:3004/api/avis/eligibilite?cibleType=CIRCUIT&cibleId=$TARGET_CIRCUIT_ID" "/api/avis/eligibilite" "4" "TOURISTE" "AVIS:LIRE,AVIS:CREER" "moussa.diop@zig.univ.sn" "" "/tmp/resp_avis_elig.json")
+          if [ "$HTTP_CODE" != "200" ] || ! jq -e '.eligible == true' /tmp/resp_avis_elig.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Éligibilité avis non détectée pour réservation réalisée #$RESA_P05_ID" >&2
+            cat /tmp/resp_avis_elig.json >&2
+            exit 1
+          fi
+
+          AVIS_CIRCUIT_BODY="{\"cibleType\":\"CIRCUIT\",\"cibleId\":$TARGET_CIRCUIT_ID,\"reservationId\":$RESA_P05_ID,\"note\":5,\"commentaire\":\"Circuit immersif parfaitement encadré en Casamance.\"}"
+          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3004/api/avis" "/api/avis" "4" "TOURISTE" "AVIS:CREER,AVIS:LIRE,AVIS:MODIFIER_PROPRE" "moussa.diop@zig.univ.sn" "$AVIS_CIRCUIT_BODY" "/tmp/resp_avis_create.json")
+          if [ "$HTTP_CODE" != "201" ] || ! jq -e '.experienceVerifiee == true and .statutModeration == "APPROUVE"' /tmp/resp_avis_create.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Création avis vérifié échouée : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_avis_create.json >&2
+            exit 1
+          fi
+          AVIS_ID=$(jq -r '.id // empty' /tmp/resp_avis_create.json)
+
+          DUP_AVIS_CODE=$(gateway_signed_curl "POST" "http://localhost:3004/api/avis" "/api/avis" "4" "TOURISTE" "AVIS:CREER,AVIS:LIRE" "moussa.diop@zig.univ.sn" "$AVIS_CIRCUIT_BODY" "/tmp/resp_avis_dup.json")
+          if [ "$DUP_AVIS_CODE" != "409" ]; then
+            echo "[ÉCHEC] Doublon avis devait retourner 409, reçu HTTP $DUP_AVIS_CODE" >&2
+            cat /tmp/resp_avis_dup.json >&2
+            exit 1
+          fi
+
+          BOLA_AVIS_CODE=$(gateway_signed_curl "PUT" "http://localhost:3004/api/avis/$AVIS_ID" "/api/avis/$AVIS_ID" "2" "TOURISTE" "AVIS:MODIFIER_PROPRE" "ci@zig.univ.sn" '{"note":1,"commentaire":"Altération BOLA non autorisée"}' "/tmp/resp_avis_bola.json")
+          if [ "$BOLA_AVIS_CODE" != "403" ]; then
+            echo "[ÉCHEC SÉCURITÉ] Modification BOLA avis non rejetée 403 : HTTP $BOLA_AVIS_CODE" >&2
+            cat /tmp/resp_avis_bola.json >&2
+            exit 1
+          fi
+          echo ">>> Succès : Avis vérifié #$AVIS_ID créé, doublon bloqué (409) et BOLA protégé (403)."
+
+          echo -e "\n10. Signalement, Modération RBAC 403 -> 200 & recalcul moyenne (:3004)"
+          MOD_DENIED=$(gateway_signed_curl "POST" "http://localhost:3004/api/moderation/avis/$AVIS_ID/decision" "/api/moderation/avis/$AVIS_ID/decision" "2" "TOURISTE" "AVIS:LIRE" "ci@zig.univ.sn" '{"decision":"MASQUE","justification":"Tentative illicite"}' "/tmp/resp_mod_denied.json")
+          if [ "$MOD_DENIED" != "403" ]; then
+            echo "[ÉCHEC SÉCURITÉ] Modération par TOURISTE devait retourner 403, reçu HTTP $MOD_DENIED" >&2
+            exit 1
+          fi
+
+          FLAG_BODY='{"categorie":"SPAM","motif":"Contenu signalé dans le scénario de vérification E2E"}'
+          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3004/api/avis/$AVIS_ID/signaler" "/api/avis/$AVIS_ID/signaler" "2" "TOURISTE" "AVIS:SIGNALER,AVIS:LIRE" "ci@zig.univ.sn" "$FLAG_BODY" "/tmp/resp_flag_create.json")
+          if [ "$HTTP_CODE" != "201" ]; then
+            echo "[ÉCHEC] Signalement avis échoué : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_flag_create.json >&2
+            exit 1
+          fi
+          SIG_ID=$(jq -r '.id // empty' /tmp/resp_flag_create.json)
+
+          SIG_DEC_BODY='{"decisionSignalement":"VALIDE_CONTENU_RETIRE","commentaire":"Contenu masqué suite au contrôle de modération E2E","statutAvisCible":"MASQUE"}'
+          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3004/api/moderation/signalements/$SIG_ID/decision" "/api/moderation/signalements/$SIG_ID/decision" "1" "ADMINISTRATEUR" "AVIS:MODERER,AVIS:LIRE" "admin@zig.univ.sn" "$SIG_DEC_BODY" "/tmp/resp_flag_dec.json")
+          if [ "$HTTP_CODE" != "200" ] || ! jq -e '.statut == "VALIDE_CONTENU_RETIRE" and .avisStatutActuel == "MASQUE"' /tmp/resp_flag_dec.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Traitement signalement échoué : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_flag_dec.json >&2
+            exit 1
+          fi
+
+          HTTP_CODE=$(gateway_signed_curl "GET" "http://localhost:3004/api/avis/resume?cibleType=CIRCUIT&cibleId=$TARGET_CIRCUIT_ID" "/api/avis/resume" "ANONYMOUS" "PUBLIC" "" "" "" "/tmp/resp_avis_resume_after.json")
+          if [ "$HTTP_CODE" != "200" ] || ! jq -e '.totalAvis == 0' /tmp/resp_avis_resume_after.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Agrégat avis non recalculé après masquage : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_avis_resume_after.json >&2
+            exit 1
+          fi
+          echo ">>> Succès : Signalement #$SIG_ID traité, avis #$AVIS_ID masqué et moyenne recalculée."
+
+          echo -e "\n11. Notifications Inbox BOLA, Idempotence & Suspension Guide (:3007 -> :3005 -> :3002)"
+          NOTIF_U4_ID=""
+          for _try in 1 2 3 4 5; do
+            HTTP_CODE=$(gateway_signed_curl "GET" "http://localhost:3007/api/notifications/mes-notifications" "/api/notifications/mes-notifications" "4" "TOURISTE" "NOTIFICATION:LIRE_PROPRE,NOTIFICATION:GERER_PROPRE" "moussa.diop@zig.univ.sn" "" "/tmp/resp_notif_u4.json")
+            NOTIF_U4_ID=$(jq -r '.content[0].id // empty' /tmp/resp_notif_u4.json 2>/dev/null || true)
+            if [ "$HTTP_CODE" = "200" ] && [ -n "$NOTIF_U4_ID" ]; then
+              break
+            fi
+            sleep 1
+          done
+          if [ -z "$NOTIF_U4_ID" ]; then
+            echo "[ÉCHEC] Aucune notification reçue dans l'inbox utilisateur #4 après modération" >&2
+            cat /tmp/resp_notif_u4.json >&2
+            dump_diagnostics "Notifications inbox utilisateur #4"
+            exit 1
+          fi
+
+          BOLA_NOTIF=$(gateway_signed_curl "PATCH" "http://localhost:3007/api/notifications/$NOTIF_U4_ID/lire" "/api/notifications/$NOTIF_U4_ID/lire" "2" "TOURISTE" "NOTIFICATION:GERER_PROPRE" "ci@zig.univ.sn" "" "/tmp/resp_notif_bola.json")
+          if [ "$BOLA_NOTIF" != "403" ]; then
+            echo "[ÉCHEC SÉCURITÉ] Lecture BOLA notification non rejetée 403 : HTTP $BOLA_NOTIF" >&2
+            exit 1
+          fi
+
+          HTTP_CODE=$(gateway_signed_curl "PATCH" "http://localhost:3007/api/notifications/$NOTIF_U4_ID/lire" "/api/notifications/$NOTIF_U4_ID/lire" "4" "TOURISTE" "NOTIFICATION:GERER_PROPRE" "moussa.diop@zig.univ.sn" "" "/tmp/resp_notif_read.json")
+          if [ "$HTTP_CODE" != "200" ] || ! jq -e '.lue == true' /tmp/resp_notif_read.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Marquage lu notification #$NOTIF_U4_ID échoué : HTTP $HTTP_CODE" >&2
+            cat /tmp/resp_notif_read.json >&2
+            exit 1
+          fi
+
+          IDEM_NOTIF_BODY='{"destinataire":"idem.ci@zig.univ.sn","utilisateurId":4,"sujet":"Test idempotence P05","contenu":"Vérification anti-doublon CI E2E","canal":"EMAIL","typeEvenement":"AVIS_MODERE","idempotencyKey":"ci-p05-idem-001"}'
+          gateway_signed_curl "POST" "http://localhost:3007/api/notifications" "/api/notifications" "1" "ADMINISTRATEUR" "NOTIFICATION:LIRE_TOUT,NOTIFICATION:RELANCER" "admin@zig.univ.sn" "$IDEM_NOTIF_BODY" "/tmp/resp_notif_idem1.json" >/dev/null
+          gateway_signed_curl "POST" "http://localhost:3007/api/notifications" "/api/notifications" "1" "ADMINISTRATEUR" "NOTIFICATION:LIRE_TOUT,NOTIFICATION:RELANCER" "admin@zig.univ.sn" "$IDEM_NOTIF_BODY" "/tmp/resp_notif_idem2.json" >/dev/null
+          N_ID1=$(jq -r '.id // empty' /tmp/resp_notif_idem1.json)
+          N_ID2=$(jq -r '.id // empty' /tmp/resp_notif_idem2.json)
+          if [ -z "$N_ID1" ] || [ "$N_ID1" != "$N_ID2" ]; then
+            echo "[ÉCHEC] Idempotence notification défaillante : id1='$N_ID1', id2='$N_ID2'" >&2
+            exit 1
+          fi
+
+          HTTP_CODE=$(gateway_signed_curl "POST" "http://localhost:3005/api/guides/$GUIDE_PROFIL_ID/suspendre" "/api/guides/$GUIDE_PROFIL_ID/suspendre" "1" "ADMINISTRATEUR" "GUIDE:SUSPENDRE,GUIDE:VALIDER" "admin@zig.univ.sn" '{"motif":"Suspension test E2E"}' "/tmp/resp_guide_susp.json")
+          if [ "$HTTP_CODE" != "200" ] || ! jq -e '.statutValidation == "SUSPENDU"' /tmp/resp_guide_susp.json >/dev/null 2>&1; then
+            echo "[ÉCHEC] Suspension guide échouée : HTTP $HTTP_CODE" >&2
+            exit 1
+          fi
+          REASSIGN_CODE=$(gateway_signed_curl "PATCH" "http://localhost:3002/api/circuits/$TARGET_CIRCUIT_ID/guide" "/api/circuits/$TARGET_CIRCUIT_ID/guide" "1" "ADMINISTRATEUR" "CIRCUIT:MODIFIER" "admin@zig.univ.sn" "$ASSIGN_BODY" "/tmp/resp_circuit_guide_susp.json")
+          if [ "$REASSIGN_CODE" != "400" ]; then
+            echo "[ÉCHEC] Affectation d'un guide suspendu devait retourner 400, reçu HTTP $REASSIGN_CODE" >&2
+            cat /tmp/resp_circuit_guide_susp.json >&2
+            exit 1
+          fi
+          echo ">>> Succès : Inbox BOLA (403 -> 200 lu), idempotence ($N_ID1 == $N_ID2) et blocage guide suspendu validés."
 
           echo -e "\n=================================================================="
-          echo " SUCCÈS COMPLET : Tous les tests d'intégration E2E ont réussi !"
+          echo " SUCCÈS COMPLET : Tous les tests d'intégration E2E P05 ont réussi !"
           echo "=================================================================="
 
       - name: Conservation des journaux et captures E2E
@@ -390,7 +829,7 @@ jobs:
   docker-build:
     name: Build Docker Images (TP3)
     runs-on: ubuntu-latest
-    needs: [build-and-test, integration-e2e]
+    needs: [build-and-test, frontend-test-and-build, integration-e2e]
     if: >
       github.ref == 'refs/heads/main' ||
       github.ref == 'refs/heads/deploy' ||
@@ -417,6 +856,11 @@ jobs:
           docker build -t fatylamine/circuits:v1 ./ms-circuit
           docker build -t fatylamine/evenements:v1 ./ms-evenement
           docker build -t fatylamine/reservations:v1 ./ms-reservation
+          docker build -t fatylamine/paiements:v1 ./ms-paiement
+          docker build -t fatylamine/utilisateurs:v1 ./ms-utilisateur
+          docker build -t fatylamine/notifications:v1 ./ms-notification
+          docker build -t fatylamine/api-gateway:v1 ./api-gateway
+          docker build -t fatylamine/discovery-server:v1 ./discovery-server
           docker images | grep fatylamine
 
   # =========================================================================
@@ -425,12 +869,12 @@ jobs:
   pr-validation-gate:
     name: Validation Finale PR (All Checks Passed)
     runs-on: ubuntu-latest
-    needs: [build-and-test, integration-e2e]
+    needs: [build-and-test, frontend-test-and-build, integration-e2e]
     if: always()
     steps:
       - name: Vérification du statut des jobs obligatoires
         run: |
-          if [ "${{ needs.build-and-test.result }}" != "success" ] || [ "${{ needs.integration-e2e.result }}" != "success" ]; then
+          if [ "${{ needs.build-and-test.result }}" != "success" ] || [ "${{ needs.frontend-test-and-build.result }}" != "success" ] || [ "${{ needs.integration-e2e.result }}" != "success" ]; then
             echo "Échec des conditions d'intégration : la Pull Request ne peut pas être fusionnée."
             exit 1
           fi

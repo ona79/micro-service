@@ -1,7 +1,7 @@
 <div class="page-section">
   <div class="container">
     @if (loading()) {
-      <app-ui-skeleton-grid [count]="2" label="Chargement de la fiche du patrimoine..." />
+      <app-ui-loading-state label="Chargement de la fiche patrimoniale de Casamance..." />
     } @else if (error() || !patrimoine()) {
       <app-ui-breadcrumb [items]="breadcrumbs()" />
       <app-ui-error-banner
@@ -22,14 +22,24 @@
               Lieu de mémoire et de recueillement
             </span>
           } @else {
-            <span class="ui-badge ui-badge--ochre">Patrimoine culturel</span>
+            <span class="ui-badge ui-badge--ochre">
+              {{ pat.categoriePatrimoine || 'Patrimoine culturel' }}
+            </span>
+          }
+          @if (pat.zoneGeographique) {
+            <span class="ui-badge">{{ pat.zoneGeographique }}</span>
+          }
+          @if (pat.donneeDemonstration !== false) {
+            <span class="ui-badge ui-badge--terracotta" title="Fiche de démonstration universitaire UASZ">
+              Donnée de démonstration
+            </span>
           }
         </div>
         <h1 class="monograph-header__title">{{ pat.nomPatrimoine }}</h1>
-        @if (pat.adressePatrimoine) {
+        @if (pat.adressePatrimoine || pat.localite) {
           <p class="monograph-header__location">
             <svg lucideMapPin [size]="16" aria-hidden="true"></svg>
-            <span>{{ pat.adressePatrimoine }}</span>
+            <span>{{ pat.adressePatrimoine || pat.localite }}</span>
           </p>
         }
       </header>
@@ -41,11 +51,12 @@
               <app-ui-patrimoine-image
                 [codePatrimoine]="pat.codePatrimoine"
                 [nomPatrimoine]="pat.nomPatrimoine"
+                [imageUrl]="pat.imageUrl"
                 [sobriete]="isMemorial()"
               />
             </div>
             <figcaption class="monograph-media__caption">
-              {{ pat.nomPatrimoine }} — {{ pat.adressePatrimoine || 'Sénégal' }} (Code :
+              {{ pat.nomPatrimoine }} — {{ pat.adressePatrimoine || 'Casamance, Sénégal' }} (Code :
               {{ pat.codePatrimoine }})
             </figcaption>
           </figure>
@@ -70,6 +81,16 @@
             @if (pat.historiquePatrimoine) {
               <h2>Repères historiques</h2>
               <p>{{ pat.historiquePatrimoine }}</p>
+            }
+
+            @if (pat.informationsCulturelles) {
+              <h2>Dimensions culturelles &amp; patrimoniales</h2>
+              <p>{{ pat.informationsCulturelles }}</p>
+            }
+
+            @if (pat.informationsPratiques) {
+              <h2>Conseils &amp; modalités de visite</h2>
+              <p>{{ pat.informationsPratiques }}</p>
             }
 
             @if (relatedCircuits().length > 0 || relatedEvenements().length > 0) {
@@ -120,6 +141,8 @@
                 }
               </div>
             }
+
+            <app-ui-avis-section cibleType="PATRIMOINE" [cibleId]="pat.id" />
           </div>
         </article>
 
@@ -134,10 +157,28 @@
               <dt>Code officiel</dt>
               <dd>{{ pat.codePatrimoine }}</dd>
             </div>
+            @if (pat.typePatrimoine) {
+              <div class="practical-list__row">
+                <dt>Typologie</dt>
+                <dd>{{ pat.typePatrimoine }}</dd>
+              </div>
+            }
             <div class="practical-list__row">
               <dt>Localisation</dt>
-              <dd>{{ pat.adressePatrimoine || 'Non renseignée' }}</dd>
+              <dd>{{ pat.adressePatrimoine || pat.localite || 'Non renseignée' }}</dd>
             </div>
+            @if (pat.horairesOuverture) {
+              <div class="practical-list__row">
+                <dt>Horaires</dt>
+                <dd>{{ pat.horairesOuverture }}</dd>
+              </div>
+            }
+            @if (pat.tarifEntree !== undefined && pat.tarifEntree !== null) {
+              <div class="practical-list__row">
+                <dt>Tarif indicatif</dt>
+                <dd class="tabular-nums">{{ pat.tarifEntree | fcfaPrice }}</dd>
+              </div>
+            }
             <div class="practical-list__row">
               <dt>Capacité maximale</dt>
               <dd class="tabular-nums">{{ pat.capacitePatrimoine }} personnes</dd>
@@ -183,34 +224,40 @@
 
       @if (autresPatrimoines().length > 0) {
         <section class="related-section">
-          <h2 class="related-section__title">À voir aussi</h2>
+          <h2 class="related-section__title">À voir aussi en Casamance</h2>
           <div class="related-grid">
             @for (autre of autresPatrimoines(); track autre.id) {
-              <article
+              <app-ui-card
+                [interactive]="true"
                 class="related-card"
                 [class.related-card--memorial]="isPatMemorial(autre)"
               >
-                <a [routerLink]="['/patrimoines', autre.id]" class="related-card__media">
-                  <app-ui-patrimoine-image
-                    [codePatrimoine]="autre.codePatrimoine"
-                    [nomPatrimoine]="autre.nomPatrimoine"
-                    [sobriete]="isPatMemorial(autre)"
-                  />
-                </a>
-                <div class="related-card__body">
+                <div slot="media">
+                  <a [routerLink]="['/patrimoines', autre.id]" class="related-card__media">
+                    <app-ui-patrimoine-image
+                      [codePatrimoine]="autre.codePatrimoine"
+                      [nomPatrimoine]="autre.nomPatrimoine"
+                      [imageUrl]="autre.imageUrl"
+                      [sobriete]="isPatMemorial(autre)"
+                    />
+                  </a>
+                </div>
+                <div slot="header">
                   <span class="ui-badge">{{ autre.codePatrimoine }}</span>
-                  <h3 class="related-card__title">
-                    <a [routerLink]="['/patrimoines', autre.id]">
-                      {{ autre.nomPatrimoine }}
-                    </a>
-                  </h3>
-                  <p class="related-card__loc">{{ autre.adressePatrimoine || 'Sénégal' }}</p>
+                </div>
+                <h3 class="related-card__title">
+                  <a [routerLink]="['/patrimoines', autre.id]">
+                    {{ autre.nomPatrimoine }}
+                  </a>
+                </h3>
+                <p class="related-card__loc">{{ autre.adressePatrimoine || 'Casamance' }}</p>
+                <div slot="footer">
                   <a [routerLink]="['/patrimoines', autre.id]" class="related-card__link">
                     <span>Lire la fiche</span>
                     <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
                   </a>
                 </div>
-              </article>
+              </app-ui-card>
             }
           </div>
         </section>

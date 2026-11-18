@@ -1,4 +1,9 @@
-export type RoleUtilisateur = 'TOURISTE' | 'GESTIONNAIRE_SITE' | 'ADMINISTRATEUR';
+export type RoleUtilisateur =
+  | 'TOURISTE'
+  | 'GUIDE'
+  | 'CONSERVATEUR'
+  | 'GESTIONNAIRE_SITE'
+  | 'ADMINISTRATEUR';
 
 export interface Utilisateur {
   id: number;
@@ -26,25 +31,13 @@ export interface InscriptionPayload {
   actif?: boolean;
 }
 
-export type ModePaiement = 'WAVE' | 'ORANGE_MONEY' | 'CARTE_BANCAIRE' | 'ESPECES';
-
-export interface Paiement {
-  id: number;
-  referenceTransaction: string;
-  reservationId: number;
-  montant: number;
-  modePaiement: ModePaiement;
-  statut: 'EN_ATTENTE' | 'REUSSI' | 'ECHOUE';
-  datePaiement: string;
+export interface UpdateProfilePayload {
+  nom: string;
+  prenom: string;
+  email: string;
+  telephone?: string | null;
+  motDePasse?: string;
 }
 
-export interface NotificationItem {
-  id: number;
-  destinataire: string;
-  sujet: string;
-  contenu: string;
-  canal: 'EMAIL' | 'SMS' | 'PUSH';
-  statut: 'ENVOYEE' | 'ECHEC';
-  dateEnvoi: string;
-  reservationId: number | null;
-}
+export type { ModePaiement, Paiement, StatutPaiement } from './paiement.model';
+export type { NotificationItem } from './notification.model';

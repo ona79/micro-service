@@ -1,0 +1,205 @@
+<a href="#pro-main-content" class="skip-link">Aller au contenu professionnel</a>
+
+<div class="pro-shell" [class.pro-shell--collapsed]="sidebarCollapsed()">
+  @if (mobileDrawerOpen()) {
+    <div
+      class="pro-backdrop"
+      (click)="closeMobileDrawer()"
+      aria-hidden="true"
+    ></div>
+  }
+
+  <aside
+    class="pro-sidebar"
+    [class.pro-sidebar--open]="mobileDrawerOpen()"
+    [attr.aria-label]="'Menu back-office (' + authStore.roleLabel() + ')'"
+  >
+    <div class="pro-sidebar__brand">
+      <a routerLink="/pro/tableau-de-bord" class="pro-brand" (click)="closeMobileDrawer()">
+        <span class="pro-brand__icon" aria-hidden="true">
+          <svg lucideCompass [size]="20"></svg>
+        </span>
+        @if (!sidebarCollapsed()) {
+          <span class="pro-brand__text">
+            <span class="pro-brand__name">Casamance Pro</span>
+            <span class="pro-brand__sub">{{ authStore.roleLabel() }}</span>
+          </span>
+        }
+      </a>
+      <button
+        type="button"
+        class="pro-sidebar__close-mobile"
+        aria-label="Fermer le menu"
+        (click)="closeMobileDrawer()"
+      >
+        <svg lucideX [size]="18" aria-hidden="true"></svg>
+      </button>
+    </div>
+
+    <nav class="pro-nav" aria-label="Navigation Espace Professionnel">
+      @for (group of visibleSections(); track group.section) {
+        <div class="pro-nav__group">
+          @if (!sidebarCollapsed()) {
+            <p class="pro-nav__heading">{{ group.section }}</p>
+          }
+          <ul class="pro-nav__list">
+            @for (item of group.items; track item.id) {
+              <li>
+                <a
+                  [routerLink]="item.to"
+                  routerLinkActive="pro-nav__link--active"
+                  class="pro-nav__link"
+                  [attr.title]="sidebarCollapsed() ? item.label : null"
+                  (click)="closeMobileDrawer()"
+                >
+                  <span class="pro-nav__icon" aria-hidden="true">
+                    @switch (item.icon) {
+                      @case ('dashboard') {
+                        <svg lucideLayoutDashboard [size]="18"></svg>
+                      }
+                      @case ('stats') {
+                        <svg lucideBarChart3 [size]="18"></svg>
+                      }
+                      @case ('patrimoines') {
+                        <svg lucideLandmark [size]="18"></svg>
+                      }
+                      @case ('circuits') {
+                        <svg lucideRoute [size]="18"></svg>
+                      }
+                      @case ('evenements') {
+                        <svg lucideCalendar [size]="18"></svg>
+                      }
+                      @case ('guide-profil') {
+                        <svg lucideAward [size]="18"></svg>
+                      }
+                      @case ('manifestes') {
+                        <svg lucideClipboardList [size]="18"></svg>
+                      }
+                      @case ('guides') {
+                        <svg lucideUsers [size]="18"></svg>
+                      }
+                      @case ('moderation') {
+                        <svg lucideMessageSquareWarning [size]="18"></svg>
+                      }
+                      @case ('reservations') {
+                        <svg lucideTicket [size]="18"></svg>
+                      }
+                      @case ('controle-acces') {
+                        <svg lucideQrCode [size]="18"></svg>
+                      }
+                      @case ('paiements') {
+                        <svg lucideCreditCard [size]="18"></svg>
+                      }
+                      @case ('notifications') {
+                        <svg lucideBell [size]="18"></svg>
+                      }
+                      @case ('utilisateurs') {
+                        <svg lucideShieldCheck [size]="18"></svg>
+                      }
+                    }
+                  </span>
+                  @if (!sidebarCollapsed()) {
+                    <span class="pro-nav__label">{{ item.label }}</span>
+                    @if (item.badgeText) {
+                      <span class="pro-nav__pill">{{ item.badgeText }}</span>
+                    } @else if (item.id === 'notifications' && notificationStore.unreadCount() > 0) {
+                      <span class="pro-nav__count tabular-nums">
+                        {{ notificationStore.unreadCount() }}
+                      </span>
+                    }
+                  }
+                </a>
+              </li>
+            }
+          </ul>
+        </div>
+      }
+    </nav>
+
+    <div class="pro-sidebar__footer">
+      <a routerLink="/" class="pro-footer-link" title="Revenir au site touristique public">
+        <svg lucideExternalLink [size]="16" aria-hidden="true"></svg>
+        @if (!sidebarCollapsed()) {
+          <span>Site public</span>
+        }
+      </a>
+    </div>
+  </aside>
+
+  <div class="pro-main-col">
+    <header class="pro-topbar">
+      <div class="pro-topbar__left">
+        <button
+          type="button"
+          class="pro-icon-btn pro-btn-desktop"
+          (click)="toggleSidebar()"
+          [attr.aria-label]="sidebarCollapsed() ? 'Déplier la barre latérale' : 'Réduire la barre latérale'"
+        >
+          @if (sidebarCollapsed()) {
+            <svg lucidePanelLeftOpen [size]="18" aria-hidden="true"></svg>
+          } @else {
+            <svg lucidePanelLeftClose [size]="18" aria-hidden="true"></svg>
+          }
+        </button>
+
+        <button
+          type="button"
+          class="pro-icon-btn pro-btn-mobile"
+          (click)="toggleMobileDrawer()"
+          [attr.aria-expanded]="mobileDrawerOpen()"
+          aria-label="Ouvrir le menu back-office"
+        >
+          <svg lucideMenu [size]="18" aria-hidden="true"></svg>
+        </button>
+
+        <div class="pro-topbar__breadcrumb">
+          <span class="pro-topbar__context">Espace Professionnel</span>
+          <span class="pro-topbar__sep" aria-hidden="true">/</span>
+          <span class="pro-topbar__current">{{ activeNavLabel() }}</span>
+        </div>
+      </div>
+
+      <div class="pro-topbar__actions">
+        <a
+          routerLink="/pro/notifications"
+          class="pro-notif-btn"
+          [attr.aria-label]="'Notifications (' + notificationStore.unreadCount() + ' non lues)'"
+          title="Notifications"
+        >
+          <svg lucideBell [size]="17" aria-hidden="true"></svg>
+          @if (notificationStore.unreadCount() > 0) {
+            <span class="pro-notif-dot tabular-nums">{{ notificationStore.unreadCount() }}</span>
+          }
+        </a>
+
+        @if (authStore.user(); as currentUser) {
+          <a routerLink="/mon-espace" class="pro-user-pill" title="Accéder à mon espace personnel">
+            <span class="pro-user-pill__avatar" aria-hidden="true">{{ authStore.initials() }}</span>
+            <span class="pro-user-pill__meta">
+              <strong>{{ currentUser.prenom }} {{ currentUser.nom }}</strong>
+              <small>{{ authStore.roleLabel() }}</small>
+            </span>
+          </a>
+        }
+
+        <a routerLink="/mon-espace" class="pro-icon-btn" title="Profil & espace personnel" aria-label="Profil personnel">
+          <svg lucideUser [size]="17" aria-hidden="true"></svg>
+        </a>
+
+        <button
+          type="button"
+          class="pro-logout-btn"
+          (click)="logout()"
+          aria-label="Se déconnecter"
+        >
+          <svg lucideLogOut [size]="16" aria-hidden="true"></svg>
+          <span class="pro-logout-btn__text">Déconnexion</span>
+        </button>
+      </div>
+    </header>
+
+    <main id="pro-main-content" class="pro-content" tabindex="-1">
+      <router-outlet />
+    </main>
+  </div>
+</div>

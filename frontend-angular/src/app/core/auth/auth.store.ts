@@ -1,11 +1,15 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { normalizeHttpError } from '../interceptors/http-error.interceptor';
+import { AuditSecuriteItem } from '../models/audit.model';
+import { PageResponse } from '../models/patrimoine.model';
+import { UtilisateurStats } from '../models/statistics.model';
 import {
   ConnexionPayload,
   InscriptionPayload,
   RoleUtilisateur,
+  UpdateProfilePayload,
   Utilisateur,
 } from '../models/utilisateur.model';
 
@@ -27,9 +31,22 @@ export class AuthStore {
 
   readonly isAuthenticated = computed(() => this._user() !== null);
   readonly isAdmin = computed(() => this._user()?.role === 'ADMINISTRATEUR');
+  readonly isSiteManager = computed(() => this._user()?.role === 'GESTIONNAIRE_SITE');
+  readonly isConservateur = computed(() => this._user()?.role === 'CONSERVATEUR');
+  readonly isGuide = computed(() => this._user()?.role === 'GUIDE');
+  readonly isTouriste = computed(() => this._user()?.role === 'TOURISTE');
   readonly isStaff = computed(() => {
     const role = this._user()?.role;
-    return role === 'ADMINISTRATEUR' || role === 'GESTIONNAIRE_SITE';
+    return role === 'ADMINISTRATEUR' || role === 'GESTIONNAIRE_SITE' || role === 'CONSERVATEUR';
+  });
+  readonly isBackOfficeRole = computed(() => {
+    const role = this._user()?.role;
+    return (
+      role === 'ADMINISTRATEUR' ||
+      role === 'GESTIONNAIRE_SITE' ||
+      role === 'CONSERVATEUR' ||
+      role === 'GUIDE'
+    );
   });
 
   readonly fullName = computed(() => {
@@ -137,6 +154,19 @@ export class AuthStore {
     }
   }
 
+  async refreshToken(): Promise<boolean> {
+    try {
+      await firstValueFrom(
+        this.http.post<void>('/api/utilisateurs/refresh', {}, { withCredentials: true })
+      );
+      await this.refreshSession();
+      return true;
+    } catch {
+      this._user.set(null);
+      return false;
+    }
+  }
+
   clearSessionLocally(): void {
     this._user.set(null);
   }
@@ -153,7 +183,10 @@ export class AuthStore {
     );
   }
 
-  async updateUser(id: number, payload: InscriptionPayload): Promise<Utilisateur> {
+  async updateUser(
+    id: number,
+    payload: InscriptionPayload | UpdateProfilePayload
+  ): Promise<Utilisateur> {
     const updated = await firstValueFrom(
       this.http.put<Utilisateur>(`/api/utilisateurs/${id}`, payload, { withCredentials: true })
     );
@@ -168,6 +201,64 @@ export class AuthStore {
       this.http.delete<void>(`/api/utilisateurs/${id}`, { withCredentials: true })
     );
   }
+
+  async rechercherUsers(
+    filters: {
+      q?: string;
+      role?: RoleUtilisateur | '';
+      actif?: boolean | null;
+      page?: number;
+      size?: number;
+    } = {}
+  ): Promise<PageResponse<Utilisateur>> {
+    let params = new HttpParams();
+    if (filters.q) params = params.set('q', filters.q);
+    if (filters.role) params = params.set('role', filters.role);
+    if (filters.actif != null) params = params.set('actif', String(filters.actif));
+    if (filters.page != null) params = params.set('page', String(filters.page));
+    if (filters.size != null) params = params.set('size', String(filters.size));
+    return firstValueFrom(
+      this.http.get<PageResponse<Utilisateur>>('/api/utilisateurs/recherche', {
+        params,
+        withCredentials: true,
+      })
+    );
+  }
+
+  async getUserStats(): Promise<UtilisateurStats> {
+    return firstValueFrom(
+      this.http.get<UtilisateurStats>('/api/utilisateurs/statistiques', { withCredentials: true })
+    );
+  }
+
+  async revoquerSessions(id: number): Promise<void> {
+    await firstValueFrom(
+      this.http.post<void>(`/api/utilisateurs/${id}/revoquer-sessions`, {}, { withCredentials: true })
+    );
+  }
+
+  async getAuditLogs(
+    filters: {
+      eventType?: string;
+      utilisateurId?: number | null;
+      q?: string;
+      page?: number;
+      size?: number;
+    } = {}
+  ): Promise<PageResponse<AuditSecuriteItem>> {
+    let params = new HttpParams();
+    if (filters.eventType) params = params.set('eventType', filters.eventType);
+    if (filters.utilisateurId != null) params = params.set('utilisateurId', String(filters.utilisateurId));
+    if (filters.q) params = params.set('q', filters.q);
+    if (filters.page != null) params = params.set('page', String(filters.page));
+    if (filters.size != null) params = params.set('size', String(filters.size));
+    return firstValueFrom(
+      this.http.get<PageResponse<AuditSecuriteItem>>('/api/utilisateurs/audit', {
+        params,
+        withCredentials: true,
+      })
+    );
+  }
 }
 
 export function formatRoleLabel(role: RoleUtilisateur | null | undefined): string {
@@ -176,6 +267,10 @@ export function formatRoleLabel(role: RoleUtilisateur | null | undefined): strin
       return 'Administrateur';
     case 'GESTIONNAIRE_SITE':
       return 'Gestionnaire de site';
+    case 'CONSERVATEUR':
+      return 'Conservateur du patrimoine';
+    case 'GUIDE':
+      return 'Guide touristique local';
     case 'TOURISTE':
     default:
       return 'Visiteur / Touriste';

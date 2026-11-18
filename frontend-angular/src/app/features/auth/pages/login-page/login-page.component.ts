@@ -9,6 +9,7 @@ import {
 } from '@lucide/angular';
 import { toast } from 'ngx-sonner';
 import { AuthStore } from '../../../../core/auth/auth.store';
+import { getDefaultPostLoginRoute } from '../../../../core/auth/permissions';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
 
 @Component({
@@ -480,10 +481,8 @@ export class LoginPageComponent {
       const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
       if (returnUrl && returnUrl.startsWith('/')) {
         await this.router.navigateByUrl(returnUrl);
-      } else if (user.role === 'ADMINISTRATEUR' || user.role === 'GESTIONNAIRE_SITE') {
-        await this.router.navigate(['/administration']);
       } else {
-        await this.router.navigate(['/mon-espace']);
+        await this.router.navigate([getDefaultPostLoginRoute(user.role)]);
       }
     } catch (err: unknown) {
       const msg =

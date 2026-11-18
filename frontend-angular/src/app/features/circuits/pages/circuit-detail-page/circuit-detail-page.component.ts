@@ -8,7 +8,6 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import {
   LucideArrowRight,
@@ -17,14 +16,19 @@ import {
   LucideMapPin,
   LucideTicket,
 } from '@lucide/angular';
-import { APP_SITE_CONFIG } from '../../../../core/config/site.config';
 import { extractErrorMessage } from '../../../../core/models/api-error.model';
 import { Circuit } from '../../../../core/models/circuit.model';
+import { GuideProfil } from '../../../../core/models/guide.model';
 import { Patrimoine } from '../../../../core/models/patrimoine.model';
+import { SeoService } from '../../../../core/services/seo.service';
+import { UiAvisSectionComponent } from '../../../../shared/components/ui-avis-section/ui-avis-section.component';
+import { GuideApiService } from '../../../guides/data-access/guide-api.service';
 import {
   BreadcrumbItem,
   UiBreadcrumbComponent,
 } from '../../../../shared/components/ui-breadcrumb/ui-breadcrumb.component';
+import { UiCardComponent } from '../../../../shared/components/ui-card/ui-card.component';
+import { UiLoadingStateComponent } from '../../../../shared/components/ui-loading-state/ui-loading-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
 import {
   HeritageMapPoint,
@@ -41,6 +45,9 @@ import {
   sortEtapes,
 } from '../../../../shared/utils/patrimoine.utils';
 import { PatrimoineStore } from '../../../patrimoines/data-access/patrimoine.store';
+import { DisponibilitePrestation } from '../../../../core/models/reservation.model';
+import { ReservationApiService } from '../../../reservations/data-access/reservation-api.service';
+import { firstValueFrom } from 'rxjs';
 import { CircuitStore } from '../../data-access/circuit.store';
 
 @Component({
@@ -55,10 +62,12 @@ import { CircuitStore } from '../../data-access/circuit.store';
     LucideMapPin,
     LucideTicket,
     UiBreadcrumbComponent,
+    UiCardComponent,
+    UiLoadingStateComponent,
     UiPatrimoineImageComponent,
     UiHeritageMapComponent,
-    UiSkeletonGridComponent,
     UiErrorBannerComponent,
+    UiAvisSectionComponent,
     DifficulteLabelPipe,
     DurationMinutesPipe,
     FcfaPricePipe,
@@ -71,12 +80,16 @@ export class CircuitDetailPageComponent {
 
   protected readonly store = inject(CircuitStore);
   protected readonly patrimoineStore = inject(PatrimoineStore);
-  private readonly titleService = inject(Title);
-  private readonly config = inject(APP_SITE_CONFIG);
+  private readonly guideApi = inject(GuideApiService);
+  private readonly reservationApi = inject(ReservationApiService);
+  private readonly seo = inject(SeoService);
 
   protected readonly circuit = signal<Circuit | null>(null);
+  protected readonly guide = signal<GuideProfil | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
+  protected readonly disponibilite = signal<DisponibilitePrestation | null>(null);
+  protected readonly checkingDispo = signal(false);
 
   protected readonly breadcrumbs = computed<BreadcrumbItem[]>(() => {
     const cir = this.circuit();
@@ -155,10 +168,26 @@ export class CircuitDetailPageComponent {
     return first.patrimoine ?? this.patrimoineStore.byIdMap().get(first.patrimoineId) ?? null;
   }
 
+  protected async checkDisponibilite(cir: Circuit): Promise<void> {
+    this.checkingDispo.set(true);
+    try {
+      const dispo = await firstValueFrom(
+        this.reservationApi.getDisponibilite('CIRCUIT', cir.id)
+      );
+      this.disponibilite.set(dispo);
+    } catch {
+      this.disponibilite.set(null);
+    } finally {
+      this.checkingDispo.set(false);
+    }
+  }
+
   private async loadDetail(circuitId: string): Promise<void> {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.error.set(null);
+    this.disponibilite.set(null);
+    this.guide.set(null);
 
     void this.store.ensureLoaded();
     void this.patrimoineStore.ensureLoaded();
@@ -167,7 +196,20 @@ export class CircuitDetailPageComponent {
       const detail = await this.store.loadById(circuitId);
       if (seq !== this.loadSeq) return;
       this.circuit.set(detail);
-      this.titleService.setTitle(`${detail.nomCircuit} — ${this.config.siteName}`);
+      this.seo.update({
+        title: detail.nomCircuit,
+        description:
+          detail.presentationTouristique ??
+          detail.descriptionCircuit ??
+          `Parcours touristique ${detail.nomCircuit} en Casamance (${detail.etapes?.length ?? 0} étape(s)).`,
+        canonicalPath: `/circuits/${detail.id}`,
+      });
+      if (detail.guideResponsableId) {
+        const g = await firstValueFrom(this.guideApi.getByUtilisateurId(detail.guideResponsableId)).catch(() => null);
+        if (seq === this.loadSeq && g?.statutValidation === 'VALIDE' && g.visibilitePublique) {
+          this.guide.set(g);
+        }
+      }
     } catch (err) {
       if (seq !== this.loadSeq) return;
       this.circuit.set(null);

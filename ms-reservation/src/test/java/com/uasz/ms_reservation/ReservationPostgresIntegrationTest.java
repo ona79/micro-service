@@ -1,5 +1,6 @@
 package com.uasz.ms_reservation;
 
+import com.uasz.ms_reservation.repositories.AvisRepository;
 import com.uasz.ms_reservation.repositories.ReservationRepository;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -26,11 +27,15 @@ class ReservationPostgresIntegrationTest {
     @Autowired
     private ReservationRepository reservationRepository;
 
+    @Autowired
+    private AvisRepository avisRepository;
+
     @Test
     void testPostgresConnectionFlywayAndHibernateValidation() {
         assertThat(reservationRepository).isNotNull();
         long count = reservationRepository.count();
         System.out.println(">>> [POSTGRES 16 TEST] ms-reservation connecté avec succès ! Nombre de réservations : " + count);
         assertThat(count).isGreaterThanOrEqualTo(2);
+        assertThat(avisRepository.count()).isGreaterThanOrEqualTo(1);
     }
 }

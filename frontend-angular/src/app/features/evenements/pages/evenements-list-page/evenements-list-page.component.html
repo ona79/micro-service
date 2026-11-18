@@ -1,117 +1,145 @@
 <div class="page-section">
   <div class="container">
     <header class="editorial-header">
-      <p class="editorial-header__eyebrow">Agenda culturel</p>
-      <h1 class="editorial-header__title">Événements &amp; Rencontres</h1>
+      <p class="editorial-header__eyebrow">Agenda culturel · Fuseau officiel Africa/Dakar</p>
+      <h1 class="editorial-header__title">Agenda Culturel &amp; Événements</h1>
       <p class="editorial-header__subtitle">
-        Expositions, ateliers culturels, conférences, visites guidées et festivals
-        organisés au cœur des sites patrimoniaux du Sénégal.
+        Conférences, ateliers vivants, visites guidées thématiques, cérémonies et festivals
+        programmés autour des sites patrimoniaux de Casamance.
       </p>
     </header>
 
-    <section class="agenda-controls" aria-label="Filtres de l'agenda">
-      <div
-        ngToolbar
-        orientation="horizontal"
-        class="type-chips"
-        aria-label="Filtrer par type d'événement"
-      >
-        @for (chip of typeChips; track chip.value) {
+    <section class="agenda-controls" aria-label="Filtres de l’agenda culturel">
+      <div class="type-chips" role="group" aria-label="Filtrer par type d’événement">
+        @for (t of eventTypes; track t.value) {
           <button
             type="button"
-            ngToolbarWidget
             class="type-chip"
-            [class.type-chip--active]="typeFilter() === chip.value"
-            [attr.aria-pressed]="typeFilter() === chip.value"
-            (click)="typeFilter.set(chip.value)"
+            [class.type-chip--active]="selectedType() === t.value"
+            [attr.aria-pressed]="selectedType() === t.value"
+            (click)="selectType(t.value)"
           >
-            {{ chip.label }}
+            {{ t.label }}
           </button>
         }
       </div>
 
       <div class="agenda-controls__inputs">
-        <div class="agenda-field agenda-field--search">
-          <label for="evt-search" class="agenda-field__label">
-            Recherche (nom, lieu, description)
-          </label>
+        <div class="agenda-field agenda-field--wide">
+          <label for="ev-search" class="agenda-field__label">Rechercher</label>
           <div class="search-wrap">
             <svg lucideSearch [size]="16" class="search-wrap__icon" aria-hidden="true"></svg>
             <input
-              id="evt-search"
+              id="ev-search"
               type="search"
               class="agenda-input agenda-input--icon"
-              placeholder="Ex: Exposition, Gorée, Casamance..."
+              placeholder="Nom, lieu, description ou site associé..."
               [ngModel]="search()"
-              (ngModelChange)="search.set($event)"
+              (ngModelChange)="onSearchChange($event)"
             />
           </div>
         </div>
 
         <div class="agenda-field">
-          <label for="evt-date" class="agenda-field__label">À partir du</label>
+          <label for="ev-zone" class="agenda-field__label">Zone</label>
+          <select
+            id="ev-zone"
+            class="agenda-input"
+            [ngModel]="selectedZone()"
+            (ngModelChange)="selectedZone.set($event); onFilterImmediate()"
+          >
+            <option value="">Toute la Casamance</option>
+            <option value="BASSE_CASAMANCE">Basse-Casamance</option>
+            <option value="MOYENNE_CASAMANCE">Moyenne-Casamance</option>
+            <option value="HAUTE_CASAMANCE">Haute-Casamance</option>
+          </select>
+        </div>
+
+        <div class="agenda-field">
+          <label for="ev-date" class="agenda-field__label">À partir du</label>
           <input
-            id="evt-date"
+            id="ev-date"
             type="date"
             class="agenda-input"
-            [ngModel]="dateMin()"
-            (ngModelChange)="dateMin.set($event)"
+            [ngModel]="fromDate()"
+            (ngModelChange)="fromDate.set($event); onFilterImmediate()"
           />
+        </div>
+
+        <div class="agenda-field">
+          <label for="ev-sort" class="agenda-field__label">Trier par</label>
+          <select
+            id="ev-sort"
+            class="agenda-input"
+            [ngModel]="sortBy()"
+            (ngModelChange)="sortBy.set($event); onFilterImmediate()"
+          >
+            <option value="dateDebut">Date (prochains d’abord)</option>
+            <option value="prix">Tarif croissant</option>
+            <option value="nomEvenement">Nom (A → Z)</option>
+          </select>
         </div>
       </div>
 
       <div class="agenda-controls__footer">
         <p class="agenda-controls__count tabular-nums">
-          <strong>{{ filteredEvenements().length }}</strong>
-          événement{{ filteredEvenements().length > 1 ? 's' : '' }}
-          @if (store.items().length !== filteredEvenements().length) {
-            <span> sur {{ store.items().length }}</span>
-          }
+          <strong>{{ totalElements() }}</strong>
+          événement{{ totalElements() > 1 ? 's' : '' }} publié{{ totalElements() > 1 ? 's' : '' }}
         </p>
-        @if (search() || typeFilter() || dateMin()) {
-          <button type="button" class="btn-reset" (click)="resetFilters()">
-            Réinitialiser les filtres
+
+        <div style="display:flex;gap:0.65rem;flex-wrap:wrap;align-items:center;">
+          <button
+            type="button"
+            class="type-chip"
+            [class.type-chip--active]="aVenirOnly()"
+            [attr.aria-pressed]="aVenirOnly()"
+            (click)="toggleAVenir()"
+          >
+            À venir uniquement
           </button>
-        }
+
+          @if (hasActiveFilters()) {
+            <button type="button" class="btn-reset" (click)="resetFilters()">
+              Réinitialiser les filtres
+            </button>
+          }
+        </div>
       </div>
     </section>
 
-    @if (store.loading() && store.items().length === 0) {
-      <app-ui-skeleton-grid [count]="2" variant="rows" label="Chargement des événements..." />
-    } @else if (store.error() && store.items().length === 0) {
+    @if (loading() && publishedEvents().length === 0) {
+      <app-ui-loading-state label="Chargement de l’agenda culturel de Casamance..." />
+    } @else if (error() && publishedEvents().length === 0) {
       <app-ui-error-banner
         title="Erreur lors du chargement des événements"
-        [message]="store.error()"
+        [message]="error()"
         [showRetry]="true"
-        (retry)="store.reload()"
+        (retry)="reload()"
       />
-    } @else if (filteredEvenements().length === 0) {
+    } @else if (publishedEvents().length === 0) {
       <app-ui-empty-state
-        title="Aucun événement programmé"
-        description="Aucun événement ne correspond à vos filtres ou aucun rendez-vous n'est encore inscrit à l'agenda."
-        actionLabel="Réinitialiser les filtres"
+        title="Aucun événement trouvé"
+        description="Aucun événement culturel publié ne correspond à vos critères actuels."
+        actionLabel="Voir tous les événements"
         [hasAction]="true"
         (action)="resetFilters()"
       />
     } @else {
       <div class="agenda-list">
-        @for (ev of filteredEvenements(); track ev.id) {
+        @for (ev of publishedEvents(); track ev.id) {
           @let patLie = resolvePatrimoine(ev);
-          @let sobre = isMemorial(ev);
+          @let sobre = isMemorialEvent(ev);
           <article class="agenda-row" [class.agenda-row--memorial]="sobre">
-            <div class="agenda-date-stamp" aria-hidden="true">
-              <span class="agenda-date-stamp__day tabular-nums">
-                {{ ev.dateDebut | dateFr: 'dd' }}
-              </span>
-              <span class="agenda-date-stamp__month">
-                {{ ev.dateDebut | dateFr: 'MMM yyyy' }}
-              </span>
+            <div class="agenda-date-stamp">
+              <span class="agenda-date-stamp__day tabular-nums">{{ ev.dateDebut | dateFr: 'dd' }}</span>
+              <span class="agenda-date-stamp__month">{{ ev.dateDebut | dateFr: 'MMM yyyy' }}</span>
             </div>
 
             <a [routerLink]="['/evenements', ev.id]" class="agenda-row__media">
               <app-ui-patrimoine-image
                 [codePatrimoine]="patLie?.codePatrimoine"
                 [nomPatrimoine]="patLie?.nomPatrimoine ?? ev.nomEvenement"
+                [imageUrl]="ev.imageUrl || patLie?.imageUrl"
                 [sobriete]="sobre"
               />
             </a>
@@ -128,6 +156,21 @@
                   </span>
                   @if (patLie) {
                     <span class="ui-badge">{{ patLie.nomPatrimoine }}</span>
+                  }
+                  @if (ev.statutEvenement === 'ANNULE') {
+                    <span class="ui-badge ui-badge--danger">ANNULÉ</span>
+                  } @else if (ev.statutEvenement === 'TERMINE') {
+                    <span class="ui-badge">TERMINÉ</span>
+                  } @else if (!isReservable(ev)) {
+                    <span class="ui-badge ui-badge--neutral">Accès sans réservation en ligne</span>
+                  }
+                  @if (getResume(ev.id); as res) {
+                    @if (res.totalAvis > 0) {
+                      <span class="ui-badge ui-badge--ochre tabular-nums">
+                        <svg lucideStar [size]="12" aria-hidden="true"></svg>
+                        {{ res.noteMoyenne }}/5 ({{ res.totalAvis }})
+                      </span>
+                    }
                   }
                 </div>
                 <span class="agenda-row__price tabular-nums">{{ ev.prix | fcfaPrice }}</span>
@@ -148,11 +191,11 @@
                 <div class="agenda-row__meta">
                   <span>
                     <svg lucideCalendar [size]="14" aria-hidden="true"></svg>
-                    {{ ev.dateDebut | dateFr }}
+                    {{ ev.dateDebut | dateFr }} (Africa/Dakar)
                   </span>
                   <span>
                     <svg lucideMapPin [size]="14" aria-hidden="true"></svg>
-                    {{ ev.lieu || patLie?.adressePatrimoine || 'Sénégal' }}
+                    {{ ev.lieu || patLie?.adressePatrimoine || 'Casamance' }}
                   </span>
                   <span class="tabular-nums">
                     <svg lucideUsers [size]="14" aria-hidden="true"></svg>
@@ -168,20 +211,31 @@
                     <span>Détails</span>
                     <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
                   </a>
-                  <a
-                    routerLink="/reserver"
-                    [queryParams]="{ type: 'EVENEMENT', evenementId: ev.id }"
-                    class="agenda-btn agenda-btn--primary"
-                  >
-                    <svg lucideTicket [size]="14" aria-hidden="true"></svg>
-                    <span>Réserver</span>
-                  </a>
+                  @if (isReservable(ev)) {
+                    <a
+                      routerLink="/reserver"
+                      [queryParams]="{ type: 'EVENEMENT', evenementId: ev.id }"
+                      class="agenda-btn agenda-btn--primary"
+                    >
+                      <svg lucideTicket [size]="14" aria-hidden="true"></svg>
+                      <span>Réserver</span>
+                    </a>
+                  }
                 </div>
               </div>
             </div>
           </article>
         }
       </div>
+
+      @if (totalPages() > 1) {
+        <app-ui-pagination
+          [page]="currentPage() - 1"
+          [totalPages]="totalPages()"
+          [totalElements]="totalElements()"
+          (pageChange)="goToPage($event + 1)"
+        />
+      }
     }
   </div>
 </div>

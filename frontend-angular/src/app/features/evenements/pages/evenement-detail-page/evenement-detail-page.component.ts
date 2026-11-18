@@ -8,7 +8,6 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { Title } from '@angular/platform-browser';
 import { RouterLink } from '@angular/router';
 import {
   LucideArrowRight,
@@ -17,21 +16,23 @@ import {
   LucideMapPin,
   LucideTicket,
 } from '@lucide/angular';
-import { APP_SITE_CONFIG } from '../../../../core/config/site.config';
 import { extractErrorMessage } from '../../../../core/models/api-error.model';
 import { Evenement } from '../../../../core/models/evenement.model';
 import { Patrimoine } from '../../../../core/models/patrimoine.model';
+import { SeoService } from '../../../../core/services/seo.service';
 import {
   BreadcrumbItem,
   UiBreadcrumbComponent,
 } from '../../../../shared/components/ui-breadcrumb/ui-breadcrumb.component';
+import { UiCardComponent } from '../../../../shared/components/ui-card/ui-card.component';
+import { UiLoadingStateComponent } from '../../../../shared/components/ui-loading-state/ui-loading-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
 import {
   HeritageMapPoint,
   UiHeritageMapComponent,
 } from '../../../../shared/components/ui-heritage-map/ui-heritage-map.component';
 import { UiPatrimoineImageComponent } from '../../../../shared/components/ui-patrimoine-image/ui-patrimoine-image.component';
-import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skeleton-grid/ui-skeleton-grid.component';
+import { UiAvisSectionComponent } from '../../../../shared/components/ui-avis-section/ui-avis-section.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { EvenementTypePipe } from '../../../../shared/pipes/evenement-type.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
@@ -41,6 +42,9 @@ import {
   isLieuDeMemoire,
 } from '../../../../shared/utils/patrimoine.utils';
 import { PatrimoineStore } from '../../../patrimoines/data-access/patrimoine.store';
+import { DisponibilitePrestation } from '../../../../core/models/reservation.model';
+import { ReservationApiService } from '../../../reservations/data-access/reservation-api.service';
+import { firstValueFrom } from 'rxjs';
 import { EvenementStore } from '../../data-access/evenement.store';
 
 @Component({
@@ -55,10 +59,12 @@ import { EvenementStore } from '../../data-access/evenement.store';
     LucideMapPin,
     LucideTicket,
     UiBreadcrumbComponent,
+    UiCardComponent,
+    UiLoadingStateComponent,
     UiPatrimoineImageComponent,
     UiHeritageMapComponent,
-    UiSkeletonGridComponent,
     UiErrorBannerComponent,
+    UiAvisSectionComponent,
     DateFrPipe,
     EvenementTypePipe,
     FcfaPricePipe,
@@ -71,17 +77,21 @@ export class EvenementDetailPageComponent {
 
   protected readonly store = inject(EvenementStore);
   protected readonly patrimoineStore = inject(PatrimoineStore);
-  private readonly titleService = inject(Title);
-  private readonly config = inject(APP_SITE_CONFIG);
+  private readonly reservationApi = inject(ReservationApiService);
+  private readonly seo = inject(SeoService);
 
   protected readonly evenement = signal<Evenement | null>(null);
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
+  protected readonly disponibilite = signal<DisponibilitePrestation | null>(null);
+  protected readonly checkingDispo = signal(false);
 
   protected readonly patLie = computed<Patrimoine | null>(() => {
     const ev = this.evenement();
     if (!ev) return null;
-    return ev.patrimoine ?? this.patrimoineStore.byIdMap().get(ev.patrimoineId) ?? null;
+    if (ev.patrimoine) return ev.patrimoine;
+    if (ev.patrimoineId == null) return null;
+    return this.patrimoineStore.byIdMap().get(ev.patrimoineId) ?? null;
   });
 
   protected readonly isMemorial = computed(() => isLieuDeMemoire(this.patLie()));
@@ -146,13 +156,30 @@ export class EvenementDetailPageComponent {
   }
 
   protected resolvePat(ev: Evenement): Patrimoine | null {
-    return ev.patrimoine ?? this.patrimoineStore.byIdMap().get(ev.patrimoineId) ?? null;
+    if (ev.patrimoine) return ev.patrimoine;
+    if (ev.patrimoineId == null) return null;
+    return this.patrimoineStore.byIdMap().get(ev.patrimoineId) ?? null;
+  }
+
+  protected async checkDisponibilite(ev: Evenement): Promise<void> {
+    this.checkingDispo.set(true);
+    try {
+      const dispo = await firstValueFrom(
+        this.reservationApi.getDisponibilite('EVENEMENT', ev.id)
+      );
+      this.disponibilite.set(dispo);
+    } catch {
+      this.disponibilite.set(null);
+    } finally {
+      this.checkingDispo.set(false);
+    }
   }
 
   private async loadDetail(evtId: string): Promise<void> {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.error.set(null);
+    this.disponibilite.set(null);
 
     void this.store.ensureLoaded();
     void this.patrimoineStore.ensureLoaded();
@@ -161,7 +188,13 @@ export class EvenementDetailPageComponent {
       const detail = await this.store.loadById(evtId);
       if (seq !== this.loadSeq) return;
       this.evenement.set(detail);
-      this.titleService.setTitle(`${detail.nomEvenement} — ${this.config.siteName}`);
+      this.seo.update({
+        title: detail.nomEvenement,
+        description:
+          detail.descriptionEvenement ??
+          `Événement culturel ${detail.nomEvenement} en Casamance (${detail.lieu || 'Casamance'}).`,
+        canonicalPath: `/evenements/${detail.id}`,
+      });
     } catch (err) {
       if (seq !== this.loadSeq) return;
       this.evenement.set(null);

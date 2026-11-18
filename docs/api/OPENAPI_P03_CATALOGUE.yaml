@@ -1,0 +1,401 @@
+openapi: 3.1.0
+info:
+  title: API Cœur Métier Touristique de Casamance (P03) — UASZ
+  version: 3.0.0
+  description: >
+    Spécification OpenAPI des trois microservices du cœur métier touristique de la
+    Plateforme de Gestion et de Valorisation du Patrimoine Touristique de la Casamance
+    (Université Assane Seck de Ziguinchor) :
+    - ms-patrimoine (:3001)
+    - ms-circuit (:3002)
+    - ms-evenement (:3003)
+    Toutes les routes publiques et privées sont exposées via l'API Gateway (:8090) avec
+    enveloppe signée X-Internal-Gateway-Token et protection CSRF/RBAC.
+servers:
+  - url: http://localhost:8090
+    description: API Gateway Zero-Trust (Point d'entrée recommandé)
+  - url: http://localhost:3001
+    description: ms-patrimoine (interne signé)
+  - url: http://localhost:3002
+    description: ms-circuit (interne signé)
+  - url: http://localhost:3003
+    description: ms-evenement (interne signé)
+
+paths:
+  /api/patrimoines:
+    get:
+      tags: [Patrimoine]
+      summary: Liste des fiches patrimoniales publiées (ou brouillons pour les conservateurs/administrateurs)
+      responses:
+        '200':
+          description: Liste des patrimoines
+    post:
+      tags: [Patrimoine]
+      summary: Créer une fiche patrimoine (Permission PATRIMOINE:CREER — CONSERVATEUR, ADMINISTRATEUR)
+      responses:
+        '201':
+          description: Fiche patrimoine créée
+        '400':
+          description: Données ou coordonnées GPS invalides
+        '401':
+          description: Non authentifié
+        '403':
+          description: Rôle non autorisé
+
+  /api/patrimoines/recherche:
+    get:
+      tags: [Patrimoine]
+      summary: Recherche multicritère, filtrage, tri et pagination des fiches patrimoniales
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: categorie
+          in: query
+          schema:
+            type: string
+            enum: [NATUREL, CULTUREL, HISTORIQUE, ARCHITECTURAL, IMMATERIEL]
+        - name: zone
+          in: query
+          schema:
+            type: string
+            enum: [BASSE_CASAMANCE, MOYENNE_CASAMANCE, HAUTE_CASAMANCE]
+        - name: localite
+          in: query
+          schema: { type: string }
+        - name: statut
+          in: query
+          schema:
+            type: string
+            enum: [BROUILLON, SOUMIS, PUBLIE, ARCHIVE]
+        - name: capaciteMin
+          in: query
+          schema: { type: integer }
+        - name: tarifMax
+          in: query
+          schema: { type: number }
+        - name: inclureNonPublies
+          in: query
+          schema: { type: boolean, default: false }
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 12 }
+        - name: sortBy
+          in: query
+          schema: { type: string, default: nom }
+        - name: sortDir
+          in: query
+          schema: { type: string, enum: [asc, desc], default: asc }
+      responses:
+        '200':
+          description: Page de résultats (PageResponseDto<PatrimoineDto>)
+        '403':
+          description: Tentative non autorisée de filtrer sur des statuts non publiés
+
+  /api/patrimoines/{id}:
+    get:
+      tags: [Patrimoine]
+      summary: Consulter une fiche patrimoine par identifiant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Détail de la fiche patrimoine
+        '403':
+          description: Fiche non publiée ou archivée inaccessible au public
+        '404':
+          description: Patrimoine introuvable
+    put:
+      tags: [Patrimoine]
+      summary: Modifier une fiche patrimoine (Permission PATRIMOINE:MODIFIER)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Fiche mise à jour
+    delete:
+      tags: [Patrimoine]
+      summary: Supprimer une fiche patrimoine (Permission PATRIMOINE:SUPPRIMER)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '204':
+          description: Fiche supprimée
+
+  /api/patrimoines/{id}/soumettre:
+    put:
+      tags: [Patrimoine]
+      summary: Soumettre une fiche patrimoine en brouillon pour validation (BROUILLON -> SOUMIS)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Fiche soumise
+
+  /api/patrimoines/{id}/publier:
+    put:
+      tags: [Patrimoine]
+      summary: Valider et publier une fiche patrimoine après contrôle des champs obligatoires et GPS (-> PUBLIE)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Fiche publiée
+        '400':
+          description: Informations obligatoires ou coordonnées GPS manquantes
+
+  /api/patrimoines/{id}/archiver:
+    put:
+      tags: [Patrimoine]
+      summary: Archiver une fiche patrimoine avec traçabilité (-> ARCHIVE, masquée des résultats publics)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Fiche archivée
+
+  /api/circuits:
+    get:
+      tags: [Circuit]
+      summary: Liste des circuits touristiques publiés
+      responses:
+        '200':
+          description: Liste des circuits
+    post:
+      tags: [Circuit]
+      summary: Créer un circuit touristique avec vérification interservice des étapes (CIRCUIT:CREER)
+      responses:
+        '201':
+          description: Circuit créé avec durée estimée et distance orthodromique indicative
+        '400':
+          description: Étape invalide, patrimoine inexistant ou archivé
+        '503':
+          description: Service ms-patrimoine indisponible
+
+  /api/circuits/recherche:
+    get:
+      tags: [Circuit]
+      summary: Recherche multicritère, filtrage et pagination des circuits touristiques
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: difficulte
+          in: query
+          schema: { type: string, enum: [FACILE, MOYEN, DIFFICILE] }
+        - name: moyenTransport
+          in: query
+          schema: { type: string, enum: [PIED, PIROGUE, VELO, VEHICULE_4X4, MINIBUS, MIXTE] }
+        - name: zone
+          in: query
+          schema: { type: string }
+        - name: statut
+          in: query
+          schema: { type: string, enum: [BROUILLON, SOUMIS, PUBLIE, ARCHIVE] }
+        - name: dureeMax
+          in: query
+          schema: { type: integer }
+        - name: distanceMax
+          in: query
+          schema: { type: number }
+        - name: prixMax
+          in: query
+          schema: { type: number }
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 12 }
+      responses:
+        '200':
+          description: Page de circuits (PageResponseDto<CircuitDto>)
+
+  /api/circuits/{id}:
+    get:
+      tags: [Circuit]
+      summary: Détail d'un circuit avec étapes ordonnées et patrimoines enrichis via OpenFeign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Détail du circuit
+    put:
+      tags: [Circuit]
+      summary: Modifier un circuit et ses étapes (CIRCUIT:MODIFIER avec contrôle périmétrique BOLA pour les guides)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Circuit mis à jour
+    delete:
+      tags: [Circuit]
+      summary: Supprimer un circuit (CIRCUIT:SUPPRIMER)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '204':
+          description: Circuit supprimé
+
+  /api/circuits/{id}/soumettre:
+    put:
+      tags: [Circuit]
+      summary: Soumettre un circuit pour publication (-> SOUMIS)
+      responses:
+        '200':
+          description: Circuit soumis
+
+  /api/circuits/{id}/publier:
+    put:
+      tags: [Circuit]
+      summary: Publier un circuit (-> PUBLIE)
+      responses:
+        '200':
+          description: Circuit publié
+
+  /api/circuits/{id}/archiver:
+    put:
+      tags: [Circuit]
+      summary: Archiver un circuit (-> ARCHIVE)
+      responses:
+        '200':
+          description: Circuit archivé
+
+  /api/evenements:
+    get:
+      tags: [Événement]
+      summary: Liste des événements culturels et touristiques publiés
+      responses:
+        '200':
+          description: Liste des événements
+    post:
+      tags: [Événement]
+      summary: Créer un événement culturel (EVENEMENT:CREER — GESTIONNAIRE_SITE, ADMINISTRATEUR)
+      responses:
+        '201':
+          description: Événement créé
+
+  /api/evenements/a-venir:
+    get:
+      tags: [Événement]
+      summary: Liste des événements à venir confirmés (statut PUBLIE uniquement, excluant ANNULE, TERMINE, ARCHIVE)
+      responses:
+        '200':
+          description: Liste des événements à venir triés par date de début
+
+  /api/evenements/recherche:
+    get:
+      tags: [Événement]
+      summary: Recherche multicritère, filtrage et pagination des événements
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [EXPOSITION, ATELIER, VISITE_GUIDEE, CONFERENCE, FESTIVAL, CEREMONIE_TRADITIONNELLE, FOIRE_ARTISANALE]
+        - name: zone
+          in: query
+          schema: { type: string }
+        - name: patrimoineId
+          in: query
+          schema: { type: integer }
+        - name: statut
+          in: query
+          schema: { type: string, enum: [BROUILLON, SOUMIS, PUBLIE, TERMINE, ANNULE, ARCHIVE] }
+        - name: aVenirUniquement
+          in: query
+          schema: { type: boolean, default: false }
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 12 }
+      responses:
+        '200':
+          description: Page d'événements (PageResponseDto<EvenementDto>)
+
+  /api/evenements/{id}:
+    get:
+      tags: [Événement]
+      summary: Consulter le détail d'un événement
+      responses:
+        '200':
+          description: Détail de l'événement
+    put:
+      tags: [Événement]
+      summary: Modifier un événement (EVENEMENT:MODIFIER)
+      responses:
+        '200':
+          description: Événement modifié
+    delete:
+      tags: [Événement]
+      summary: Supprimer un événement (EVENEMENT:SUPPRIMER)
+      responses:
+        '204':
+          description: Événement supprimé
+
+  /api/evenements/{id}/publier:
+    put:
+      tags: [Événement]
+      summary: Publier un événement (-> PUBLIE)
+      responses:
+        '200':
+          description: Événement publié
+
+  /api/evenements/{id}/annuler:
+    put:
+      tags: [Événement]
+      summary: Annuler un événement avec motif (-> ANNULE, exclu des événements à venir confirmés)
+      responses:
+        '200':
+          description: Événement annulé
+
+  /api/evenements/{id}/terminer:
+    put:
+      tags: [Événement]
+      summary: Clôturer un événement passé (-> TERMINE)
+      responses:
+        '200':
+          description: Événement terminé
+
+  /api/evenements/{id}/archiver:
+    put:
+      tags: [Événement]
+      summary: Archiver un événement (-> ARCHIVE)
+      responses:
+        '200':
+          description: Événement archivé

@@ -21,9 +21,12 @@
     "@angular/platform-browser": "^22.2.0",
     "@angular/router": "^22.2.0",
     "@lucide/angular": "^1.74.0",
+    "@types/qrcode": "^1.5.6",
     "date-fns": "^4.4.0",
+    "html5-qrcode": "^2.3.8",
     "leaflet": "^1.9.4",
     "ngx-sonner": "^3.1.0",
+    "qrcode": "^1.5.4",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },

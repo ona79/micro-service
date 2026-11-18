@@ -7,7 +7,7 @@
 - **Front-End (`frontend-angular/`)** : Angular 22 (Standalone Components, Signals, Router, Nginx SPA fallback + reverse proxy `/api`).
 - **Back-End (9 services)** : Java 21, Spring Boot `4.1.0`, Spring Cloud `2025.1.4`, Spring Data JPA, PostgreSQL 16 (Database-per-Service), Flyway 10, MapStruct `1.6.3`, Lombok, OpenFeign, RestTemplate, WebClient, Netflix Eureka, Spring Cloud Gateway.
 - **Base de données** : PostgreSQL 16 (7 bases indépendantes : `patrimoine_db`, `circuit_db`, `evenement_db`, `reservation_db`, `utilisateur_db`, `paiement_db`, `notification_db`).
-- **Déploiement** : Docker Compose avec isolation réseau (seuls Nginx `:80` et API Gateway `:8090` sont exposés).
+- **Déploiement** : Docker Compose avec isolation réseau (`edge-net`, `app-net`, `data-net`, seul `frontend-angular` Nginx `:80` est exposé sur l'hôte en configuration Compose standard).
 
 ---
 
@@ -36,10 +36,10 @@ docker compose up -d --build
 ```
 
 Services démarrés :
-- `postgres` (port interne `5432` - 7 bases initialisées)
-- `discovery-server` (Eureka sur `http://localhost:8761`)
-- `ms-patrimoine`, `ms-circuit`, `ms-evenement`, `ms-reservation`, `ms-utilisateur`, `ms-notification`, `ms-paiement` (réseau privé `internal-net`)
-- `api-gateway` (port `8090` sur `http://localhost:8090`)
+- `postgres` (port interne `5432` - 7 bases initialisées sur `data-net`)
+- `discovery-server` (Eureka interne sur `app-net:8761`)
+- `ms-patrimoine`, `ms-circuit`, `ms-evenement`, `ms-reservation`, `ms-utilisateur`, `ms-notification`, `ms-paiement` (réseaux internes `app-net` / `data-net`)
+- `api-gateway` (interne `app-net:8090`, desservi par `/api` via Nginx)
 - `frontend-angular` (port `80` sur `http://localhost`)
 
 ---
@@ -60,12 +60,12 @@ Services démarrés :
 | **`api-gateway`** | `8090` | `8090` | — | Point d'entrée unique HTTP routant `/api/**` vers les microservices |
 | **`discovery-server`** | `8761` | `8761` | — | Annuaire de services Netflix Eureka |
 | **`ms-patrimoine`** | `3001` | *Réseau privé* | `patrimoine_db` | Inventaire des sites patrimoniaux, coordonnées GPS, capacité |
-| **`ms-circuit`** | `3002` | *Réseau privé* | `circuit_db` | Circuits touristiques, étapes, calcul durée/distance (OpenFeign -> `ms-patrimoine`) |
+| **`ms-circuit`** | `3002` | *Réseau privé* | `circuit_db` | Circuits touristiques, étapes, affectation guide validé (`ms-patrimoine`, `ms-utilisateur`) |
 | **`ms-evenement`** | `3003` | *Réseau privé* | `evenement_db` | Manifestations culturelles, festivals, ateliers (OpenFeign -> `ms-patrimoine`) |
-| **`ms-reservation`** | `3004` | *Réseau privé* | `reservation_db` | Gestion des réservations (OpenFeign -> `ms-circuit`, `ms-evenement`) |
-| **`ms-utilisateur`** | `3005` | *Réseau privé* | `utilisateur_db` | Comptes utilisateurs, profils et gestion des rôles |
-| **`ms-paiement`** | `3006` | *Réseau privé* | `paiement_db` | Simulation des transactions financières (OpenFeign -> `ms-reservation`, `ms-notification`) |
-| **`ms-notification`** | `3007` | *Réseau privé* | `notification_db` | Envoi d'alertes email et confirmations de réservations |
+| **`ms-reservation`** | `3004` | *Réseau privé* | `reservation_db` | Réservations P04, avis vérifiés & modération P05 (`ms-circuit`, `ms-evenement`, `ms-utilisateur`, `ms-patrimoine`) |
+| **`ms-utilisateur`** | `3005` | *Réseau privé* | `utilisateur_db` | Comptes utilisateurs, RBAC 48 permissions et gestion des profils guides P05 |
+| **`ms-paiement`** | `3006` | *Réseau privé* | `paiement_db` | Simulation des transactions financières (`ms-reservation`, `ms-notification`) |
+| **`ms-notification`** | `3007` | *Réseau privé* | `notification_db` | Notifications métier P05, inbox utilisateur BOLA, idempotence et reprise automatique |
 
 ---
 
@@ -92,9 +92,25 @@ Chaque microservice dispose de profils Spring Boot indépendants de Config Serve
 ## 🧪 EXÉCUTION DES TESTS AUTOMATISÉS
 
 ```bash
-# Tests unitaires et intégration de l'ensemble des modules backend Java (62 tests)
+# 1. Tests unitaires, sécurité et Testcontainers PG16 des 9 services backend Java
 ./verify-integration.sh
 
-# Tests unitaires et composants du frontend Angular (31 tests)
-cd frontend-angular && npm test -- --watch=false
+# 2. Tests d'intégration sur le conteneur PostgreSQL 16 multi-bases (Flyway V1..V4/V6 + Hibernate validate sur les 7 bases)
+eval "$(docker inspect postgres --format '{{range .Config.Env}}{{println "export " .}}{{end}}' | grep '_PASSWORD=')" && ./verify-postgres.sh
+
+# 3. Build de production et tests Vitest du frontend Angular 22
+npm --prefix frontend-angular run build
+npm --prefix frontend-angular exec ng test -- --no-watch
 ```
+
+Documentation technique détaillée :
+- **Back-Office Professionnel, RBAC/BOLA & Rapports P07** : [docs/P07_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md](docs/P07_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md)
+- **Expérience Touristique Publique & Design System Casamance P06** : [frontend-angular/docs/P06_GUIDE_ET_RAPPORT.md](frontend-angular/docs/P06_GUIDE_ET_RAPPORT.md)
+- **Guides, Avis Vérifiés, Modération & Notifications P05** : [docs/P05_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md](docs/P05_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md)
+- **Spécification OpenAPI P05** : [docs/api/OPENAPI_P05_GUIDES_AVIS_NOTIFICATIONS.yaml](docs/api/OPENAPI_P05_GUIDES_AVIS_NOTIFICATIONS.yaml)
+- **Diagrammes PlantUML P05** : [Architecture globale](docs/architecture/p05-architecture-globale.puml) · [États Guide/Avis/Notif](docs/architecture/p05-workflow-guide-etats.puml) · [Séquence Avis & Modération](docs/architecture/p05-sequence-avis-modere-notification.puml)
+- **Réservation & Paiement Simulé P04** : [docs/P04_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md](docs/P04_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md)
+- **Spécification OpenAPI P04** : [docs/api/OPENAPI_P04_RESERVATION_PAIEMENT.yaml](docs/api/OPENAPI_P04_RESERVATION_PAIEMENT.yaml)
+- **Cœur métier touristique P03** : [docs/P03_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md](docs/P03_ARCHITECTURE_ET_RAPPORT_TECHNIQUE.md)
+- **Spécification OpenAPI P03** : [docs/api/OPENAPI_P03_CATALOGUE.yaml](docs/api/OPENAPI_P03_CATALOGUE.yaml)
+- **Sécurité Zero-Trust & RBAC P02** : [docs/security/P02_RAPPORT_FINAL.md](docs/security/P02_RAPPORT_FINAL.md)

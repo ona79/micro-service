@@ -9,6 +9,7 @@ import {
   inject,
   input,
   output,
+  signal,
   viewChild,
 } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
@@ -30,23 +31,67 @@ export interface HeritageMapPoint {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="map-shell" [style.height.px]="height()">
+    <div
+      class="map-shell"
+      [class.map-shell--fullscreen]="isFullscreen()"
+      [style.height.px]="isFullscreen() ? null : height()"
+    >
       <div
         #mapCanvas
         class="map-canvas"
         role="region"
         [attr.aria-label]="ariaLabel()"
       ></div>
+      @if (allowFullscreen()) {
+        <button
+          type="button"
+          class="map-fullscreen-btn"
+          [attr.aria-label]="isFullscreen() ? 'Quitter le mode plein écran' : 'Agrandir la carte en plein écran'"
+          (click)="toggleFullscreen()"
+        >
+          {{ isFullscreen() ? '✕ Réduire' : '⛶ Plein écran' }}
+        </button>
+      }
     </div>
   `,
   styles: `
     .map-shell {
+      position: relative;
       width: 100%;
       border-radius: var(--radius-lg);
       overflow: hidden;
       border: 1px solid var(--border-strong);
       background-color: var(--surface-sand);
       box-shadow: var(--shadow-sm);
+    }
+
+    .map-shell--fullscreen {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh !important;
+      border-radius: 0;
+      border: none;
+      z-index: 9999;
+    }
+
+    .map-fullscreen-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      z-index: 1000;
+      background: var(--surface-elevated, #ffffff);
+      color: var(--ink-primary, #1e293b);
+      border: 1px solid var(--border-strong, #cbd5e1);
+      border-radius: var(--radius-pill, 9999px);
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.1));
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
     }
 
     .map-canvas {
@@ -59,8 +104,11 @@ export class UiHeritageMapComponent implements AfterViewInit, OnDestroy {
   readonly points = input<readonly HeritageMapPoint[]>([]);
   readonly drawRoute = input<boolean>(false);
   readonly height = input<number>(360);
+  readonly allowFullscreen = input<boolean>(true);
   readonly ariaLabel = input<string>('Carte interactive des sites patrimoniaux');
   readonly pointSelected = output<HeritageMapPoint>();
+
+  protected readonly isFullscreen = signal<boolean>(false);
 
   private readonly mapCanvas = viewChild<ElementRef<HTMLDivElement>>('mapCanvas');
   private readonly platformId = inject(PLATFORM_ID);
@@ -76,6 +124,13 @@ export class UiHeritageMapComponent implements AfterViewInit, OnDestroy {
         this.renderPoints(pts, route);
       }
     });
+  }
+
+  protected toggleFullscreen(): void {
+    this.isFullscreen.update((v) => !v);
+    setTimeout(() => {
+      this.map?.invalidateSize();
+    }, 100);
   }
 
   ngAfterViewInit(): void {

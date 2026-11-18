@@ -2,7 +2,9 @@ package com.uasz.ms_circuit.controllers;
 
 import com.uasz.ms_circuit.dto.CircuitDto;
 import com.uasz.ms_circuit.dto.EtapeDto;
+import com.uasz.ms_circuit.dto.PageResponseDto;
 import com.uasz.ms_circuit.entities.Difficulte;
+import com.uasz.ms_circuit.entities.StatutCircuit;
 import com.uasz.ms_circuit.exceptions.BadRequestException;
 import com.uasz.ms_circuit.exceptions.ResourceNotFoundException;
 import com.uasz.ms_circuit.services.ICircuitService;
@@ -10,20 +12,26 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(CircuitController.class)
+@TestPropertySource(properties = "security.filter.enabled=false")
 class CircuitControllerTest {
 
     private static final String URL = "/api/circuits";
@@ -65,6 +73,49 @@ class CircuitControllerTest {
     }
 
     @Test
+    void rechercher_retournePage200() throws Exception {
+        PageResponseDto<CircuitDto> page = PageResponseDto.<CircuitDto>builder()
+                .content(List.of(sampleDto()))
+                .page(0)
+                .size(12)
+                .totalElements(1)
+                .totalPages(1)
+                .last(true)
+                .build();
+        when(circuitService.rechercherCircuits(
+                any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean(), anyInt(), anyInt(), any(), any()))
+                .thenReturn(page);
+
+        mockMvc.perform(get(URL + "/recherche")
+                        .param("q", "Ziguinchor")
+                        .param("difficulte", "FACILE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].nomCircuit").value("Circuit Historique de Ziguinchor"));
+    }
+
+    @Test
+    void publierEtArchiver_retournent200() throws Exception {
+        CircuitDto publie = sampleDto();
+        publie.setStatutCircuit(StatutCircuit.PUBLIE);
+        when(circuitService.publierCircuit(1L)).thenReturn(publie);
+
+        mockMvc.perform(put(URL + "/1/publier"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statutCircuit").value("PUBLIE"));
+
+        CircuitDto archive = sampleDto();
+        archive.setStatutCircuit(StatutCircuit.ARCHIVE);
+        when(circuitService.archiverCircuit(eq(1L), any())).thenReturn(archive);
+
+        mockMvc.perform(put(URL + "/1/archiver")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"motif\":\"Archivage\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statutCircuit").value("ARCHIVE"));
+    }
+
+    @Test
     void post_sansEtapes_retourne400() throws Exception {
         mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nomCircuit\": \"Vide\", \"etapes\": []}"))
@@ -98,4 +149,3 @@ class CircuitControllerTest {
                 .andExpect(status().isNoContent());
     }
 }
-

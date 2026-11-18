@@ -1,7 +1,7 @@
 <div class="page-section">
   <div class="container">
     @if (loading()) {
-      <app-ui-skeleton-grid [count]="2" label="Chargement des détails de l'événement..." />
+      <app-ui-loading-state label="Chargement des détails de l'événement en cours..." />
     } @else if (error() || !evenement()) {
       <app-ui-breadcrumb [items]="breadcrumbs()" />
       <app-ui-error-banner
@@ -26,11 +26,24 @@
           @if (patLie(); as pat) {
             <span class="ui-badge">{{ pat.nomPatrimoine }}</span>
           }
+          @if (ev.statutEvenement === 'ANNULE') {
+            <span class="ui-badge ui-badge--danger">ÉVÉNEMENT ANNULÉ</span>
+          } @else if (ev.statutEvenement === 'TERMINE') {
+            <span class="ui-badge">ÉVÉNEMENT TERMINÉ</span>
+          }
+          @if (ev.donneeDemonstration !== false) {
+            <span class="ui-badge ui-badge--ochre">Donnée de démonstration</span>
+          }
         </div>
         <h1 class="event-header__title">{{ ev.nomEvenement }}</h1>
         <p class="event-header__schedule">
           <svg lucideCalendar [size]="16" aria-hidden="true"></svg>
-          <span>Du {{ ev.dateDebut | dateFr }} au {{ ev.dateFin | dateFr }}</span>
+          <span>
+            Du {{ ev.dateDebut | dateFr }} au {{ ev.dateFin | dateFr }}
+            @if (ev.horaires) {
+              · {{ ev.horaires }}
+            }
+          </span>
         </p>
       </header>
 
@@ -47,15 +60,22 @@
             <figcaption class="event-media__caption">
               @if (patLie(); as pat) {
                 Site d’accueil : {{ pat.nomPatrimoine }} ({{
-                  ev.lieu || pat.adressePatrimoine || 'Sénégal'
+                  ev.lieu || pat.adressePatrimoine || 'Casamance'
                 }})
               } @else {
-                {{ ev.nomEvenement }}
+                {{ ev.nomEvenement }} — {{ ev.lieu || 'Casamance' }}
               }
             </figcaption>
           </figure>
 
           <div class="event-body">
+            @if (ev.statutEvenement === 'ANNULE') {
+              <div class="memorial-notice" role="alert">
+                <strong>Événement annulé :</strong>
+                {{ ev.motifAnnulation || 'Cet événement a été annulé par les organisateurs.' }}
+              </div>
+            }
+
             @if (isMemorial()) {
               <div class="memorial-notice">
                 <strong>Rencontre sur un lieu de mémoire :</strong> Cet événement se tient
@@ -71,14 +91,24 @@
               }}
             </p>
 
-            <h2>Site patrimonial d'accueil</h2>
+            @if (ev.conditionsAcces) {
+              <h2>Conditions d'accès &amp; informations pratiques</h2>
+              <p>{{ ev.conditionsAcces }}</p>
+            }
+
+            @if (ev.supportCommunication) {
+              <h2>Supports de communication</h2>
+              <p>{{ ev.supportCommunication }}</p>
+            }
+
             @if (patLie(); as pat) {
+              <h2>Site patrimonial d'accueil</h2>
               <div class="host-card">
                 <div>
                   <p class="host-card__title">{{ pat.nomPatrimoine }}</p>
                   <p class="host-card__addr">
                     <svg lucideMapPin [size]="14" aria-hidden="true"></svg>
-                    <span>{{ pat.adressePatrimoine || 'Sénégal' }}</span>
+                    <span>{{ pat.adressePatrimoine || 'Casamance' }}</span>
                   </p>
                 </div>
                 <a [routerLink]="['/patrimoines', pat.id]" class="host-card__link">
@@ -86,12 +116,15 @@
                   <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
                 </a>
               </div>
-            } @else {
+            } @else if (ev.patrimoineId) {
+              <h2>Site patrimonial d'accueil</h2>
               <p>
-                Site patrimonial associé : identifiant #{{ ev.patrimoineId }}.
+                Site patrimonial associé : identifiant {{ ev.patrimoineId }}.
                 <a [routerLink]="['/patrimoines', ev.patrimoineId]">Consulter la fiche</a>
               </p>
             }
+
+            <app-ui-avis-section cibleType="EVENEMENT" [cibleId]="ev.id" />
           </div>
         </article>
 
@@ -115,15 +148,54 @@
               <dt>Date de fin</dt>
               <dd>{{ ev.dateFin | dateFr }}</dd>
             </div>
+            @if (ev.horaires) {
+              <div>
+                <dt>Horaires</dt>
+                <dd>{{ ev.horaires }} ({{ ev.fuseauHoraire || 'Africa/Dakar' }})</dd>
+              </div>
+            }
             <div>
               <dt>Lieu</dt>
               <dd>{{ ev.lieu || patLie()?.adressePatrimoine || 'Non renseigné' }}</dd>
             </div>
+            @if (ev.organisateur) {
+              <div>
+                <dt>Organisateur</dt>
+                <dd>{{ ev.organisateur }}</dd>
+              </div>
+            }
+            @if (ev.contactOrganisateur) {
+              <div>
+                <dt>Contact</dt>
+                <dd>{{ ev.contactOrganisateur }}</dd>
+              </div>
+            }
             <div>
               <dt>Capacité maximale</dt>
               <dd class="tabular-nums">{{ ev.capaciteMax }} places</dd>
             </div>
           </dl>
+
+          @if (disponibilite(); as dispo) {
+            <div class="memorial-notice" style="margin-top: 0.75rem;">
+              @if (dispo.reservable) {
+                <strong>Disponibilité en direct :</strong>
+                {{ dispo.placesDisponibles }} place(s) disponible(s) sur {{ dispo.capaciteTotale }}
+              } @else {
+                <strong>Non réservable :</strong> {{ dispo.motifIndisponibilite || 'Complet ou fermé' }}
+              }
+            </div>
+          } @else if (ev.ouvertReservation !== false && (ev.statutEvenement ?? 'PUBLIE') === 'PUBLIE') {
+            <button
+              type="button"
+              class="ui-btn ui-btn--ghost"
+              style="width: 100%; margin-bottom: 0.75rem;"
+              [disabled]="checkingDispo()"
+              (click)="checkDisponibilite(ev)"
+            >
+              {{ checkingDispo() ? 'Vérification...' : 'Vérifier les places en direct' }}
+            </button>
+          }
 
           @if (hasCoords()) {
             <div class="event-map">
@@ -146,14 +218,24 @@
             </div>
           }
 
-          <a
-            routerLink="/reserver"
-            [queryParams]="{ type: 'EVENEMENT', evenementId: ev.id }"
-            class="event-cta"
-          >
-            <svg lucideTicket [size]="16" aria-hidden="true"></svg>
-            <span>Réserver cet événement</span>
-          </a>
+          @if (
+            (ev.statutEvenement ?? 'PUBLIE') === 'PUBLIE' &&
+            ev.ouvertReservation === true
+          ) {
+            <a
+              routerLink="/reserver"
+              [queryParams]="{ type: 'EVENEMENT', evenementId: ev.id }"
+              class="event-cta"
+            >
+              <svg lucideTicket [size]="16" aria-hidden="true"></svg>
+              <span>Réserver cet événement</span>
+            </a>
+          } @else {
+            <div class="memorial-notice" style="margin-top: 0.75rem;">
+              <strong>Consultation uniquement :</strong> cet événement n’est pas ouvert à la
+              réservation en ligne ({{ ev.ouvertReservation === false ? 'accès libre / commémoration' : ev.statutEvenement }}).
+            </div>
+          }
         </aside>
       </div>
 
@@ -163,7 +245,7 @@
           <div class="related-grid">
             @for (autre of autresEvenements(); track autre.id) {
               @let patAutre = resolvePat(autre);
-              <article class="related-card">
+              <app-ui-card [interactive]="true" class="related-card">
                 <a [routerLink]="['/evenements', autre.id]" class="related-card__media">
                   <app-ui-patrimoine-image
                     [codePatrimoine]="patAutre?.codePatrimoine"
@@ -188,7 +270,7 @@
                     <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
                   </a>
                 </div>
-              </article>
+              </app-ui-card>
             }
           </div>
         </section>

@@ -29,6 +29,16 @@ public class GlobalExceptionHandler {
         return erreur(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<Map<String, String>> handleUnauthorized(UnauthorizedException ex) {
+        return erreur(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<Map<String, String>> handleForbidden(ForbiddenException ex) {
+        return erreur(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
     @ExceptionHandler(ServiceIndisponibleException.class)
     public ResponseEntity<Map<String, String>> handleServiceIndisponible(ServiceIndisponibleException ex) {
         return erreur(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
@@ -66,8 +76,7 @@ public class GlobalExceptionHandler {
         return erreur(HttpStatus.INTERNAL_SERVER_ERROR, "Erreur interne du serveur");
     }
 
-    private ResponseEntity<Map<String, String>> erreur(HttpStatusCode status, String message) {
+    private ResponseEntity<Map<String, String>> erreur(HttpStatus status, String message) {
         return ResponseEntity.status(status).body(Map.of("erreur", message));
     }
 }
-

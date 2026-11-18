@@ -36,10 +36,13 @@ describe('Shared formatting pipes', () => {
     expect(pipe.transform('FESTIVAL')).toBe('Festival');
   });
 
-  it('DateFrPipe formats valid ISO dates and falls back gracefully', () => {
+  it('DateFrPipe formats valid ISO dates in Africa/Dakar and falls back gracefully', () => {
     const pipe = new DateFrPipe();
     expect(pipe.transform(null)).toBe('Date non renseignée');
     expect(pipe.transform('not-a-date')).toBe('not-a-date');
-    expect(pipe.transform('2026-12-15T09:30:00')).toContain('2026');
+    expect(pipe.transform('2026-12-15T09:30:00')).toContain('09:30');
+    expect(pipe.transform('2026-12-15T09:30:00', 'dd')).toBe('15');
+    expect(pipe.transform('2026-12-15T09:30:00', 'MMM yyyy')).toContain('2026');
+    expect(pipe.transform('2026-12-15', 'date')).toContain('15 décembre 2026');
   });
 });

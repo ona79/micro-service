@@ -102,4 +102,22 @@ class UtilisateurServiceTest {
         )).isInstanceOf(UnauthorizedException.class)
                 .hasMessage("Identifiants invalides");
     }
+
+    @Test
+    void getUtilisateursStats_agregeCompteursParRoleEtActivation() {
+        when(utilisateurRepository.count()).thenReturn(6L);
+        when(utilisateurRepository.countByActifTrue()).thenReturn(5L);
+        when(utilisateurRepository.countByRole(RoleUtilisateur.TOURISTE)).thenReturn(2L);
+        when(utilisateurRepository.countByRole(RoleUtilisateur.ADMINISTRATEUR)).thenReturn(1L);
+        when(utilisateurRepository.countByRole(RoleUtilisateur.GESTIONNAIRE_SITE)).thenReturn(1L);
+        when(utilisateurRepository.countByRole(RoleUtilisateur.CONSERVATEUR)).thenReturn(1L);
+        when(utilisateurRepository.countByRole(RoleUtilisateur.GUIDE)).thenReturn(1L);
+
+        var stats = utilisateurService.getUtilisateursStats();
+
+        assertThat(stats.getTotal()).isEqualTo(6L);
+        assertThat(stats.getActifs()).isEqualTo(5L);
+        assertThat(stats.getInactifs()).isEqualTo(1L);
+        assertThat(stats.getParRole()).containsEntry("ADMINISTRATEUR", 1L).containsEntry("TOURISTE", 2L);
+    }
 }

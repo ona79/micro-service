@@ -1,73 +1,123 @@
 <div class="page-section">
   <div class="container">
     <header class="editorial-header">
-      <p class="editorial-header__eyebrow">Archive culturelle</p>
+      <p class="editorial-header__eyebrow">Catalogue patrimonial · Casamance</p>
       <h1 class="editorial-header__title">Sites &amp; Monuments Patrimoniaux</h1>
       <p class="editorial-header__subtitle">
-        Explorez les trésors historiques, spirituels et mémoriels du Sénégal, de l'île
-        de Gorée aux rives de la Casamance.
+        Parcourez les sites culturels, historiques, naturels et mémoriels publiés de Basse, Moyenne
+        et Haute-Casamance.
       </p>
     </header>
 
-    <section class="controls-bar" aria-label="Filtres et mode d'affichage">
-      <div class="controls-bar__fields">
-        <div class="control-field control-field--search">
-          <label for="pat-search" class="control-field__label">
-            Recherche (nom, ville, code)
-          </label>
+    <section class="controls-bar" aria-label="Filtres de recherche des patrimoines">
+      <form class="controls-bar__fields" (ngSubmit)="onSearchSubmit()">
+        <div class="control-field">
+          <label for="pat-search" class="control-field__label">Rechercher</label>
           <div class="search-input-wrap">
             <svg lucideSearch [size]="16" class="search-input-wrap__icon" aria-hidden="true"></svg>
             <input
               id="pat-search"
+              name="search"
               type="search"
-              class="control-input control-input--with-icon"
-              placeholder="Ex: Gorée, Ziguinchor, PAT-DKR..."
-              [ngModel]="urlQuery()"
+              [ngModel]="searchTerm()"
               (ngModelChange)="onSearchChange($event)"
+              placeholder="Nom, localité, code ou description (Carabane, Sédhiou…)"
+              class="control-input control-input--with-icon"
             />
           </div>
         </div>
 
         <div class="control-field">
-          <label for="pat-cap" class="control-field__label">Capacité min. (pers.)</label>
-          <input
-            id="pat-cap"
-            type="number"
-            min="0"
-            step="50"
+          <label for="pat-zone" class="control-field__label">Zone</label>
+          <select
+            id="pat-zone"
+            name="zone"
+            [ngModel]="selectedZone()"
+            (ngModelChange)="onZoneChange($event)"
             class="control-input"
-            placeholder="Ex: 100"
-            [ngModel]="capaciteMin()"
-            (ngModelChange)="capaciteMin.set($event)"
-          />
+          >
+            @for (z of zones; track z.value) {
+              <option [value]="z.value">{{ z.label }}</option>
+            }
+          </select>
         </div>
 
         <div class="control-field">
-          <label for="pat-tri" class="control-field__label">Trier par</label>
+          <label for="pat-cat" class="control-field__label">Catégorie</label>
           <select
-            id="pat-tri"
+            id="pat-cat"
+            name="categorie"
+            [ngModel]="selectedCategorie()"
+            (ngModelChange)="onCategorieChange($event)"
             class="control-input"
-            [ngModel]="tri()"
-            (ngModelChange)="tri.set($event)"
           >
-            <option value="nom_asc">Nom (A → Z)</option>
-            <option value="capacite_desc">Capacité (plus grande d’abord)</option>
-            <option value="capacite_asc">Capacité (plus petite d’abord)</option>
+            @for (cat of categories; track cat.value) {
+              <option [value]="cat.value">{{ cat.label }}</option>
+            }
           </select>
         </div>
-      </div>
+
+        <div class="control-field">
+          <label for="pat-sort" class="control-field__label">Trier par</label>
+          <select
+            id="pat-sort"
+            name="sort"
+            [ngModel]="sortBy()"
+            (ngModelChange)="onSortChange($event)"
+            class="control-input"
+          >
+            <option value="nom_asc">Nom (A → Z)</option>
+            <option value="capacite_desc">Capacité d'accueil</option>
+            <option value="tarif_asc">Tarif croissant</option>
+            <option value="date_desc">Ajoutés récemment</option>
+          </select>
+        </div>
+      </form>
 
       <div class="controls-bar__footer">
         <p class="controls-bar__count tabular-nums">
-          <strong>{{ filteredPatrimoines().length }}</strong>
-          résultat{{ filteredPatrimoines().length > 1 ? 's' : '' }}
-          @if (store.items().length !== filteredPatrimoines().length) {
-            <span> sur {{ store.items().length }}</span>
-          }
+          <strong>{{ totalElements() }}</strong>
+          {{ totalElements() > 1 ? 'sites publiés trouvés' : 'site publié trouvé' }}
         </p>
 
         <div class="controls-bar__actions">
-          @if (urlQuery() || capaciteMin() || tri() !== 'nom_asc') {
+          @if (!gpsLocation()) {
+            <button
+              type="button"
+              class="btn-gps"
+              (click)="activerGeolocalisation()"
+              [disabled]="gpsLoading()"
+              title="Trier par proximité depuis votre position"
+            >
+              <svg lucideMapPin [size]="15" aria-hidden="true"></svg>
+              <span>{{ gpsLoading() ? 'Localisation…' : 'Autour de moi (GPS)' }}</span>
+            </button>
+          } @else {
+            <button
+              type="button"
+              class="btn-gps btn-gps--active"
+              (click)="desactiverGeolocalisation()"
+              title="Désactiver le filtre de proximité"
+            >
+              <svg lucideMapPin [size]="15" aria-hidden="true"></svg>
+              <span>Proximité active (✕)</span>
+            </button>
+            <div class="gps-rayon-wrap">
+              <label for="gps-rayon-select" class="sr-only">Rayon de recherche GPS</label>
+              <select
+                id="gps-rayon-select"
+                class="control-input control-input--sm"
+                [ngModel]="selectedRayonKm()"
+                (ngModelChange)="onRayonChange($event)"
+              >
+                @for (r of rayonsKm; track r.value) {
+                  <option [value]="r.value">{{ r.label }}</option>
+                }
+              </select>
+            </div>
+          }
+
+          @if (hasActiveFilters() || gpsLocation()) {
             <button type="button" class="btn-reset" (click)="resetFilters()">
               Réinitialiser les filtres
             </button>
@@ -75,9 +125,9 @@
 
           <div
             ngToolbar
-            orientation="horizontal"
             class="view-switcher"
-            aria-label="Mode d'affichage"
+            role="toolbar"
+            aria-label="Mode d'affichage des sites"
           >
             <button
               type="button"
@@ -104,18 +154,22 @@
           </div>
         </div>
       </div>
+
+      @if (gpsError()) {
+        <p class="gps-error-banner" role="alert">{{ gpsError() }}</p>
+      }
     </section>
 
-    @if (store.loading() && store.items().length === 0) {
-      <app-ui-skeleton-grid [count]="3" label="Chargement des sites patrimoniaux..." />
-    } @else if (store.error() && store.items().length === 0) {
+    @if (loading() && publishedItems().length === 0) {
+      <app-ui-loading-state label="Chargement des sites patrimoniaux de Casamance..." />
+    } @else if (error() && publishedItems().length === 0) {
       <app-ui-error-banner
         title="Erreur lors du chargement des patrimoines"
-        [message]="store.error()"
+        [message]="error()"
         [showRetry]="true"
-        (retry)="store.reload()"
+        (retry)="reload()"
       />
-    } @else if (filteredPatrimoines().length === 0) {
+    } @else if (publishedItems().length === 0) {
       <app-ui-empty-state
         title="Aucun site patrimonial trouvé"
         description="Essayez d'élargir vos critères de recherche ou réinitialisez les filtres."
@@ -128,7 +182,7 @@
         <app-ui-heritage-map
           [points]="mapPoints()"
           [height]="440"
-          ariaLabel="Carte géographique des sites patrimoniaux filtrés"
+          ariaLabel="Carte géographique des sites patrimoniaux de Casamance"
           (pointSelected)="onMapPointSelected($event)"
         />
 
@@ -141,12 +195,19 @@
               <app-ui-patrimoine-image
                 [codePatrimoine]="pat.codePatrimoine"
                 [nomPatrimoine]="pat.nomPatrimoine"
+                [imageUrl]="pat.imageUrl"
                 [sobriete]="isMemorial(pat)"
               />
             </div>
             <div class="map-preview-card__body">
               <div class="heritage-card__badges">
                 <span class="ui-badge">{{ pat.codePatrimoine }}</span>
+                @if (pat.distanceKm != null) {
+                  <span class="ui-badge ui-badge--success" title="Distance approximative">📍 ~{{ pat.distanceKm }} km</span>
+                }
+                <span class="ui-badge ui-badge--ochre">
+                  {{ formatCategorie(pat.categoriePatrimoine) }}
+                </span>
                 @if (isMemorial(pat)) {
                   <span class="ui-badge ui-badge--memorial">Lieu de mémoire</span>
                 }
@@ -156,7 +217,7 @@
               <ul class="map-preview-card__meta">
                 <li>
                   <svg lucideMapPin [size]="14" aria-hidden="true"></svg>
-                  <span>{{ pat.adressePatrimoine || 'Non renseignée' }}</span>
+                  <span>{{ pat.adressePatrimoine || pat.localite || 'Casamance' }}</span>
                 </li>
                 <li class="tabular-nums">
                   <svg lucideUsers [size]="14" aria-hidden="true"></svg>
@@ -173,53 +234,83 @@
       </div>
     } @else {
       <div class="patrimoines-grid">
-        @for (pat of filteredPatrimoines(); track pat.id) {
-          <article
+        @for (pat of publishedItems(); track pat.id) {
+          <app-ui-card
+            [interactive]="true"
             class="pat-card"
             [class.pat-card--memorial]="isMemorial(pat)"
           >
-            <a
-              [routerLink]="['/patrimoines', pat.id]"
-              class="pat-card__media"
-              [attr.aria-label]="pat.nomPatrimoine"
-            >
-              <app-ui-patrimoine-image
-                [codePatrimoine]="pat.codePatrimoine"
-                [nomPatrimoine]="pat.nomPatrimoine"
-                [sobriete]="isMemorial(pat)"
-              />
-            </a>
-            <div class="pat-card__body">
-              <div class="pat-card__badges">
-                <span class="ui-badge">{{ pat.codePatrimoine }}</span>
-                @if (isMemorial(pat)) {
-                  <span class="ui-badge ui-badge--memorial">Lieu de mémoire</span>
-                }
-              </div>
-              <h2 class="pat-card__title">
-                <a [routerLink]="['/patrimoines', pat.id]">{{ pat.nomPatrimoine }}</a>
-              </h2>
-              <p class="pat-card__desc">{{ pat.descriptionPatrimoine }}</p>
-              <dl class="pat-card__meta">
-                <div>
-                  <dt>Adresse</dt>
-                  <dd>{{ pat.adressePatrimoine || 'Non renseignée' }}</dd>
-                </div>
-                <div>
-                  <dt>Capacité</dt>
-                  <dd class="tabular-nums">{{ pat.capacitePatrimoine }} visiteurs</dd>
-                </div>
-              </dl>
-              <div class="pat-card__footer">
-                <a [routerLink]="['/patrimoines', pat.id]" class="pat-card__cta">
-                  <span>Voir le détail</span>
-                  <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
-                </a>
-              </div>
+            <div slot="media">
+              <a
+                [routerLink]="['/patrimoines', pat.id]"
+                class="pat-card__media"
+                [attr.aria-label]="pat.nomPatrimoine"
+              >
+                <app-ui-patrimoine-image
+                  [codePatrimoine]="pat.codePatrimoine"
+                  [nomPatrimoine]="pat.nomPatrimoine"
+                  [imageUrl]="pat.imageUrl"
+                  [sobriete]="isMemorial(pat)"
+                />
+              </a>
             </div>
-          </article>
+            <div slot="header" class="pat-card__badges">
+              <span class="ui-badge">{{ pat.codePatrimoine }}</span>
+              @if (pat.distanceKm != null) {
+                <span class="ui-badge ui-badge--success" title="Distance approximative">📍 ~{{ pat.distanceKm }} km</span>
+              }
+              @if (pat.categoriePatrimoine) {
+                <span class="ui-badge ui-badge--ochre">
+                  {{ formatCategorie(pat.categoriePatrimoine) }}
+                </span>
+              }
+              @if (pat.zoneGeographique) {
+                <span class="ui-badge ui-badge--neutral">
+                  {{ formatZone(pat.zoneGeographique) }}
+                </span>
+              }
+              @if (isMemorial(pat)) {
+                <span class="ui-badge ui-badge--memorial">Lieu de mémoire</span>
+              }
+              @if (getResume(pat.id); as res) {
+                @if (res.totalAvis > 0) {
+                  <span class="ui-badge ui-badge--success tabular-nums">
+                    <svg lucideStar [size]="12" aria-hidden="true"></svg>
+                    {{ res.noteMoyenne }}/5 ({{ res.totalAvis }})
+                  </span>
+                }
+              }
+            </div>
+            <h2 class="pat-card__title">
+              <a [routerLink]="['/patrimoines', pat.id]">{{ pat.nomPatrimoine }}</a>
+            </h2>
+            <p class="pat-card__desc">{{ pat.descriptionPatrimoine }}</p>
+            <dl class="pat-card__meta">
+              <div>
+                <dt>Localisation</dt>
+                <dd>{{ pat.localite || pat.adressePatrimoine || 'Casamance' }}</dd>
+              </div>
+              <div>
+                <dt>Capacité</dt>
+                <dd class="tabular-nums">{{ pat.capacitePatrimoine }} visiteurs</dd>
+              </div>
+            </dl>
+            <div slot="footer" class="pat-card__footer">
+              <a [routerLink]="['/patrimoines', pat.id]" class="pat-card__cta">
+                <span>Voir le détail</span>
+                <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
+              </a>
+            </div>
+          </app-ui-card>
         }
       </div>
+
+      <app-ui-pagination
+        [page]="currentPage() - 1"
+        [totalPages]="totalPages()"
+        [totalElements]="totalElements()"
+        (pageChange)="goToPage($event + 1)"
+      />
     }
   </div>
 </div>

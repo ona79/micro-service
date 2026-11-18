@@ -1,8 +1,11 @@
 package com.uasz.ms_reservation.entities;
 
 public enum StatutReservation {
-    EN_ATTENTE,
+    BROUILLON,
+    EN_ATTENTE_PAIEMENT,
     CONFIRMEE,
-    ANNULEE
+    EXPIREE,
+    ANNULEE,
+    ECHEC,
+    REMBOURSEE
 }
-

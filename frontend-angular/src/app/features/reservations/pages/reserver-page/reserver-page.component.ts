@@ -5,6 +5,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import {
+  LucideArrowRight,
+  LucideCalendar,
   LucideCheck,
   LucideRefreshCw,
   LucideSearch,
@@ -12,11 +14,21 @@ import {
 } from '@lucide/angular';
 import { toast } from 'ngx-sonner';
 import { firstValueFrom, map } from 'rxjs';
-import { Reservation, StatutReservation, TypeReservation } from '../../../../core/models/reservation.model';
+import { AuthStore } from '../../../../core/auth/auth.store';
+import { extractErrorMessage } from '../../../../core/models/api-error.model';
+import { SeoService } from '../../../../core/services/seo.service';
+import {
+  Reservation,
+  ReservationParticipant,
+  StatutReservation,
+  TypeReservation,
+  formatReservationStatusLabel,
+  reservationStatusBadgeClass,
+} from '../../../../core/models/reservation.model';
 import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confirm-dialog/ui-confirm-dialog.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
-import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skeleton-grid/ui-skeleton-grid.component';
+import { UiLoadingStateComponent } from '../../../../shared/components/ui-loading-state/ui-loading-state.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
 import { CircuitStore } from '../../../circuits/data-access/circuit.store';
@@ -35,11 +47,13 @@ type StatusFilter = 'ALL' | StatutReservation;
     RouterLink,
     Toolbar,
     ToolbarWidget,
+    LucideArrowRight,
+    LucideCalendar,
     LucideCheck,
     LucideRefreshCw,
     LucideSearch,
     LucideTicket,
-    UiSkeletonGridComponent,
+    UiLoadingStateComponent,
     UiErrorBannerComponent,
     UiEmptyStateComponent,
     DateFrPipe,
@@ -49,22 +63,35 @@ type StatusFilter = 'ALL' | StatutReservation;
   styleUrl: './reserver-page.component.css',
 })
 export class ReserverPageComponent implements OnInit {
+  protected readonly authStore = inject(AuthStore);
   protected readonly reservationStore = inject(ReservationStore);
   protected readonly circuitStore = inject(CircuitStore);
   protected readonly evenementStore = inject(EvenementStore);
   private readonly fb = inject(FormBuilder).nonNullable;
   private readonly route = inject(ActivatedRoute);
   private readonly dialog = inject(Dialog);
+  private readonly seo = inject(SeoService);
 
   protected readonly submittedAttempt = signal(false);
   protected readonly lastCreated = signal<Reservation | null>(null);
   protected readonly statusFilter = signal<StatusFilter>('ALL');
   protected readonly ledgerSearch = signal('');
+  protected readonly expandedHistoryId = signal<number | null>(null);
+  protected readonly extraParticipants = signal<ReservationParticipant[]>([]);
+  protected readonly pageSize = 6;
+  protected readonly currentPage = signal(0);
+
+  protected readonly formatReservationStatusLabel = formatReservationStatusLabel;
+  protected readonly reservationStatusBadgeClass = reservationStatusBadgeClass;
+
+  protected readonly defaultDate = this.computeTomorrowIsoDate();
 
   protected readonly form = this.fb.group({
     typeReservation: this.fb.control<TypeReservation>('CIRCUIT', [Validators.required]),
     circuitId: this.fb.control<string>(''),
     evenementId: this.fb.control<string>(''),
+    datePrestation: this.fb.control<string>(this.defaultDate),
+    creneauPrestation: this.fb.control<string>('Matin (09h00)'),
     nomClient: this.fb.control<string>('', [Validators.required, Validators.minLength(2)]),
     emailClient: this.fb.control<string>('', [Validators.required, Validators.email]),
     telephoneClient: this.fb.control<string>(''),
@@ -73,12 +100,19 @@ export class ReserverPageComponent implements OnInit {
       Validators.min(1),
       Validators.pattern(/^\d+$/),
     ]),
+    commentaire: this.fb.control<string>(''),
+    soumettrePourPaiement: this.fb.control<boolean>(true),
   });
 
   private readonly queryParamsSignal = toSignal(
     this.route.queryParamMap.pipe(
       map((params) => ({
-        type: params.get('type') === 'EVENEMENT' ? ('EVENEMENT' as const) : params.get('type') === 'CIRCUIT' ? ('CIRCUIT' as const) : null,
+        type:
+          params.get('type') === 'EVENEMENT'
+            ? ('EVENEMENT' as const)
+            : params.get('type') === 'CIRCUIT'
+              ? ('CIRCUIT' as const)
+              : null,
         circuitId: params.get('circuitId') ?? '',
         evenementId: params.get('evenementId') ?? '',
       }))
@@ -106,6 +140,18 @@ export class ReserverPageComponent implements OnInit {
     return this.evenementStore.items().find((ev) => ev.id === id) ?? null;
   });
 
+  protected readonly reservableCircuits = computed(() =>
+    this.circuitStore
+      .items()
+      .filter((c) => (c.statutCircuit ?? 'PUBLIE') === 'PUBLIE')
+  );
+
+  protected readonly reservableEvenements = computed(() =>
+    this.evenementStore
+      .items()
+      .filter((ev) => (ev.statutEvenement ?? 'PUBLIE') === 'PUBLIE')
+  );
+
   protected readonly estimatedTotal = computed<number | null>(() => {
     const places = Number(this.formValueSignal().nombrePlaces ?? 0);
     if (!Number.isFinite(places) || places < 1) return null;
@@ -126,15 +172,43 @@ export class ReserverPageComponent implements OnInit {
       if (q) {
         const circuitName = this.resolveCircuitName(res);
         const eventName = this.resolveEvenementName(res);
-        const haystack = `${res.nomClient} ${res.emailClient} ${res.id} ${circuitName} ${eventName}`.toLowerCase();
+        const haystack = `${res.referenceReservation ?? ''} ${res.nomClient} ${res.emailClient} ${res.id} ${circuitName} ${eventName}`.toLowerCase();
         if (!haystack.includes(q)) return false;
       }
       return true;
     });
   });
 
+  protected readonly totalPages = computed(() =>
+    Math.max(1, Math.ceil(this.filteredReservations().length / this.pageSize))
+  );
+
+  protected readonly pagedReservations = computed(() => {
+    const safePage = Math.min(this.currentPage(), this.totalPages() - 1);
+    const start = safePage * this.pageSize;
+    return this.filteredReservations().slice(start, start + this.pageSize);
+  });
+
   constructor() {
-    // Synchronise dynamiquement le formulaire lorsque les queryParams changent
+    effect(() => {
+      const user = this.authStore.user();
+      if (user) {
+        if (!this.form.controls.nomClient.value && !this.form.controls.nomClient.dirty) {
+          this.form.controls.nomClient.setValue(`${user.prenom} ${user.nom}`.trim());
+        }
+        if (!this.form.controls.emailClient.value && !this.form.controls.emailClient.dirty) {
+          this.form.controls.emailClient.setValue(user.email);
+        }
+        if (
+          !this.form.controls.telephoneClient.value &&
+          !this.form.controls.telephoneClient.dirty &&
+          user.telephone
+        ) {
+          this.form.controls.telephoneClient.setValue(user.telephone);
+        }
+      }
+    });
+
     effect(() => {
       const qp = this.queryParamsSignal();
       if (qp.type) {
@@ -148,23 +222,29 @@ export class ReserverPageComponent implements OnInit {
       }
     });
 
-    // Pré-sélectionne le 1er élément disponible si aucun n'est encore sélectionné
     effect(() => {
-      const circuits = this.circuitStore.items();
+      const circuits = this.reservableCircuits();
       if (circuits.length > 0 && !this.form.controls.circuitId.value) {
         this.form.controls.circuitId.setValue(String(circuits[0].id));
       }
     });
 
     effect(() => {
-      const evts = this.evenementStore.items();
+      const evts = this.reservableEvenements();
       if (evts.length > 0 && !this.form.controls.evenementId.value) {
-        this.form.controls.evenementId.setValue(String(evts[0].id));
+        const firstOpen = evts.find((e) => e.ouvertReservation === true) ?? evts[0];
+        this.form.controls.evenementId.setValue(String(firstOpen.id));
       }
     });
   }
 
   ngOnInit(): void {
+    this.seo.update({
+      title: 'Réserver une Visite',
+      description:
+        'Comptoir de réservation de circuits et événements culturels de Casamance avec contrôle de capacité serveur.',
+      canonicalPath: '/reserver',
+    });
     void this.refreshAll();
   }
 
@@ -179,6 +259,43 @@ export class ReserverPageComponent implements OnInit {
     this.reservationStore.clearSubmitError();
   }
 
+  protected setStatusFilter(filter: StatusFilter): void {
+    this.statusFilter.set(filter);
+    this.currentPage.set(0);
+  }
+
+  protected async verifierDisponibilite(): Promise<void> {
+    const raw = this.form.getRawValue();
+    const id =
+      raw.typeReservation === 'CIRCUIT' ? Number(raw.circuitId) : Number(raw.evenementId);
+    if (!Number.isFinite(id) || id <= 0) return;
+
+    await this.reservationStore.loadDisponibilite(
+      raw.typeReservation,
+      id,
+      raw.typeReservation === 'CIRCUIT' ? raw.datePrestation || undefined : undefined
+    );
+  }
+
+  protected addParticipant(): void {
+    const max = Math.max(1, Number(this.form.controls.nombrePlaces.value || 1));
+    if (this.extraParticipants().length >= max) return;
+    this.extraParticipants.update((list) => [
+      ...list,
+      { nomComplet: '', email: '', categorie: 'ADULTE' },
+    ]);
+  }
+
+  protected removeParticipant(idx: number): void {
+    this.extraParticipants.update((list) => list.filter((_, i) => i !== idx));
+  }
+
+  protected updateParticipant(idx: number, field: keyof ReservationParticipant, value: string): void {
+    this.extraParticipants.update((list) =>
+      list.map((p, i) => (i === idx ? { ...p, [field]: value } : p))
+    );
+  }
+
   protected hasTargetSelection(): boolean {
     const raw = this.form.getRawValue();
     return raw.typeReservation === 'CIRCUIT'
@@ -189,6 +306,14 @@ export class ReserverPageComponent implements OnInit {
   protected isInvalid(controlName: keyof typeof this.form.controls): boolean {
     const ctrl = this.form.controls[controlName];
     return ctrl.invalid && (ctrl.touched || this.submittedAttempt());
+  }
+
+  protected canPayReservation(res: Reservation): boolean {
+    return res.statut === 'EN_ATTENTE_PAIEMENT' || res.statut === 'BROUILLON';
+  }
+
+  protected canCancelReservation(res: Reservation): boolean {
+    return ['BROUILLON', 'EN_ATTENTE_PAIEMENT', 'CONFIRMEE'].includes(res.statut);
   }
 
   protected async onSubmit(): Promise<void> {
@@ -203,6 +328,14 @@ export class ReserverPageComponent implements OnInit {
 
     const raw = this.form.getRawValue();
     const isCircuit = raw.typeReservation === 'CIRCUIT';
+    const validParticipants = this.extraParticipants()
+      .filter((p) => p.nomComplet && p.nomComplet.trim().length > 0)
+      .map((p) => ({
+        nomComplet: p.nomComplet.trim(),
+        email: p.email?.trim() || null,
+        telephone: p.telephone?.trim() || null,
+        categorie: p.categorie || 'ADULTE',
+      }));
 
     try {
       const created = await this.reservationStore.createReservation({
@@ -210,26 +343,47 @@ export class ReserverPageComponent implements OnInit {
         emailClient: raw.emailClient.trim(),
         telephoneClient: raw.telephoneClient.trim() || null,
         nombrePlaces: Number(raw.nombrePlaces),
+        datePrestation: isCircuit ? raw.datePrestation || this.defaultDate : null,
+        creneauPrestation: isCircuit ? raw.creneauPrestation || 'Matin (09h00)' : null,
+        commentaire: raw.commentaire.trim() || null,
         typeReservation: raw.typeReservation,
         circuitId: isCircuit ? Number(raw.circuitId) : null,
         evenementId: !isCircuit ? Number(raw.evenementId) : null,
+        soumettrePourPaiement: raw.soumettrePourPaiement,
+        participants: validParticipants,
       });
 
       this.lastCreated.set(created);
       this.submittedAttempt.set(false);
+      this.extraParticipants.set([]);
       this.form.patchValue({
-        nomClient: '',
-        emailClient: '',
-        telephoneClient: '',
         nombrePlaces: 1,
+        commentaire: '',
+        soumettrePourPaiement: true,
       });
-      this.form.controls.nomClient.markAsUntouched();
-      this.form.controls.emailClient.markAsUntouched();
-      this.form.controls.telephoneClient.markAsUntouched();
 
-      toast.success(`Réservation #${created.id} confirmée pour ${created.nomClient}`);
+      if (created.statut === 'CONFIRMEE') {
+        toast.success(
+          `Réservation ${created.referenceReservation || '#' + created.id} confirmée avec succès (offre gratuite).`
+        );
+      } else if (created.statut === 'EN_ATTENTE_PAIEMENT') {
+        toast.success(
+          `Réservation ${created.referenceReservation || '#' + created.id} créée : passez au paiement simulé.`
+        );
+      } else {
+        toast.success(`Réservation brouillon ${created.id} enregistrée.`);
+      }
     } catch {
       toast.error('La réservation n’a pas pu être enregistrée.');
+    }
+  }
+
+  protected async submitDraft(res: Reservation): Promise<void> {
+    try {
+      await this.reservationStore.soumettreReservation(res.id);
+      toast.success(`Réservation ${res.id} soumise pour paiement.`);
+    } catch (err) {
+      toast.error(extractErrorMessage(err));
     }
   }
 
@@ -241,7 +395,7 @@ export class ReserverPageComponent implements OnInit {
 
     const dialogRef = this.dialog.open<boolean>(UiConfirmDialogComponent, {
       data: {
-        title: `Annuler la réservation #${res.id} ?`,
+        title: `Annuler la réservation ${res.referenceReservation || '#' + res.id} ?`,
         message: `Vous êtes sur le point d'annuler la réservation de ${res.nomClient} (${res.nombrePlaces} place(s)) pour « ${targetTitle} ». Cette action libérera les places réservées.`,
         confirmLabel: 'Confirmer l’annulation',
         cancelLabel: 'Conserver',
@@ -254,10 +408,14 @@ export class ReserverPageComponent implements OnInit {
 
     try {
       await this.reservationStore.cancelReservation(res.id);
-      toast.success(`Réservation #${res.id} annulée.`);
+      toast.success(`Réservation ${res.id} annulée.`);
     } catch {
-      toast.error(`Impossible d'annuler la réservation #${res.id}.`);
+      toast.error(`Impossible d'annuler la réservation ${res.id}.`);
     }
+  }
+
+  protected toggleHistory(reservationId: number): void {
+    this.expandedHistoryId.update((curr) => (curr === reservationId ? null : reservationId));
   }
 
   protected resolveCircuitName(res: Reservation): string {
@@ -265,7 +423,7 @@ export class ReserverPageComponent implements OnInit {
     if (!res.circuitId) return 'Circuit';
     return (
       this.circuitStore.items().find((c) => c.id === res.circuitId)?.nomCircuit ??
-      `Circuit #${res.circuitId}`
+      `Circuit ${res.circuitId}`
     );
   }
 
@@ -274,7 +432,13 @@ export class ReserverPageComponent implements OnInit {
     if (!res.evenementId) return 'Événement';
     return (
       this.evenementStore.items().find((e) => e.id === res.evenementId)?.nomEvenement ??
-      `Événement #${res.evenementId}`
+      `Événement ${res.evenementId}`
     );
+  }
+
+  private computeTomorrowIsoDate(): string {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
   }
 }

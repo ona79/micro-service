@@ -14,9 +14,9 @@ export interface SiteConfig {
 }
 
 export const SITE_CONFIG: SiteConfig = {
-  siteName: 'Patrimoine du Sénégal',
-  siteSubtitle: 'Carnets & Itinéraires Culturels',
-  siteSlogan: 'Découvrir, préserver et vivre la richesse culturelle de la Teranga',
+  siteName: 'Casamance Patrimoine',
+  siteSubtitle: 'Découverte & Itinéraires Culturels',
+  siteSlogan: 'Découvrir, préserver et vivre les trésors culturels et naturels de la Casamance',
   apiBaseUrl: environment.apiBaseUrl,
   universite: {
     nom: 'Université Assane Seck de Ziguinchor — UFR Sciences et Technologies — Département Informatique',

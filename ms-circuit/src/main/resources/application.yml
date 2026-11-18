@@ -30,11 +30,21 @@ management:
 
 patrimoine:
   url: ${PATRIMOINE_URL:http://localhost:3001}
+utilisateur:
+  url: ${UTILISATEUR_URL:http://localhost:3005}
+notification:
+  url: ${NOTIFICATION_URL:http://localhost:3007}
 
 eureka:
   client:
     service-url:
       defaultZone: ${EUREKA_URI:http://localhost:8761/eureka}
+
+security:
+  session:
+    secret: ${SECURITY_SESSION_SECRET:?Variable obligatoire SECURITY_SESSION_SECRET non definie (min 32 octets)}
+  interservice:
+    secret: ${SECURITY_INTERSERVICE_SECRET:?Variable obligatoire SECURITY_INTERSERVICE_SECRET non definie (min 32 octets)}
 
 ---
 # Profil DEV : H2 en mémoire pour le développement local
@@ -103,3 +113,10 @@ management:
     web:
       exposure:
         include: 'health,info'
+
+patrimoine:
+  url: ${PATRIMOINE_URL:}
+utilisateur:
+  url: ${UTILISATEUR_URL:}
+notification:
+  url: ${NOTIFICATION_URL:}

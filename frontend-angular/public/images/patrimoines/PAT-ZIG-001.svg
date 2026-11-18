@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-label="Illustration sobre du Mémorial du Joola à Ziguinchor">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E8ECEA" />
+      <stop offset="62%" stop-color="#D9E2DD" />
+      <stop offset="100%" stop-color="#C8D5CF" />
+    </linearGradient>
+    <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#245B45" stop-opacity="0.82" />
+      <stop offset="100%" stop-color="#173D2D" stop-opacity="0.95" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="335" fill="url(#sky)" />
+  <rect y="335" width="800" height="165" fill="url(#water)" />
+  <path d="M0 322 Q180 302 360 320 T740 315 L800 320 L800 336 L0 336 Z" fill="#355F4D" opacity="0.45" />
+  <rect x="250" y="308" width="300" height="27" rx="3" fill="#46524C" />
+  <rect x="295" y="150" width="210" height="158" rx="4" fill="#F1EBDD" stroke="#36423C" stroke-width="2.5" />
+  <rect x="330" y="176" width="140" height="106" fill="none" stroke="#245B45" stroke-width="2" />
+  <path d="M350 250 L400 218 L450 250 Z" fill="#245B45" opacity="0.85" />
+  <line x1="250" y1="365" x2="550" y2="365" stroke="#F1EBDD" stroke-opacity="0.32" stroke-width="2" />
+  <line x1="305" y1="390" x2="495" y2="390" stroke="#F1EBDD" stroke-opacity="0.22" stroke-width="2" />
+  <line x1="340" y1="415" x2="460" y2="415" stroke="#F1EBDD" stroke-opacity="0.16" stroke-width="2" />
+</svg>

@@ -1,0 +1,39 @@
+@startuml p05-workflow-guide-etats
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam shadowing false
+
+title Machines à États P05 — Validation des Guides, Modération des Avis & Notifications
+
+state "Cycle de vie du Profil Guide (ms-utilisateur)" as GuideLifecycle {
+  [*] --> BROUILLON : PUT /api/guides/mon-profil (GUIDE)
+  BROUILLON --> EN_ATTENTE_VALIDATION : POST /mon-profil/soumettre
+  EN_ATTENTE_VALIDATION --> VALIDE : POST /{id}/valider\n(ADMIN / GESTIONNAIRE, non-auto-validation)
+  EN_ATTENTE_VALIDATION --> REJETE : POST /{id}/rejeter (motif obligatoire)
+  REJETE --> EN_ATTENTE_VALIDATION : PUT /mon-profil + /soumettre
+  VALIDE --> SUSPENDU : POST /{id}/suspendre (motif obligatoire)
+  SUSPENDU --> VALIDE : POST /{id}/reactiver
+  VALIDE --> DESACTIVE : POST /mon-profil/desactiver ou /{id}/desactiver
+  DESACTIVE --> VALIDE : POST /{id}/reactiver
+  SUSPENDU --> DESACTIVE : POST /mon-profil/desactiver
+}
+
+state "Cycle de vie Avis & Signalement (ms-reservation)" as AvisLifecycle {
+  [*] --> APPROUVE : POST /api/avis\n(Prestation CONFIRMEE + réalisée)
+  APPROUVE --> MASQUE : POST /moderation/avis/{id}/decision\nou signalement VALIDE_CONTENU_RETIRE
+  APPROUVE --> REJETE : POST /moderation/avis/{id}/decision
+  EN_ATTENTE --> APPROUVE : Décision modération
+  MASQUE --> APPROUVE : Réhabilitation modération
+  REJETE --> APPROUVE : Réhabilitation modération
+}
+
+state "Cycle de livraison Notification (ms-notification)" as NotifLifecycle {
+  [*] --> EN_ATTENTE : Reçu via POST /api/notifications
+  EN_ATTENTE --> ENVOYEE : Livraison simulée réussie\n(NotificationDeliveryAdapter)
+  EN_ATTENTE --> ECHEC_TEMPORAIRE : Échec simulé temporaire\n(tentatives < max_tentatives)
+  ECHEC_TEMPORAIRE --> ENVOYEE : @Scheduled retry / POST /{id}/relancer
+  ECHEC_TEMPORAIRE --> ECHEC : tentatives >= max_tentatives
+  ECHEC --> ENVOYEE : Relance manuelle admin réussie
+}
+
+@enduml

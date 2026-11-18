@@ -29,6 +29,21 @@ public class GlobalExceptionHandler {
         return erreur(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<Map<String, String>> handleConflict(ConflictException ex) {
+        return erreur(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<Map<String, String>> handleUnauthorized(UnauthorizedException ex) {
+        return erreur(HttpStatus.UNAUTHORIZED, ex.getMessage());
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<Map<String, String>> handleForbidden(ForbiddenException ex) {
+        return erreur(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
     @ExceptionHandler(ServiceIndisponibleException.class)
     public ResponseEntity<Map<String, String>> handleServiceIndisponible(ServiceIndisponibleException ex) {
         return erreur(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());

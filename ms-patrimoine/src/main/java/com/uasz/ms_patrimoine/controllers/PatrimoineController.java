@@ -1,6 +1,10 @@
 package com.uasz.ms_patrimoine.controllers;
 
+import com.uasz.ms_patrimoine.dto.PageResponseDto;
 import com.uasz.ms_patrimoine.dto.PatrimoineDto;
+import com.uasz.ms_patrimoine.entities.CategoriePatrimoine;
+import com.uasz.ms_patrimoine.entities.StatutPublication;
+import com.uasz.ms_patrimoine.entities.ZoneCasamance;
 import com.uasz.ms_patrimoine.services.IPatrimoineService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -13,9 +17,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/patrimoines")
@@ -35,6 +41,40 @@ public class PatrimoineController {
         return ResponseEntity.ok(patrimoineService.getAllPatrimoines());
     }
 
+    @GetMapping("/recherche")
+    public ResponseEntity<PageResponseDto<PatrimoineDto>> rechercherPatrimoines(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) CategoriePatrimoine categorie,
+            @RequestParam(required = false) ZoneCasamance zone,
+            @RequestParam(required = false) String localite,
+            @RequestParam(required = false) StatutPublication statut,
+            @RequestParam(required = false) Integer capaciteMin,
+            @RequestParam(required = false) Double tarifMax,
+            @RequestParam(defaultValue = "false") boolean inclureNonPublies,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "12") int size,
+            @RequestParam(defaultValue = "nom") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir
+    ) {
+        return ResponseEntity.ok(patrimoineService.rechercherPatrimoines(
+                q, categorie, zone, localite, statut, capaciteMin, tarifMax, inclureNonPublies, page, size, sortBy, sortDir));
+    }
+
+    @GetMapping("/proximite")
+    public ResponseEntity<List<PatrimoineDto>> getPatrimoinesProximite(
+            @RequestParam double lat,
+            @RequestParam double lon,
+            @RequestParam(required = false, defaultValue = "50.0") Double rayonKm,
+            @RequestParam(required = false, defaultValue = "10") Integer limit
+    ) {
+        return ResponseEntity.ok(patrimoineService.getPatrimoinesProximite(lat, lon, rayonKm, limit));
+    }
+
+    @GetMapping("/statistiques")
+    public ResponseEntity<com.uasz.ms_patrimoine.dto.PatrimoineStatsDto> getStatistiques() {
+        return ResponseEntity.ok(patrimoineService.getStatistiques());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<PatrimoineDto> getByIdPatrimoine(@PathVariable Long id) {
         return ResponseEntity.ok(patrimoineService.getByIdPatrimoine(id));
@@ -46,10 +86,28 @@ public class PatrimoineController {
         return ResponseEntity.ok(patrimoineService.updatePatrimoine(id, patrimoineDto));
     }
 
+    @PutMapping("/{id}/soumettre")
+    public ResponseEntity<PatrimoineDto> soumettrePatrimoine(@PathVariable Long id) {
+        return ResponseEntity.ok(patrimoineService.soumettrePatrimoine(id));
+    }
+
+    @PutMapping("/{id}/publier")
+    public ResponseEntity<PatrimoineDto> publierPatrimoine(@PathVariable Long id) {
+        return ResponseEntity.ok(patrimoineService.publierPatrimoine(id));
+    }
+
+    @PutMapping("/{id}/archiver")
+    public ResponseEntity<PatrimoineDto> archiverPatrimoine(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> body
+    ) {
+        String motif = body != null ? body.get("motif") : null;
+        return ResponseEntity.ok(patrimoineService.archiverPatrimoine(id, motif));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletePatrimoine(@PathVariable Long id) {
         patrimoineService.deletePatrimoine(id);
         return ResponseEntity.noContent().build();
     }
 }
-

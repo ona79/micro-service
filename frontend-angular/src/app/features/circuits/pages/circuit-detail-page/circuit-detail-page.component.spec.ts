@@ -83,10 +83,63 @@ describe('CircuitDetailPageComponent', () => {
     await new Promise((r) => setTimeout(r, 0));
     fixture.detectChanges();
 
+    httpMock
+      .expectOne('/api/avis/resume?cibleType=CIRCUIT&cibleId=1')
+      .flush({ cibleType: 'CIRCUIT', cibleId: 1, noteMoyenne: 4.5, totalAvis: 1, repartition: { 5: 1 } });
+    httpMock
+      .expectOne('/api/avis?cibleType=CIRCUIT&cibleId=1&page=0&size=6')
+      .flush({ content: [], page: 0, size: 6, totalElements: 0, totalPages: 0, last: true });
+
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+
     const titles = Array.from(
       fixture.nativeElement.querySelectorAll('.timeline-item__title') as NodeListOf<HTMLElement>
     ).map((el) => el.textContent?.trim());
 
     expect(titles).toEqual(['Maison des Esclaves', 'Cathédrale de Ziguinchor']);
+  });
+
+  it('falls back to circuit list when direct /api/circuits/:id returns an error', async () => {
+    const fixture = TestBed.createComponent(CircuitDetailPageComponent);
+    fixture.componentRef.setInput('id', '2');
+    fixture.detectChanges();
+
+    // The store calls getAll and loadById
+    httpMock.expectOne('/api/circuits').flush([
+      {
+        id: 2,
+        nomCircuit: 'Trésors de Basse-Casamance',
+        descriptionCircuit: 'Immersion au cœur des traditions diolas',
+        difficulte: 'FACILE',
+        dureeEstimee: 180,
+        distanceTotale: 55.0,
+        placesMax: 15,
+        prix: 15000,
+        etapes: [],
+      },
+    ]);
+    httpMock.expectOne('/api/patrimoines').flush([]);
+    // Direct call to /circuits/2 fails with 403 (replay attack or feign error)
+    httpMock.expectOne('/api/circuits/2').flush(
+      { statut: 403, erreur: "Attaque par rejeu détectée sur l'enveloppe Gateway." },
+      { status: 403, statusText: 'Forbidden' }
+    );
+
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+
+    httpMock
+      .expectOne('/api/avis/resume?cibleType=CIRCUIT&cibleId=2')
+      .flush({ cibleType: 'CIRCUIT', cibleId: 2, noteMoyenne: 4.8, totalAvis: 2, repartition: { 5: 2 } });
+    httpMock
+      .expectOne('/api/avis?cibleType=CIRCUIT&cibleId=2&page=0&size=6')
+      .flush({ content: [], page: 0, size: 6, totalElements: 0, totalPages: 0, last: true });
+
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+
+    const titleEl = fixture.nativeElement.querySelector('.circuit-header__title');
+    expect(titleEl?.textContent).toContain('Trésors de Basse-Casamance');
   });
 });

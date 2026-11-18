@@ -1,22 +1,30 @@
 ### Variables
 @reservationUrl = http://localhost:3004/api/reservations
 
-### 1. POST - Réserver 5 places sur le circuit 1 (vérifie auprès de ms-circuit :3002) -> 201 Created
+### 0. GET - Vérification de disponibilité temps réel sur le circuit 1
+GET {{reservationUrl}}/disponibilite?type=CIRCUIT&prestationId=1&date=2026-12-20
+
+### 1. POST - Réserver 5 places sur le circuit 1 avec clé d'idempotence (calcul prix serveur) -> 201 Created
 POST {{reservationUrl}}
 Content-Type: application/json
+Idempotency-Key: req-circuit-1-demo
 
 {
   "nomClient": "Moussa Diop",
   "emailClient": "moussa.diop@zig.univ.sn",
   "telephoneClient": "+221771234567",
   "nombrePlaces": 5,
+  "datePrestation": "2026-12-20",
+  "creneauPrestation": "Matin (09h00)",
   "typeReservation": "CIRCUIT",
-  "circuitId": 1
+  "circuitId": 1,
+  "soumettrePourPaiement": true
 }
 
-### 2. POST - Réserver 4 places sur l'événement 1 (vérifie auprès de ms-evenement :3003) -> 201 Created
+### 2. POST - Réserver 4 places sur l'événement 1 (uniquement si PUBLIE et ouvertReservation=true) -> 201 Created
 POST {{reservationUrl}}
 Content-Type: application/json
+Idempotency-Key: req-event-1-demo
 
 {
   "nomClient": "Fatou Ndiaye",
@@ -24,16 +32,17 @@ Content-Type: application/json
   "telephoneClient": "+221781112233",
   "nombrePlaces": 4,
   "typeReservation": "EVENEMENT",
-  "evenementId": 1
+  "evenementId": 1,
+  "soumettrePourPaiement": true
 }
 
-### 3. GET - Liste de toutes les réservations (200 OK)
-GET {{reservationUrl}}
+### 3. GET - Recherche paginée des réservations P04
+GET {{reservationUrl}}/recherche?page=0&size=12&sortBy=dateCreation&sortDir=desc
 
-### 4. GET - Détail de la réservation 1 enrichi avec le CircuitDto via OpenFeign (200 OK)
+### 4. GET - Détail de la réservation enrichi + participants + historique transitions
 GET {{reservationUrl}}/1
 
-### 5. POST - Erreur : dépassement de la capacité restante du circuit 1 (400 Bad Request)
+### 5. POST - Erreur : dépassement de la capacité restante (409 Conflict / 400 Bad Request)
 POST {{reservationUrl}}
 Content-Type: application/json
 
@@ -46,9 +55,13 @@ Content-Type: application/json
   "circuitId": 1
 }
 
-### 6. PUT - Annulation de la réservation 1 (libère les 5 places) -> 200 OK
+### 6. PUT - Annulation contrôlée de la réservation 1 (libère les places) -> 200 OK
 PUT {{reservationUrl}}/1/annuler
+Content-Type: application/json
 
-### 7. DELETE - Suppression de la réservation 1 (204 No Content)
-DELETE {{reservationUrl}}/1
+{
+  "motif": "Annulation demandée par le visiteur"
+}
 
+### 7. POST - Resynchronisation pull avec ms-paiement -> 200 OK
+POST {{reservationUrl}}/1/synchroniser

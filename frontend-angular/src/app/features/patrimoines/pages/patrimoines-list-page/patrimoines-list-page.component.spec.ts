@@ -14,25 +14,29 @@ describe('PatrimoinesListPageComponent', () => {
   const MOCK_PATRIMOINES = [
     {
       id: 1,
-      nomPatrimoine: 'Maison des Esclaves de Gorée',
-      codePatrimoine: 'PAT-DKR-001',
-      descriptionPatrimoine: 'Monument historique.',
-      historiquePatrimoine: '1776',
-      adressePatrimoine: 'Île de Gorée, Dakar',
-      capacitePatrimoine: 150,
-      latitudePatrimoine: 14.6672,
-      longitudePatrimoine: -17.399,
+      nomPatrimoine: 'Mémorial de la Tragédie du Joola',
+      codePatrimoine: 'PAT-ZIG-001',
+      descriptionPatrimoine: 'Lieu de mémoire.',
+      historiquePatrimoine: '2002',
+      adressePatrimoine: 'Ziguinchor',
+      capacitePatrimoine: 250,
+      latitudePatrimoine: 12.583,
+      longitudePatrimoine: -16.271,
+      zoneGeographique: 'BASSE_CASAMANCE',
+      statutPublication: 'PUBLIE',
     },
     {
       id: 2,
-      nomPatrimoine: 'Cathédrale Saint-Antoine de Padoue',
-      codePatrimoine: 'PAT-ZIG-003',
-      descriptionPatrimoine: 'Édifice religieux.',
+      nomPatrimoine: 'Fort de Sédhiou',
+      codePatrimoine: 'PAT-SED-006',
+      descriptionPatrimoine: 'Fort historique.',
       historiquePatrimoine: 'Colonial',
-      adressePatrimoine: 'Centre-ville, Ziguinchor',
-      capacitePatrimoine: 300,
-      latitudePatrimoine: 12.5833,
-      longitudePatrimoine: -16.2719,
+      adressePatrimoine: 'Sédhiou',
+      capacitePatrimoine: 150,
+      latitudePatrimoine: 12.708,
+      longitudePatrimoine: -15.556,
+      zoneGeographique: 'MOYENNE_CASAMANCE',
+      statutPublication: 'PUBLIE',
     },
   ];
 
@@ -59,28 +63,102 @@ describe('PatrimoinesListPageComponent', () => {
     httpMock.verify();
   });
 
-  it('loads patrimoines and synchronizes search with ?q= query param', async () => {
+  it('calls server /recherche and synchronizes ?q= query param', async () => {
     const fixture = TestBed.createComponent(PatrimoinesListPageComponent);
     fixture.detectChanges();
 
-    const req = httpMock.expectOne('/api/patrimoines');
-    req.flush(MOCK_PATRIMOINES);
-    await fixture.whenStable();
+    httpMock
+      .expectOne(
+        (req) =>
+          req.url === '/api/patrimoines/recherche' &&
+          req.params.get('sortBy') === 'nom' &&
+          req.params.get('page') === '0'
+      )
+      .flush({
+        content: MOCK_PATRIMOINES,
+        page: 0,
+        size: 9,
+        totalElements: 2,
+        totalPages: 1,
+        last: true,
+      });
+
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+
+    httpMock.expectOne('/api/avis/resumes?cibleType=PATRIMOINE&cibleIds=1,2').flush([]);
+    await new Promise((r) => setTimeout(r, 0));
     fixture.detectChanges();
 
     const text = fixture.nativeElement.textContent as string;
-    expect(text).toContain('Maison des Esclaves de Gorée');
-    expect(text).toContain('Cathédrale Saint-Antoine de Padoue');
+    expect(text).toContain('Mémorial de la Tragédie du Joola');
+    expect(text).toContain('Fort de Sédhiou');
 
-    // Simule navigation vers /patrimoines?q=Ziguinchor
-    queryParams$.next(convertToParamMap({ q: 'Ziguinchor' }));
+    // Navigation vers /patrimoines?q=Sédhiou
+    queryParams$.next(convertToParamMap({ q: 'Sédhiou' }));
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).not.toContain('Maison des Esclaves de Gorée');
-    expect(fixture.nativeElement.textContent).toContain('Cathédrale Saint-Antoine de Padoue');
 
-    // Simule retour vers /patrimoines sans ?q= -> doit réinitialiser la recherche
-    queryParams$.next(convertToParamMap({}));
+    httpMock
+      .expectOne(
+        (req) =>
+          req.url === '/api/patrimoines/recherche' && req.params.get('q') === 'Sédhiou'
+      )
+      .flush({
+        content: [MOCK_PATRIMOINES[1]],
+        page: 0,
+        size: 9,
+        totalElements: 1,
+        totalPages: 1,
+        last: true,
+      });
+
+    await new Promise((r) => setTimeout(r, 0));
     fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('Maison des Esclaves de Gorée');
+
+    httpMock.expectOne('/api/avis/resumes?cibleType=PATRIMOINE&cibleIds=2').flush([]);
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.textContent).not.toContain('Mémorial de la Tragédie du Joola');
+    expect(fixture.nativeElement.textContent).toContain('Fort de Sédhiou');
+  });
+
+  it('charge les sites de proximité via getProximite et affiche le badge distance', async () => {
+    const fixture = TestBed.createComponent(PatrimoinesListPageComponent);
+    fixture.detectChanges();
+
+    // Rejet de la première requête initiale standard
+    httpMock.expectOne((req) => req.url.startsWith('/api/patrimoines/recherche')).flush({
+      content: [],
+      page: 0,
+      size: 9,
+      totalElements: 0,
+      totalPages: 1,
+      last: true,
+    });
+    await new Promise((r) => setTimeout(r, 0));
+
+    // Simulation de l'appel direct à loadProximite
+    const proxItem = {
+      ...MOCK_PATRIMOINES[0],
+      distanceKm: 8.5,
+    };
+    void (fixture.componentInstance as any).loadProximite(12.58, -16.27);
+
+    const proxReq = httpMock.expectOne(
+      (req) => req.url === '/api/patrimoines/proximite' && req.params.get('lat') === '12.58'
+    );
+    proxReq.flush([proxItem]);
+
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+
+    httpMock.expectOne('/api/avis/resumes?cibleType=PATRIMOINE&cibleIds=1').flush([]);
+    await new Promise((r) => setTimeout(r, 0));
+    fixture.detectChanges();
+
+    const text = fixture.nativeElement.textContent as string;
+    expect(text).toContain('Mémorial de la Tragédie du Joola');
+    expect(text).toContain('8.5 km');
   });
 });

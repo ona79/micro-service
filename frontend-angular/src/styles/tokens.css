@@ -1,116 +1,281 @@
 /* ==========================================================================
-   DESIGN SYSTEM TOKENS — « Terre, Mangrove & Lin »
-   Source unique de vérité pour les couleurs, typographies, espacements,
-   rayons, ombres, dimensions et transitions.
+   DESIGN SYSTEM TOKENS — « CASAMANCE : PATRIMOINE VIVANT »
+   Lot 1 : Fondations visuelles, tokens centralisés, accessibilité WCAG 2.2 AA
+   Université Assane Seck de Ziguinchor — Licence 3 Informatique
    ========================================================================== */
 
 :root {
-  /* --- Surfaces papier & lin --- */
-  --surface-canvas: #faf7f2;
-  --surface-elevated: #ffffff;
-  --surface-sand: #f2ede4;
-  --surface-tinted: #ebe4d8;
-  --surface-forest: #163828;
-  --surface-forest-soft: #204a36;
+  /* ========================================================================
+     1. PALETTE DE COULEURS PRIMAIRES & IDENTITAIRES
+     ======================================================================== */
+  /* Mangrove profonde : Navigation, titres d'autorité, éléments maîtres */
+  --color-brand-mangrove: #153d30;
+  --color-brand-mangrove-hover: #0f2e24;
+  --color-brand-mangrove-soft: #e3ede8;
 
-  /* --- Encres & lisibilité (WCAG AA >= 4.5:1) --- */
-  --ink-primary: #1c1b18;
-  --ink-secondary: #4a463f;
-  --ink-muted: #635d53;
-  --ink-on-dark: #faf7f2;
-  --ink-on-dark-muted: #d5ded8;
+  /* Vert forêt : Actions principales, boutons d'appel à l'action, états actifs */
+  --color-brand-forest: #28634b;
+  --color-brand-forest-hover: #1e4e3a;
+  --color-brand-forest-soft: #e8f2ed;
+  --color-brand-forest-border: #9ec4b2;
 
-  /* --- Identitaire Vert Casamance --- */
-  --brand-primary: #1f5138;
-  --brand-primary-hover: #143826;
-  --brand-medium: #2d6a4f;
-  --brand-soft: #e3efe7;
-  --brand-border: #b8d3c1;
+  /* Latérite Casamançaise : Accent culturel, circuits, géographie, actions secondaires */
+  --color-brand-laterite: #c36b45;
+  --color-brand-laterite-hover: #a85732;
+  --color-brand-laterite-dark: #944622;
+  --color-brand-laterite-soft: #fbeee8;
+  --color-brand-laterite-border: #e8b9a5;
 
-  /* --- Accents Latérite & Ocre --- */
-  --accent-terracotta: #b24c29;
-  --accent-terracotta-hover: #8f3b1e;
-  --accent-terracotta-soft: #f9ece7;
-  --accent-terracotta-border: #e5b8a8;
+  /* Ocre sahélien : Mise en valeur patrimoniale, événements, notes, étoiles */
+  --color-brand-ochre: #d6a85d;
+  --color-brand-ochre-hover: #be9247;
+  --color-brand-ochre-dark: #7a4b08;
+  --color-brand-ochre-soft: #fdf5e7;
+  --color-brand-ochre-border: #edd5a4;
 
-  --accent-ochre: #8a5a10;
-  --accent-ochre-soft: #fdf4e3;
-  --accent-ochre-border: #e9d19f;
+  /* ========================================================================
+     2. SURFACES & FONDS
+     ======================================================================== */
+  /* Lin naturel Casamance : Fond éditorial, chaleur et authenticité */
+  --color-surface-lin: #f5f0e5;
+  --color-surface-lin-light: #faf7f0;
+  --color-surface-lin-dark: #e8dfcd;
 
-  /* --- Registre sobre « Lieu de mémoire » --- */
-  --memorial-surface: #eef0f2;
-  --memorial-surface-alt: #e3e7eb;
-  --memorial-border: #9aa5b1;
-  --memorial-ink: #2d3748;
+  /* Blanc pur & surfaces élevées */
+  --color-surface-white: #ffffff;
+  --color-surface-overlay: rgba(21, 61, 48, 0.45);
 
-  /* --- États sémantiques --- */
-  --status-success-bg: #e4f2e8;
-  --status-success-border: #9cc7ab;
-  --status-success-ink: #14452b;
+  /* Surfaces sombres (header pro, footer) */
+  --color-surface-dark: #153d30;
+  --color-surface-dark-alt: #1a493a;
 
-  --status-error-bg: #fcebe9;
-  --status-error-border: #e8b4ae;
-  --status-error-ink: #921f18;
+  /* Lieu de mémoire & recueillement (Joola) */
+  --color-memorial-surface: #edf1f3;
+  --color-memorial-border: #9aa9b5;
+  --color-memorial-ink: #2b3944;
 
-  --status-warning-bg: #fdf4e3;
-  --status-warning-border: #e4c485;
-  --status-warning-ink: #704809;
+  /* ========================================================================
+     3. TYPOGRAPHIE & LISIBILITÉ ENCRE (WCAG 2.2 AA / AAA)
+     ======================================================================== */
+  /* Texte principal : Contraste 14.5:1 sur lin, 16.5:1 sur blanc (AAA) */
+  --color-text-primary: #161f1b;
 
-  /* --- Bordures --- */
-  --border-subtle: #e4ddd0;
-  --border-strong: #cdc3b2;
+  /* Texte secondaire : Contraste 6.8:1 sur lin, 7.3:1 sur blanc (AA > 4.5:1) */
+  --color-text-secondary: #3d4942;
 
-  /* --- Typographies --- */
+  /* Texte tertiaire / métadonnées : Contraste 4.6:1 sur blanc / lin (AA) */
+  --color-text-muted: #5a665e;
+
+  /* Texte sur fond sombre */
+  --color-text-on-dark: #faf7f0;
+  --color-text-on-dark-muted: #d0ded6;
+
+  /* ========================================================================
+     4. BORDURES & SÉPARATIONS
+     ======================================================================== */
+  --color-border-subtle: #e2dac9;
+  --color-border-strong: #c2b5a0;
+  --color-border-dark: #275645;
+
+  /* ========================================================================
+     5. STATUTS SÉMANTIQUES (Accessible avec icône + texte)
+     ======================================================================== */
+  /* Succès / Confirmé / Payé / Validé */
+  --color-status-success-bg: #dcf2e5;
+  --color-status-success-border: #8bc6a3;
+  --color-status-success-ink: #135035;
+
+  /* Avertissement / En attente / Attention */
+  --color-status-warning-bg: #fef3d6;
+  --color-status-warning-border: #e7c87e;
+  --color-status-warning-ink: #7a4b08;
+
+  /* Erreur / Rejeté / Annulé / Expiré */
+  --color-status-error-bg: #fde8e6;
+  --color-status-error-border: #e8ada7;
+  --color-status-error-ink: #92231c;
+
+  /* Information / Guide / Donnée neutre */
+  --color-status-info-bg: #e1f0f8;
+  --color-status-info-border: #8ec5e2;
+  --color-status-info-ink: #154c6d;
+
+  /* ========================================================================
+     6. ALIAS DE COMPATIBILITÉ HISTORIQUE (Pour rétrocompatibilité parfaite)
+     ======================================================================== */
+  --brand-primary: var(--color-brand-forest);
+  --brand-primary-hover: var(--color-brand-forest-hover);
+  --brand-medium: #235842;
+  --brand-soft: var(--color-brand-forest-soft);
+  --brand-border: var(--color-brand-forest-border);
+
+  --accent-terracotta: var(--color-brand-laterite);
+  --accent-terracotta-hover: var(--color-brand-laterite-hover);
+  --accent-terracotta-soft: var(--color-brand-laterite-soft);
+  --accent-terracotta-border: var(--color-brand-laterite-border);
+
+  --accent-ochre: var(--color-brand-ochre-dark);
+  --accent-ochre-gold: var(--color-brand-ochre);
+  --accent-ochre-soft: var(--color-brand-ochre-soft);
+  --accent-ochre-border: var(--color-brand-ochre-border);
+
+  --surface-canvas: var(--color-surface-lin-light);
+  --surface-elevated: var(--color-surface-white);
+  --surface-sand: var(--color-surface-lin);
+  --surface-tinted: var(--color-surface-lin-dark);
+  --surface-forest: var(--color-brand-mangrove);
+  --surface-forest-soft: var(--color-brand-forest);
+
+  --ink-primary: var(--color-text-primary);
+  --ink-secondary: var(--color-text-secondary);
+  --ink-muted: var(--color-text-muted);
+  --ink-on-dark: var(--color-text-on-dark);
+  --ink-on-dark-muted: var(--color-text-on-dark-muted);
+
+  --border-subtle: var(--color-border-subtle);
+  --border-strong: var(--color-border-strong);
+
+  --memorial-surface: var(--color-memorial-surface);
+  --memorial-surface-alt: #e3e9ed;
+  --memorial-border: var(--color-memorial-border);
+  --memorial-ink: var(--color-memorial-ink);
+
+  --status-success-bg: var(--color-status-success-bg);
+  --status-success-border: var(--color-status-success-border);
+  --status-success-ink: var(--color-status-success-ink);
+
+  --status-error-bg: var(--color-status-error-bg);
+  --status-error-border: var(--color-status-error-border);
+  --status-error-ink: var(--color-status-error-ink);
+
+  --status-warning-bg: var(--color-status-warning-bg);
+  --status-warning-border: var(--color-status-warning-border);
+  --status-warning-ink: var(--color-status-warning-ink);
+
+  --success: var(--color-status-success-ink);
+  --success-soft: var(--color-status-success-bg);
+  --danger: var(--color-status-error-ink);
+  --danger-soft: var(--color-status-error-bg);
+  --warning: var(--color-status-warning-ink);
+  --warning-soft: var(--color-status-warning-bg);
+  --info: var(--color-status-info-ink);
+  --info-soft: var(--color-status-info-bg);
+
+  /* ========================================================================
+     7. TYPOGRAPHIE
+     ======================================================================== */
   --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
 
-  --text-xs: 0.78rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-md: 1.125rem;
-  --text-lg: 1.35rem;
-  --text-xl: 1.75rem;
-  --text-2xl: 2.25rem;
-  --text-3xl: clamp(2.1rem, 4vw, 3rem);
+  --text-xs: 0.75rem;    /* 12px */
+  --text-sm: 0.875rem;   /* 14px */
+  --text-base: 1rem;     /* 16px */
+  --text-md: 1.125rem;   /* 18px */
+  --text-lg: 1.25rem;    /* 20px */
+  --text-xl: 1.5rem;     /* 24px */
+  --text-2xl: 1.875rem;  /* 30px */
+  --text-3xl: 2.25rem;   /* 36px */
+  --text-4xl: clamp(2.2rem, 4.5vw, 3.25rem); /* 36-52px responsive */
 
-  /* --- Rayons --- */
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --font-weight-black: 800;
+
+  --line-height-tight: 1.2;
+  --line-height-snug: 1.35;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.65;
+
+  /* ========================================================================
+     8. ÉCHELLE D'ESPACEMENTS (Multiples de 4px)
+     ======================================================================== */
+  --space-0: 0;
+  --space-1: 0.25rem;  /* 4px */
+  --space-2: 0.5rem;   /* 8px */
+  --space-3: 0.75rem;  /* 12px */
+  --space-4: 1rem;     /* 16px */
+  --space-5: 1.25rem;  /* 20px */
+  --space-6: 1.5rem;   /* 24px */
+  --space-8: 2rem;     /* 32px */
+  --space-10: 2.5rem;  /* 40px */
+  --space-12: 3rem;    /* 48px */
+  --space-16: 4rem;    /* 64px */
+  --space-20: 5rem;    /* 80px */
+
+  /* ========================================================================
+     9. DIMENSIONS & STRUCTURES DE LAYOUT
+     ======================================================================== */
+  --container-max: 1240px;
+  --container-pro: 1440px;
+  --header-height: 72px;
+  --header-height-mobile: 64px;
+  --sidebar-width: 280px;
+  --sidebar-width-collapsed: 76px;
+
+  --control-height-sm: 34px;
+  --control-height-md: 42px;
+  --control-height-lg: 50px;
+
+  /* ========================================================================
+     10. RAYONS DE COURBURE (Border Radius)
+     ======================================================================== */
   --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 24px;
+  --radius-card: 14px;
+  --radius-modal: 18px;
   --radius-pill: 9999px;
 
-  /* --- Ombres --- */
-  --shadow-xs: 0 1px 2px rgba(28, 27, 24, 0.05);
-  --shadow-sm: 0 2px 10px rgba(28, 27, 24, 0.06);
-  --shadow-md: 0 8px 24px rgba(28, 27, 24, 0.08);
-  --shadow-lg: 0 16px 40px rgba(22, 56, 40, 0.12);
-  --shadow-focus: 0 0 0 3px rgba(31, 81, 56, 0.28);
+  /* ========================================================================
+     11. ÉLÉVATION & OMBRES PORTÉES (Naturelles et douces)
+     ======================================================================== */
+  --shadow-xs: 0 1px 2px rgba(22, 31, 27, 0.05);
+  --shadow-sm: 0 2px 8px rgba(22, 31, 27, 0.06);
+  --shadow-md: 0 6px 20px rgba(22, 31, 27, 0.08);
+  --shadow-lg: 0 12px 32px rgba(21, 61, 48, 0.12);
+  --shadow-xl: 0 20px 48px rgba(21, 61, 48, 0.18);
+  --shadow-focus: 0 0 0 3px rgba(40, 99, 75, 0.32);
+  --shadow-focus-danger: 0 0 0 3px rgba(146, 35, 28, 0.28);
 
-  /* --- Espacements --- */
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-5: 1.5rem;
-  --space-6: 2rem;
-  --space-8: 3rem;
-  --space-10: 4rem;
-  --space-12: 5.5rem;
+  /* ========================================================================
+     12. BREAKPOINTS RESPONSIVE (Références CSS & Media Queries)
+     ======================================================================== */
+  --bp-mobile: 390px;
+  --bp-mobile-large: 480px;
+  --bp-tablet: 768px;
+  --bp-desktop: 1024px;
+  --bp-wide: 1440px;
 
-  /* --- Dimensions & Layout --- */
-  --container-max: 1240px;
-  --header-height: 76px;
-  --sidebar-width: 360px;
+  /* ========================================================================
+     13. TRANSITIONS & ANIMATIONS
+     ======================================================================== */
+  --ease-standard: cubic-bezier(0.2, 0.9, 0.3, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* --- Transitions & Z-index --- */
-  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
-  --transition-fast: 160ms var(--ease-standard);
-  --transition-base: 240ms var(--ease-standard);
+  --duration-fast: 150ms;
+  --duration-base: 240ms;
+  --duration-slow: 350ms;
 
+  --transition-fast: var(--duration-fast) var(--ease-standard);
+  --transition-base: var(--duration-base) var(--ease-standard);
+  --transition-slow: var(--duration-slow) var(--ease-standard);
+
+  /* ========================================================================
+     14. PROFONDEURS Z-INDEX
+     ======================================================================== */
+  --z-base: 1;
+  --z-sticky: 20;
   --z-header: 40;
+  --z-sidebar: 50;
   --z-dropdown: 60;
+  --z-backdrop: 80;
   --z-modal: 100;
   --z-toast: 120;
+  --z-tooltip: 140;
 }
