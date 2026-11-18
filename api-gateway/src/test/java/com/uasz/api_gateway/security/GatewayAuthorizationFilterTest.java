@@ -173,4 +173,78 @@ class GatewayAuthorizationFilterTest {
         assertThat(response.getStatus()).isEqualTo(401);
         assertThat(response.getContentAsString()).contains("Signature de session invalide");
     }
+
+    @Test
+    @DisplayName("SEC-VULN-03 : Les en-têtes non fiables (X-User-*) fournis par le client sont assainis et l'enveloppe interne est signée")
+    void shouldStripUntrustedHeadersAndInjectSignedGatewayEnvelope() throws Exception {
+        String token = generateToken(42L, "touriste@uasz.sn", "TOURISTE", 3600);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/patrimoines");
+        request.setCookies(new Cookie("PATRIMOINE_SESSION", token));
+        // Client tente d'injecter des privilèges falsifiés
+        request.addHeader("X-User-Roles", "ADMINISTRATEUR");
+        request.addHeader("X-User-Id", "1");
+        request.addHeader("X-Internal-Gateway-Token", "fake-token");
+
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(chain.getRequest()).isNotNull();
+
+        // Le microservice reçoit les valeurs vérifiées et non les valeurs forgées par le client
+        jakarta.servlet.http.HttpServletRequest forwarded = (jakarta.servlet.http.HttpServletRequest) chain.getRequest();
+        assertThat(forwarded.getHeader("X-User-Roles")).isEqualTo("TOURISTE");
+        assertThat(forwarded.getHeader("X-User-Id")).isEqualTo("42");
+        assertThat(forwarded.getHeader("X-Internal-Gateway-Token")).isNotNull().contains(".");
+    }
+
+    @Test
+    @DisplayName("Routes protégées : /api/reservations requiert une authentification")
+    void shouldRejectAnonymousReservationAccess() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/reservations");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(response.getContentAsString()).contains("Authentification requise");
+    }
+
+    @Test
+    @DisplayName("Routes protégées : /api/paiements requiert une authentification")
+    void shouldRejectAnonymousPaiementAccess() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/paiements");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+
+        filter.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(response.getContentAsString()).contains("Authentification requise");
+    }
+
+    @Test
+    @DisplayName("Rate Limiting : Plus de 10 tentatives de connexion par minute renvoie 429")
+    void shouldRateLimitLoginAttempts() throws Exception {
+        String clientIp = "192.168.10.99";
+        for (int i = 1; i <= 10; i++) {
+            MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/utilisateurs/connexion");
+            req.setRemoteAddr(clientIp);
+            MockHttpServletResponse res = new MockHttpServletResponse();
+            filter.doFilter(req, res, new MockFilterChain());
+            assertThat(res.getStatus()).isEqualTo(200);
+        }
+
+        // 11ème tentative : doit être bloquée
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/utilisateurs/connexion");
+        req.setRemoteAddr(clientIp);
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        filter.doFilter(req, res, new MockFilterChain());
+
+        assertThat(res.getStatus()).isEqualTo(429);
+        assertThat(res.getContentAsString()).contains("Trop de tentatives de connexion");
+    }
 }
