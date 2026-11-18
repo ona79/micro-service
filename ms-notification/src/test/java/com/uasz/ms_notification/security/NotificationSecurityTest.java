@@ -177,6 +177,81 @@ class NotificationSecurityTest {
         assertThat(respTampered.getContentAsString()).contains("Intégrité du corps");
     }
 
+    @Test
+    void filter_touristeSurMesNotificationsAccepteMaisListeGlobaleRefusee403() throws Exception {
+        long ts = Instant.now().getEpochSecond();
+        String bodySha = MicroserviceSecurityFilter.sha256Hex(new byte[0]);
+
+        String nonceOk = UUID.randomUUID().toString();
+        String canonicalOk = "GET|/api/notifications/mes-notifications|2|TOURISTE|NOTIFICATION:LIRE_PROPRE|moussa@uasz.sn|sess-2|" + ts + "|" + nonceOk + "|" + bodySha;
+        MockHttpServletRequest reqOk = new MockHttpServletRequest("GET", "/api/notifications/mes-notifications");
+        reqOk.addHeader("X-User-Id", "2");
+        reqOk.addHeader("X-User-Roles", "TOURISTE");
+        reqOk.addHeader("X-User-Permissions", "NOTIFICATION:LIRE_PROPRE");
+        reqOk.addHeader("X-User-Email", "moussa@uasz.sn");
+        reqOk.addHeader("X-User-Session-Id", "sess-2");
+        reqOk.addHeader("X-Content-SHA256", bodySha);
+        reqOk.addHeader("X-Internal-Gateway-Token", ts + "." + nonceOk + "." + signHmac(canonicalOk, gatewaySecret));
+        MockHttpServletResponse respOk = new MockHttpServletResponse();
+        securityFilter.doFilter(reqOk, respOk, new MockFilterChain());
+        assertThat(respOk.getStatus()).isEqualTo(200);
+
+        String nonceDenied = UUID.randomUUID().toString();
+        String canonicalDenied = "GET|/api/notifications|2|TOURISTE|NOTIFICATION:LIRE_PROPRE|moussa@uasz.sn|sess-2|" + ts + "|" + nonceDenied + "|" + bodySha;
+        MockHttpServletRequest reqDenied = new MockHttpServletRequest("GET", "/api/notifications");
+        reqDenied.addHeader("X-User-Id", "2");
+        reqDenied.addHeader("X-User-Roles", "TOURISTE");
+        reqDenied.addHeader("X-User-Permissions", "NOTIFICATION:LIRE_PROPRE");
+        reqDenied.addHeader("X-User-Email", "moussa@uasz.sn");
+        reqDenied.addHeader("X-User-Session-Id", "sess-2");
+        reqDenied.addHeader("X-Content-SHA256", bodySha);
+        reqDenied.addHeader("X-Internal-Gateway-Token", ts + "." + nonceDenied + "." + signHmac(canonicalDenied, gatewaySecret));
+        MockHttpServletResponse respDenied = new MockHttpServletResponse();
+        securityFilter.doFilter(reqDenied, respDenied, new MockFilterChain());
+        assertThat(respDenied.getStatus()).isEqualTo(403);
+    }
+
+    @Test
+    void filter_appelsInterservicesUtilisateurEtCircuitAcceptesMaisInconnuRefuse403() throws Exception {
+        long ts = Instant.now().getEpochSecond();
+        byte[] body = "{\"destinataire\":\"guide@uasz.sn\",\"sujet\":\"Ok\"}".getBytes(StandardCharsets.UTF_8);
+        String bodySha = MicroserviceSecurityFilter.sha256Hex(body);
+
+        for (String svc : new String[]{"ms-utilisateur", "ms-circuit"}) {
+            String nonce = UUID.randomUUID().toString();
+            String sig = signHmac("POST|/api/notifications|ms-notification|" + svc + "|" + ts + "|" + nonce + "|1|ADMINISTRATEUR|||" + bodySha, interserviceSecret);
+            MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/notifications");
+            req.setContent(body);
+            req.addHeader("X-Service-Name", svc);
+            req.addHeader("X-Service-Audience", "ms-notification");
+            req.addHeader("X-Service-Timestamp", String.valueOf(ts));
+            req.addHeader("X-Service-Nonce", nonce);
+            req.addHeader("X-Content-SHA256", bodySha);
+            req.addHeader("X-User-Id", "1");
+            req.addHeader("X-User-Roles", "ADMINISTRATEUR");
+            req.addHeader("X-Service-Signature", sig);
+            MockHttpServletResponse resp = new MockHttpServletResponse();
+            securityFilter.doFilter(req, resp, new MockFilterChain());
+            assertThat(resp.getStatus()).isEqualTo(200);
+        }
+
+        String badNonce = UUID.randomUUID().toString();
+        String badSig = signHmac("POST|/api/notifications|ms-notification|ms-inconnu|" + ts + "|" + badNonce + "|1|ADMINISTRATEUR|||" + bodySha, interserviceSecret);
+        MockHttpServletRequest badReq = new MockHttpServletRequest("POST", "/api/notifications");
+        badReq.setContent(body);
+        badReq.addHeader("X-Service-Name", "ms-inconnu");
+        badReq.addHeader("X-Service-Audience", "ms-notification");
+        badReq.addHeader("X-Service-Timestamp", String.valueOf(ts));
+        badReq.addHeader("X-Service-Nonce", badNonce);
+        badReq.addHeader("X-Content-SHA256", bodySha);
+        badReq.addHeader("X-User-Id", "1");
+        badReq.addHeader("X-User-Roles", "ADMINISTRATEUR");
+        badReq.addHeader("X-Service-Signature", badSig);
+        MockHttpServletResponse badResp = new MockHttpServletResponse();
+        securityFilter.doFilter(badReq, badResp, new MockFilterChain());
+        assertThat(badResp.getStatus()).isEqualTo(403);
+    }
+
     private String signHmac(String data, String secret) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");

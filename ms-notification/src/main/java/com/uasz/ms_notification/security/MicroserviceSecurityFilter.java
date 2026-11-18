@@ -31,6 +31,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -45,6 +46,10 @@ public class MicroserviceSecurityFilter extends OncePerRequestFilter {
     private static final long FEIGN_TOLERANCE_SECONDS = 30L;
     private static final int MIN_SECRET_BYTES = 32;
     private static final int MIN_DISTINCT_CHARS = 10;
+
+    private static final Set<String> ALLOWED_CALLER_SERVICES = Set.of(
+            "ms-paiement", "ms-reservation", "ms-utilisateur", "ms-circuit"
+    );
 
     private static final List<String> FORBIDDEN_SECRET_PATTERNS = List.of(
             "CHANGE_ME", "REPLACE_ME", "DEV-SECRET", "DEV-INTERSERVICE",
@@ -105,22 +110,26 @@ public class MicroserviceSecurityFilter extends OncePerRequestFilter {
         String gatewayToken = cachedRequest.getHeader("X-Internal-Gateway-Token");
         String serviceSignature = cachedRequest.getHeader("X-Service-Signature");
 
-        if (serviceSignature != null && !serviceSignature.isBlank()) {
-            if (validateInterserviceCall(cachedRequest, response, serviceSignature)) {
-                filterChain.doFilter(cachedRequest, response);
+        try {
+            if (serviceSignature != null && !serviceSignature.isBlank()) {
+                if (validateInterserviceCall(cachedRequest, response, serviceSignature)) {
+                    filterChain.doFilter(cachedRequest, response);
+                }
+                return;
             }
-            return;
-        }
 
-        if (gatewayToken != null && !gatewayToken.isBlank()) {
-            if (validateGatewayCall(cachedRequest, response, gatewayToken)) {
-                filterChain.doFilter(cachedRequest, response);
+            if (gatewayToken != null && !gatewayToken.isBlank()) {
+                if (validateGatewayCall(cachedRequest, response, gatewayToken)) {
+                    filterChain.doFilter(cachedRequest, response);
+                }
+                return;
             }
-            return;
-        }
 
-        writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
-                "Accès direct non autorisé. La requête doit transiter par l'API Gateway ou un appel interservice signé.");
+            writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED,
+                    "Accès direct non autorisé. La requête doit transiter par l'API Gateway ou un appel interservice signé.");
+        } finally {
+            SecurityUserContextHolder.clear();
+        }
     }
 
     private boolean validateGatewayCall(CachedBodyHttpServletRequest request,
@@ -185,13 +194,51 @@ public class MicroserviceSecurityFilter extends OncePerRequestFilter {
             return false;
         }
 
-        // Contrôle RBAC sur ms-notification : seul l'ADMINISTRATEUR peut accéder à ms-notification via le Gateway
-        if (!"ADMINISTRATEUR".equals(roleForSig)) {
-            writeJsonError(response, HttpServletResponse.SC_FORBIDDEN, "Accès interdit : seul un administrateur peut accéder à ms-notification via l'API Gateway.");
+        if ("PUBLIC".equals(roleForSig) || "ANONYMOUS".equals(userIdForSig)) {
+            writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED, "Authentification requise pour accéder aux notifications.");
             return false;
         }
 
+        Long parsedUserId = parseNullableLong(userIdForSig);
+        if (parsedUserId == null) {
+            writeJsonError(response, HttpServletResponse.SC_UNAUTHORIZED, "Identifiant utilisateur invalide dans l'enveloppe Gateway.");
+            return false;
+        }
+
+        Set<String> perms = SecurityUserContext.parsePermissions(permsForSig, roleForSig);
+        SecurityUserContext context = new SecurityUserContext(parsedUserId, roleForSig, emailForSig, false, null, perms);
+
+        if (!isGatewayCallerAuthorized(context, upperMethod, normalizedPath)) {
+            writeJsonError(response, HttpServletResponse.SC_FORBIDDEN,
+                    "Accès interdit : privilèges insuffisants pour accéder à cette ressource de notification.");
+            return false;
+        }
+
+        SecurityUserContextHolder.setContext(context);
         return true;
+    }
+
+    private boolean isGatewayCallerAuthorized(SecurityUserContext context, String method, String path) {
+        if (path.startsWith("/api/notifications/mes-notifications")
+                || "/api/notifications/tout-lire".equals(path)
+                || ("PATCH".equals(method) && path.matches("^/api/notifications/\\d+/lire$"))) {
+            return context.hasPermission("NOTIFICATION:LIRE_PROPRE")
+                    || context.hasPermission("NOTIFICATION:GERER_PROPRE");
+        }
+        if ("GET".equals(method) && path.matches("^/api/notifications/\\d+$")) {
+            return context.hasPermission("NOTIFICATION:LIRE_PROPRE")
+                    || context.hasPermission("NOTIFICATION:LIRE_TOUT")
+                    || context.isAdmin();
+        }
+        if ("POST".equals(method) && (path.equals("/api/notifications/relancer-echecs")
+                || path.matches("^/api/notifications/\\d+/relancer$"))) {
+            return context.isAdmin() || context.hasPermission("NOTIFICATION:RELANCER");
+        }
+        if ("GET".equals(method) && "/api/notifications/toutes".equals(path)) {
+            return context.isAdmin() || context.hasPermission("NOTIFICATION:LIRE_TOUT");
+        }
+        // Admin endpoints historiques : GET /api/notifications, POST /api/notifications, DELETE /api/notifications/{id}
+        return context.isAdmin() || context.hasPermission("NOTIFICATION:LIRE_TOUT");
     }
 
     private boolean validateInterserviceCall(CachedBodyHttpServletRequest request,
@@ -267,13 +314,33 @@ public class MicroserviceSecurityFilter extends OncePerRequestFilter {
             return false;
         }
 
+        Long parsedUserId = parseNullableLong(userIdForSig);
+        SecurityUserContextHolder.setContext(new SecurityUserContext(
+                parsedUserId,
+                roleForSig,
+                emailForSig,
+                true,
+                callerService.trim(),
+                SecurityUserContext.parsePermissions(permsForSig, roleForSig)
+        ));
         return true;
     }
 
     private boolean isCallerServiceAuthorized(String callerService, String method, String normalizedPath) {
-        return ("ms-paiement".equals(callerService) || "ms-reservation".equals(callerService))
+        return ALLOWED_CALLER_SERVICES.contains(callerService)
                 && "POST".equalsIgnoreCase(method)
                 && "/api/notifications".equals(normalizedPath);
+    }
+
+    private Long parseNullableLong(String val) {
+        if (val == null || val.isBlank() || "ANONYMOUS".equals(val) || "SYSTEM".equals(val)) {
+            return null;
+        }
+        try {
+            return Long.parseLong(val.trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private String defaultIfBlank(String val, String fallback) {

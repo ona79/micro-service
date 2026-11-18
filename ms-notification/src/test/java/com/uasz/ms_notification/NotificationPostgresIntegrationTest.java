@@ -1,5 +1,6 @@
 package com.uasz.ms_notification;
 
+import com.uasz.ms_notification.entities.StatutNotification;
 import com.uasz.ms_notification.repositories.NotificationRepository;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -32,5 +33,9 @@ class NotificationPostgresIntegrationTest {
         long count = notificationRepository.count();
         System.out.println(">>> [POSTGRES 16 TEST] ms-notification connecté avec succès ! Nombre de notifications : " + count);
         assertThat(count).isGreaterThanOrEqualTo(2);
+        assertThat(notificationRepository.findById(1L))
+                .isPresent()
+                .get()
+                .satisfies(n -> assertThat(n.getStatut()).isEqualTo(StatutNotification.ENVOYEE));
     }
 }
