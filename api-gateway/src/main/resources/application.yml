@@ -56,7 +56,9 @@ eureka:
 
 security:
   session:
-    secret: ${SECURITY_SESSION_SECRET:dev-secret-key-patrimoine-casamance-uasz-32bytes!}
+    secret: ${SECURITY_SESSION_SECRET:?Variable obligatoire SECURITY_SESSION_SECRET non definie (min 32 octets)}
+  interservice:
+    secret: ${SECURITY_INTERSERVICE_SECRET:?Variable obligatoire SECURITY_INTERSERVICE_SECRET non definie (min 32 octets)}
 
 ---
 # Profil PROD : Secrets obligatoires et Actuator durci
@@ -74,3 +76,5 @@ management:
 security:
   session:
     secret: ${SECURITY_SESSION_SECRET:?Variable obligatoire SECURITY_SESSION_SECRET manquante pour la production (min 32 octets)}
+  interservice:
+    secret: ${SECURITY_INTERSERVICE_SECRET:?Variable obligatoire SECURITY_INTERSERVICE_SECRET manquante pour la production (min 32 octets)}

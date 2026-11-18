@@ -4,9 +4,23 @@ import { Router } from '@angular/router';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthStore } from '../auth/auth.store';
 
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined' || !document.cookie) {
+    return null;
+  }
+  const cookies = document.cookie.split(';');
+  for (const raw of cookies) {
+    const [k, ...rest] = raw.trim().split('=');
+    if (k === name && rest.length > 0) {
+      return decodeURIComponent(rest.join('='));
+    }
+  }
+  return null;
+}
+
 /**
- * Attache systématiquement `withCredentials: true` aux requêtes API pour transmettre
- * les cookies HttpOnly de session et gère le rafraîchissement transparent (silent refresh) sur 401.
+ * Attache systématiquement `withCredentials: true` et l'en-tête anti-CSRF `X-XSRF-TOKEN`
+ * aux requêtes mutatives, et gère le rafraîchissement transparent (silent refresh) sur 401.
  */
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authStore = inject(AuthStore);
@@ -14,8 +28,12 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const httpBackend = inject(HttpBackend);
   const rawHttp = new HttpClient(httpBackend);
 
+  const isMutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method.toUpperCase());
+  const xsrfToken = isMutating ? readCookie('XSRF-TOKEN') : null;
+
   const authReq = req.clone({
     withCredentials: true,
+    setHeaders: xsrfToken && !req.headers.has('X-XSRF-TOKEN') ? { 'X-XSRF-TOKEN': xsrfToken } : {},
   });
 
   return next(authReq).pipe(
@@ -26,24 +44,30 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         const isRefreshCall = req.url.includes('/api/utilisateurs/refresh');
 
         if (!isSessionProbe && !isLoginCall && !isRefreshCall && authStore.isAuthenticated()) {
-          // Tentative de rafraîchissement transparent du jeton (Silent Refresh)
-          return rawHttp.post('/api/utilisateurs/refresh', {}, { withCredentials: true }).pipe(
-            switchMap(() => {
-              // Rafraîchissement réussi : on rejoue la requête initiale
-              return next(authReq);
-            }),
-            catchError((refreshErr) => {
-              // Échec du rafraîchissement : révocation de session et redirection vers connexion
-              authStore.clearSessionLocally();
-              const currentUrl = router.url;
-              if (!currentUrl.startsWith('/connexion')) {
-                void router.navigate(['/connexion'], {
-                  queryParams: { returnUrl: currentUrl, expired: '1' },
+          const refreshXsrf = readCookie('XSRF-TOKEN');
+          const refreshHeaders: Record<string, string> = refreshXsrf ? { 'X-XSRF-TOKEN': refreshXsrf } : {};
+          return rawHttp
+            .post('/api/utilisateurs/refresh', {}, { withCredentials: true, headers: refreshHeaders })
+            .pipe(
+              switchMap(() => {
+                const updatedXsrf = isMutating ? readCookie('XSRF-TOKEN') : null;
+                const retryReq = req.clone({
+                  withCredentials: true,
+                  setHeaders: updatedXsrf ? { 'X-XSRF-TOKEN': updatedXsrf } : {},
                 });
-              }
-              return throwError(() => refreshErr);
-            })
-          );
+                return next(retryReq);
+              }),
+              catchError((refreshErr) => {
+                authStore.clearSessionLocally();
+                const currentUrl = router.url;
+                if (!currentUrl.startsWith('/connexion')) {
+                  void router.navigate(['/connexion'], {
+                    queryParams: { returnUrl: currentUrl, expired: '1' },
+                  });
+                }
+                return throwError(() => refreshErr);
+              })
+            );
         }
       }
       return throwError(() => error);
