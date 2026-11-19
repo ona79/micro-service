@@ -45,7 +45,8 @@ import { ScrollRevealDirective } from '../../../../shared/directives/scroll-reve
             Patrimoine culturel &amp; naturel · Casamance, Sénégal
           </p>
           <h1 class="hero-fullscreen__title hero-stagger hero-stagger--2">
-            Explorez la mémoire vivante et les terroirs de Casamance
+            Explorez la <em class="hero-title-accent">mémoire vivante</em> et les terroirs de
+            <span class="hero-title-highlight">Casamance</span>
           </h1>
           <p class="hero-fullscreen__lead hero-stagger hero-stagger--3">
             De Ziguinchor à Kolda, en passant par l’île de Carabane, les cases à impluvium d’Enampore,
@@ -182,39 +183,74 @@ import { ScrollRevealDirective } from '../../../../shared/directives/scroll-reve
     }
 
     .hero-fullscreen__content {
-      max-width: 740px;
+      max-width: 860px;
+      margin: 0 auto;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     .hero-eyebrow {
       display: inline-flex;
       align-items: center;
-      padding: 5px 13px;
+      gap: 8px;
+      padding: 6px 16px;
       border-radius: 999px;
       background: rgba(250, 246, 240, 0.14);
-      border: 1px solid rgba(250, 246, 240, 0.25);
-      color: #f4e6d2;
+      border: 1px solid rgba(233, 196, 106, 0.42);
+      color: #f8e3b4;
       font-size: 12px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.07em;
-      margin-bottom: 16px;
+      letter-spacing: 0.1em;
+      margin-bottom: 18px;
     }
 
     .hero-fullscreen__title {
-      font-family: var(--font-display);
-      font-size: clamp(2.1rem, 4.3vw, 3.35rem);
-      line-height: 1.1;
+      font-family: var(--font-sans);
+      font-size: clamp(2.35rem, 4.7vw, 3.85rem);
+      font-weight: 800;
+      line-height: 1.08;
       color: #faf6f0;
-      margin: 0 0 16px;
-      letter-spacing: -0.015em;
+      margin: 0 0 18px;
+      letter-spacing: -0.02em;
+      text-shadow: 0 10px 30px rgba(7, 19, 14, 0.45);
+    }
+
+    .hero-title-accent {
+      font-family: var(--font-editorial, Georgia, serif);
+      font-style: italic;
+      font-weight: 700;
+      font-size: 1.12em;
+      color: #f6cf7e;
+      padding: 0 4px;
+    }
+
+    .hero-title-highlight {
+      position: relative;
+      display: inline-block;
+      color: #ffffff;
+    }
+
+    .hero-title-highlight::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 2px;
+      height: 4px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #b75f3b 0%, #e9c46a 100%);
+      opacity: 0.9;
     }
 
     .hero-fullscreen__lead {
-      font-size: clamp(0.98rem, 1.35vw, 1.1rem);
+      font-size: clamp(1rem, 1.35vw, 1.12rem);
       line-height: 1.65;
-      color: rgba(250, 246, 240, 0.88);
-      margin: 0 0 24px;
-      max-width: 650px;
+      color: rgba(250, 246, 240, 0.9);
+      margin: 0 auto 26px;
+      max-width: 710px;
     }
 
     /* Staggered fade-in on transform & opacity */
@@ -238,6 +274,8 @@ import { ScrollRevealDirective } from '../../../../shared/directives/scroll-reve
 
     /* Translucent floating search card */
     .hero-floating-card {
+      width: 100%;
+      max-width: 720px;
       background: rgba(250, 246, 240, 0.13);
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
@@ -246,6 +284,22 @@ import { ScrollRevealDirective } from '../../../../shared/directives/scroll-reve
       padding: 14px 16px;
       margin-bottom: 24px;
       box-shadow: 0 18px 40px rgba(8, 22, 16, 0.28);
+    }
+
+    .hero-topics {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 12px;
+    }
+
+    .hero-actions {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px;
     }
 
     .hero-search {

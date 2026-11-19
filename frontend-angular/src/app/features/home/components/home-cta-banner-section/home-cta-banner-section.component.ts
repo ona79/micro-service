@@ -35,8 +35,10 @@ import { ScrollRevealDirective } from '../../../../shared/directives/scroll-reve
           </div>
 
           <div class="final-cta-banner__content">
-            <p class="final-cta-banner__eyebrow">Tourisme culturel responsable</p>
-            <h2 class="final-cta-banner__title">Préparer votre venue en Casamance</h2>
+            <p class="final-cta-banner__eyebrow">05 · Tourisme culturel responsable</p>
+            <h2 class="final-cta-banner__title">
+              Préparer votre venue en <em class="cta-title-serif">Casamance</em>
+            </h2>
             <p class="final-cta-banner__lead">
               Réservez directement vos visites de circuits et événements culturels, consultez les
               disponibilités calculées côté serveur et laissez des avis vérifiés après votre passage.
@@ -97,17 +99,19 @@ import { ScrollRevealDirective } from '../../../../shared/directives/scroll-reve
     .final-cta-banner__content {
       position: relative;
       z-index: 1;
-      padding: 44px 48px;
-      max-width: 680px;
+      padding: 48px 32px;
+      max-width: 720px;
+      margin: 0 auto;
+      text-align: center;
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
+      align-items: center;
       gap: 14px;
     }
 
     .final-cta-banner__eyebrow {
       margin: 0;
-      padding: 4px 12px;
+      padding: 4px 14px;
       border-radius: 999px;
       background: rgba(198, 139, 44, 0.25);
       border: 1px solid rgba(233, 196, 106, 0.45);
@@ -115,27 +119,37 @@ import { ScrollRevealDirective } from '../../../../shared/directives/scroll-reve
       font-size: 11.5px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
     }
 
     .final-cta-banner__title {
       margin: 0;
       font-family: var(--font-display);
-      font-size: clamp(1.65rem, 3vw, 2.35rem);
+      font-size: clamp(1.75rem, 3.2vw, 2.55rem);
       line-height: 1.15;
       color: #faf6f0;
+    }
+
+    .cta-title-serif {
+      font-family: var(--font-editorial, Georgia, serif);
+      font-style: italic;
+      font-weight: 700;
+      font-size: 1.14em;
+      color: #f6cf7e;
     }
 
     .final-cta-banner__lead {
       margin: 0;
       font-size: 14.5px;
       line-height: 1.6;
-      color: rgba(250, 246, 240, 0.88);
+      color: rgba(250, 246, 240, 0.9);
+      max-width: 620px;
     }
 
     .final-cta-banner__actions {
       margin-top: 8px;
       display: flex;
+      justify-content: center;
       flex-wrap: wrap;
       gap: 12px;
     }

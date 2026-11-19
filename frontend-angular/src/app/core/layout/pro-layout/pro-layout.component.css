@@ -196,19 +196,34 @@
 }
 
 .pro-footer-link {
+  width: 100%;
   display: flex;
   align-items: center;
   gap: var(--space-2);
   padding: 0.55rem 0.75rem;
   border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
   color: var(--ink-on-dark-muted);
+  font-family: var(--font-sans);
   font-size: var(--text-sm);
   font-weight: 600;
+  cursor: pointer;
+  text-align: left;
 }
 
 .pro-footer-link:hover {
   background-color: rgba(255, 255, 255, 0.08);
   color: #ffffff;
+}
+
+.pro-footer-link--danger {
+  color: #fca5a5;
+}
+
+.pro-footer-link--danger:hover {
+  background-color: rgba(239, 68, 68, 0.18);
+  color: #fecaca;
 }
 
 .pro-main-col {
@@ -421,38 +436,28 @@
   margin: 0 auto;
 }
 
-@media (max-width: 1279px) and (min-width: 961px) {
-  .pro-shell {
-    grid-template-columns: 68px minmax(0, 1fr);
-  }
+.pro-nav {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
 
-  .pro-sidebar {
-    width: 68px;
-    transition: width var(--transition-base);
-  }
+.pro-nav::-webkit-scrollbar {
+  display: none;
+}
 
-  .pro-sidebar .pro-brand__text,
-  .pro-sidebar .pro-nav__heading-btn,
-  .pro-sidebar .pro-nav__label,
-  .pro-sidebar .pro-nav__pill,
-  .pro-sidebar .pro-nav__count,
-  .pro-sidebar .pro-footer-link span {
-    display: none;
-  }
+.pro-shell--collapsed .pro-sidebar .pro-brand__text,
+.pro-shell--collapsed .pro-sidebar .pro-nav__heading-btn,
+.pro-shell--collapsed .pro-sidebar .pro-nav__label,
+.pro-shell--collapsed .pro-sidebar .pro-nav__pill,
+.pro-shell--collapsed .pro-sidebar .pro-nav__count,
+.pro-shell--collapsed .pro-sidebar .pro-footer-link span {
+  display: none;
+}
 
-  .pro-sidebar:hover {
-    width: 220px;
-    box-shadow: var(--shadow-lg);
-  }
-
-  .pro-sidebar:hover .pro-brand__text,
-  .pro-sidebar:hover .pro-nav__heading-btn,
-  .pro-sidebar:hover .pro-nav__label,
-  .pro-sidebar:hover .pro-nav__pill,
-  .pro-sidebar:hover .pro-nav__count,
-  .pro-sidebar:hover .pro-footer-link span {
-    display: flex;
-  }
+.pro-shell--collapsed .pro-nav__link {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 @media (max-width: 960px) {
@@ -502,9 +507,12 @@
 
   .pro-topbar__context,
   .pro-topbar__sep,
-  .pro-user-pill,
-  .pro-logout-btn__text {
+  .pro-user-pill__meta {
     display: none;
+  }
+
+  .pro-user-pill {
+    padding: 3px;
   }
 
   .pro-content {

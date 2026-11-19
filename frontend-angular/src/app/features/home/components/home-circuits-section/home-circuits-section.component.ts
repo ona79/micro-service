@@ -42,15 +42,12 @@ import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
   template: `
     <section class="page-section band-sand circuits-carousel-section" aria-labelledby="circuits-home-title">
       <div class="container">
-        <div class="section-header" appScrollReveal="fade-up">
-          <div>
-            <p class="eyebrow">Itinéraires thématiques</p>
-            <h2 id="circuits-home-title" class="section-title">
-              Circuits entre bolongs, forêts et mémoires
-            </h2>
-          </div>
-
-          <div class="section-header__right">
+        <div class="section-header section-header--reverse" appScrollReveal="slide-right">
+          <div class="section-header__controls">
+            <a routerLink="/circuits" class="section-link-pill">
+              <span>Tous les circuits</span>
+              <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
+            </a>
             @if (circuits().length > 1) {
               <div class="carousel-controls" aria-label="Navigation du carrousel des circuits">
                 <button
@@ -71,10 +68,13 @@ import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
                 </button>
               </div>
             }
-            <a routerLink="/circuits" class="section-link">
-              <span>Tous les circuits</span>
-              <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
-            </a>
+          </div>
+
+          <div class="section-header__title-right">
+            <p class="eyebrow">02 · Itinéraires thématiques</p>
+            <h2 id="circuits-home-title" class="section-title">
+              Circuits entre <em class="title-serif-ochre">bolongs, forêts</em> et mémoires
+            </h2>
           </div>
         </div>
 
@@ -218,40 +218,55 @@ import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
       border-bottom: 1px solid var(--border-subtle);
     }
 
-    .section-header {
+    .section-header--reverse {
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
       gap: 16px;
-      margin-bottom: 24px;
+      margin-bottom: 26px;
+      flex-wrap: wrap-reverse;
+    }
+
+    .section-header__controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
       flex-wrap: wrap;
     }
 
-    .section-header__right {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      flex-wrap: wrap;
+    .section-header__title-right {
+      text-align: right;
+      margin-left: auto;
+      padding-right: 16px;
+      border-right: 4px solid var(--brand-primary);
     }
 
     .section-title {
-      font-size: clamp(1.55rem, 2.8vw, 2.1rem);
-      margin: 6px 0 0;
+      font-size: clamp(1.65rem, 3vw, 2.25rem);
+      margin: 4px 0 0;
       color: var(--ink-primary);
     }
 
-    .section-link {
+    .title-serif-ochre {
+      font-family: var(--font-editorial, Georgia, serif);
+      font-style: italic;
+      font-weight: 700;
+      font-size: 1.12em;
+      color: #8f5c14;
+    }
+
+    .section-link-pill {
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: 1px solid var(--border-strong);
+      background-color: var(--surface-elevated);
       font-weight: 700;
-      font-size: 14px;
+      font-size: 13px;
       color: var(--brand-primary);
       text-decoration: none;
-    }
-
-    .section-link:hover {
-      text-decoration: underline;
     }
 
     .carousel-controls {

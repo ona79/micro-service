@@ -30,12 +30,17 @@ export interface ZoneCasamanceCard {
   template: `
     <section class="page-section terroirs-section" aria-labelledby="zones-title">
       <div class="container">
-        <div class="section-header" appScrollReveal="fade-up">
-          <div>
-            <p class="eyebrow">Trois grands ensembles géographiques</p>
-            <h2 id="zones-title" class="section-title">Explorer la Casamance par terroir</h2>
+        <div class="section-header section-header--centered" appScrollReveal="zoom-in">
+          <p class="eyebrow eyebrow--pill">Trois grands ensembles géographiques</p>
+          <h2 id="zones-title" class="section-title section-title--editorial">
+            Explorer la Casamance <em class="title-serif-accent">par terroir</em>
+          </h2>
+          <div class="section-title-ornament" aria-hidden="true">
+            <span class="ornament-line"></span>
+            <span class="ornament-diamond"></span>
+            <span class="ornament-line"></span>
           </div>
-          <a routerLink="/patrimoines" class="section-link">
+          <a routerLink="/patrimoines" class="section-link section-link--centered">
             <span>Carte &amp; annuaire complet</span>
             <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
           </a>
@@ -100,19 +105,63 @@ export interface ZoneCasamanceCard {
       padding: 56px 0;
     }
 
-    .section-header {
+    .section-header--centered {
       display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      gap: 16px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 8px;
+      margin-bottom: 30px;
     }
 
-    .section-title {
-      font-size: clamp(1.55rem, 2.8vw, 2.1rem);
-      margin: 6px 0 0;
+    .eyebrow--pill {
+      display: inline-flex;
+      padding: 4px 14px;
+      border-radius: 999px;
+      background-color: var(--brand-soft, #e4efe9);
+      color: var(--brand-primary);
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin: 0;
+    }
+
+    .section-title--editorial {
+      font-family: var(--font-sans);
+      font-size: clamp(1.75rem, 3.1vw, 2.45rem);
+      font-weight: 800;
+      margin: 2px 0 0;
       color: var(--ink-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .title-serif-accent {
+      font-family: var(--font-editorial, Georgia, serif);
+      font-style: italic;
+      font-weight: 700;
+      font-size: 1.12em;
+      color: var(--accent-terracotta, #b75f3b);
+    }
+
+    .section-title-ornament {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin: 2px 0 4px;
+    }
+
+    .ornament-line {
+      width: 44px;
+      height: 1.5px;
+      background: linear-gradient(90deg, transparent, var(--accent-ochre-gold, #d9a441), transparent);
+    }
+
+    .ornament-diamond {
+      width: 7px;
+      height: 7px;
+      background-color: var(--accent-terracotta, #b75f3b);
+      transform: rotate(45deg);
     }
 
     .section-link {
@@ -120,7 +169,7 @@ export interface ZoneCasamanceCard {
       align-items: center;
       gap: 8px;
       font-weight: 700;
-      font-size: 14px;
+      font-size: 13.5px;
       color: var(--brand-primary);
       text-decoration: none;
     }

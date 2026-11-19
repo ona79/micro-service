@@ -47,11 +47,11 @@ const MONTHS_SHORT_FR = [
   template: `
     <section class="page-section agenda-section" aria-labelledby="events-home-title">
       <div class="container">
-        <div class="section-header" appScrollReveal="fade-up">
-          <div>
-            <p class="eyebrow">Rendez-vous culturels</p>
-            <h2 id="events-home-title" class="section-title">Agenda des événements en Casamance</h2>
-          </div>
+        <div class="section-header section-header--agenda-center" appScrollReveal="fade-up">
+          <span class="agenda-badge-kicker">03 · RENDEZ-VOUS CULTURELS</span>
+          <h2 id="events-home-title" class="section-title">
+            Agenda des <em class="title-serif-terracotta">événements</em> en Casamance
+          </h2>
           <a routerLink="/evenements" class="section-link">
             <span>Tout l’agenda</span>
             <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
@@ -137,19 +137,39 @@ const MONTHS_SHORT_FR = [
       padding: 52px 0;
     }
 
-    .section-header {
+    .section-header--agenda-center {
       display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      gap: 16px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+
+    .agenda-badge-kicker {
+      display: inline-flex;
+      padding: 4px 14px;
+      border-radius: 999px;
+      background-color: var(--accent-terracotta-soft, #f9ece6);
+      border: 1px solid var(--accent-terracotta-border, #e5b7a5);
+      color: var(--accent-terracotta, #b75f3b);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
     }
 
     .section-title {
-      font-size: clamp(1.55rem, 2.8vw, 2.1rem);
-      margin: 6px 0 0;
+      font-size: clamp(1.7rem, 3vw, 2.35rem);
+      margin: 2px 0 0;
       color: var(--ink-primary);
+    }
+
+    .title-serif-terracotta {
+      font-family: var(--font-editorial, Georgia, serif);
+      font-style: italic;
+      font-weight: 700;
+      font-size: 1.14em;
+      color: var(--accent-terracotta, #b75f3b);
     }
 
     .section-link {

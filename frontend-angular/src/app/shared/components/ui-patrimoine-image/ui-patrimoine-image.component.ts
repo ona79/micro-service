@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
 
 const LOCAL_PATRIMOINE_ASSETS: Record<string, string> = {
-  'PAT-ZIG-001': '/images/patrimoines/PAT-ZIG-001.svg',
+  'PAT-ZIG-001': '/images/circuits-banner.webp',
   'PAT-CRB-002': '/images/patrimoines/PAT-CRB-002.webp',
   'PAT-ZIG-003': '/images/patrimoines/PAT-ZIG-003.webp',
   'PAT-OSS-004': '/images/patrimoines/PAT-OSS-004.webp',
   'PAT-CAS-005': '/images/patrimoines/PAT-CAS-005.webp',
-  'PAT-SED-006': '/images/patrimoines/PAT-SED-006.svg',
+  'PAT-SED-006': '/images/patrimoines/PAT-DKR-001.webp',
   'PAT-OSS-007': '/images/patrimoines/PAT-OSS-007.webp',
   'PAT-KOL-008': '/images/patrimoines/PAT-KOL-008.webp',
   'PAT-DKR-001': '/images/patrimoines/PAT-DKR-001.webp',
@@ -16,12 +16,12 @@ const LOCAL_PATRIMOINE_ASSETS: Record<string, string> = {
 };
 
 const LEGACY_ASSET_FILENAME_MAP: Record<string, string> = {
-  'memorial-joola.jpg': '/images/patrimoines/PAT-ZIG-001.svg',
+  'memorial-joola.jpg': '/images/circuits-banner.webp',
   'carabane.jpg': '/images/patrimoines/PAT-CRB-002.webp',
   'cathedrale-zig.jpg': '/images/patrimoines/PAT-ZIG-003.webp',
   'bois-oussouye.jpg': '/images/patrimoines/PAT-OSS-004.webp',
   'enampore.jpg': '/images/patrimoines/PAT-CAS-005.webp',
-  'fort-sedhiou.jpg': '/images/patrimoines/PAT-SED-006.svg',
+  'fort-sedhiou.jpg': '/images/patrimoines/PAT-DKR-001.webp',
   'mangrove-oussouye.jpg': '/images/patrimoines/PAT-OSS-007.webp',
   'reserve-kolda.jpg': '/images/patrimoines/PAT-KOL-008.webp',
 };
@@ -128,7 +128,7 @@ export class UiPatrimoineImageComponent {
     if (code.includes('KOL') || name.includes('kolda') || name.includes('vélingara') || name.includes('réserve')) {
       return LOCAL_PATRIMOINE_ASSETS['PAT-KOL-008'];
     }
-    if (code.includes('CAS') || name.includes('impluvium') || name.includes('enampore') || name.includes('casamance')) {
+    if (code.includes('CAS') || name.includes('impluvium') || name.includes('enampore')) {
       return LOCAL_PATRIMOINE_ASSETS['PAT-CAS-005'];
     }
     if (name.includes('gorée') || name.includes('esclave')) {
@@ -137,7 +137,24 @@ export class UiPatrimoineImageComponent {
     if (code.includes('SLN') || name.includes('saint-louis') || name.includes('faidherbe')) {
       return LOCAL_PATRIMOINE_ASSETS['PAT-SLN-004'];
     }
-    return '/images/hero.webp';
+
+    const pool = [
+      '/images/patrimoines/PAT-CRB-002.webp',
+      '/images/patrimoines/PAT-ZIG-003.webp',
+      '/images/patrimoines/PAT-OSS-004.webp',
+      '/images/patrimoines/PAT-CAS-005.webp',
+      '/images/patrimoines/PAT-OSS-007.webp',
+      '/images/patrimoines/PAT-KOL-008.webp',
+      '/images/circuits-banner.webp',
+      '/images/patrimoines/PAT-DKR-001.webp',
+      '/images/patrimoines/PAT-SLN-004.webp',
+    ];
+    let hash = 0;
+    const key = code || name || 'casamance';
+    for (let i = 0; i < key.length; i++) {
+      hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+    }
+    return pool[hash % pool.length];
   });
 
   protected readonly resolvedSrcset = computed(() => {

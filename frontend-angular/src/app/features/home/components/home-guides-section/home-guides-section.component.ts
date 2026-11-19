@@ -28,11 +28,15 @@ import { ScrollRevealDirective } from '../../../../shared/directives/scroll-reve
   template: `
     <section class="page-section band-sand guides-human-section" aria-labelledby="guides-home-title">
       <div class="container">
-        <div class="section-header" appScrollReveal="fade-up">
-          <div>
-            <p class="eyebrow">Savoir-faire &amp; transmission</p>
-            <h2 id="guides-home-title" class="section-title">Guides touristiques agréés</h2>
+        <div class="section-header section-header--guides-center" appScrollReveal="zoom-in">
+          <div class="guides-ornament-top" aria-hidden="true">
+            <span class="guides-ornament-line"></span>
+            <span class="guides-ornament-kicker">04 · SAVOIR-FAIRE &amp; TRANSMISSION</span>
+            <span class="guides-ornament-line"></span>
           </div>
+          <h2 id="guides-home-title" class="section-title">
+            Guides touristiques <em class="title-serif-forest">agréés</em>
+          </h2>
           <a routerLink="/guides" class="section-link">
             <span>Voir tous les guides</span>
             <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
@@ -141,19 +145,46 @@ import { ScrollRevealDirective } from '../../../../shared/directives/scroll-reve
       border-bottom: 1px solid var(--border-subtle);
     }
 
-    .section-header {
+    .section-header--guides-center {
       display: flex;
-      justify-content: space-between;
-      align-items: flex-end;
-      gap: 16px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+
+    .guides-ornament-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .guides-ornament-line {
+      width: 36px;
+      height: 1px;
+      background-color: var(--border-strong);
+    }
+
+    .guides-ornament-kicker {
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      color: var(--brand-primary);
     }
 
     .section-title {
-      font-size: clamp(1.55rem, 2.8vw, 2.1rem);
-      margin: 6px 0 0;
+      font-size: clamp(1.7rem, 3vw, 2.35rem);
+      margin: 2px 0 0;
       color: var(--ink-primary);
+    }
+
+    .title-serif-forest {
+      font-family: var(--font-editorial, Georgia, serif);
+      font-style: italic;
+      font-weight: 700;
+      font-size: 1.14em;
+      color: var(--brand-primary);
     }
 
     .section-link {

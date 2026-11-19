@@ -34,12 +34,14 @@ import { isLieuDeMemoire } from '../../../../shared/utils/patrimoine.utils';
   template: `
     <section class="page-section editorial-section" aria-labelledby="featured-sites-title">
       <div class="container">
-        <div class="section-header" appScrollReveal="fade-up">
-          <div>
-            <p class="eyebrow">Sélection éditoriale</p>
-            <h2 id="featured-sites-title" class="section-title">Sites patrimoniaux à la une</h2>
+        <div class="section-header section-header--editorial-left" appScrollReveal="slide-left">
+          <div class="editorial-title-block">
+            <span class="editorial-kicker">01 · SÉLECTION ÉDITORIALE</span>
+            <h2 id="featured-sites-title" class="section-title">
+              Sites patrimoniaux <em class="title-serif-green">à la une</em>
+            </h2>
           </div>
-          <a routerLink="/patrimoines" class="section-link">
+          <a routerLink="/patrimoines" class="section-link-pill">
             <span>Tout le catalogue</span>
             <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
           </a>
@@ -200,33 +202,62 @@ import { isLieuDeMemoire } from '../../../../shared/utils/patrimoine.utils';
       padding: 48px 0 56px;
     }
 
-    .section-header {
+    .section-header--editorial-left {
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
       gap: 16px;
-      margin-bottom: 24px;
+      margin-bottom: 26px;
       flex-wrap: wrap;
     }
 
-    .section-title {
-      font-size: clamp(1.55rem, 2.8vw, 2.1rem);
-      margin: 6px 0 0;
-      color: var(--ink-primary);
+    .editorial-title-block {
+      padding-left: 16px;
+      border-left: 4px solid var(--accent-terracotta, #b75f3b);
     }
 
-    .section-link {
+    .editorial-kicker {
+      display: block;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      color: var(--accent-terracotta, #b75f3b);
+      text-transform: uppercase;
+    }
+
+    .section-title {
+      font-size: clamp(1.65rem, 3vw, 2.25rem);
+      margin: 4px 0 0;
+      color: var(--ink-primary);
+      letter-spacing: -0.015em;
+    }
+
+    .title-serif-green {
+      font-family: var(--font-editorial, Georgia, serif);
+      font-style: italic;
+      font-weight: 700;
+      font-size: 1.12em;
+      color: var(--brand-primary);
+    }
+
+    .section-link-pill {
       display: inline-flex;
       align-items: center;
       gap: 8px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: 1px solid var(--border-strong);
+      background-color: var(--surface-elevated);
       font-weight: 700;
-      font-size: 14px;
+      font-size: 13px;
       color: var(--brand-primary);
       text-decoration: none;
+      transition: transform 150ms ease;
     }
 
-    .section-link:hover {
-      text-decoration: underline;
+    .section-link-pill:hover {
+      transform: translateX(3px);
+      border-color: var(--brand-primary);
     }
 
     /* Editorial magazine layout: 1 large feature left + 2 stacked right */

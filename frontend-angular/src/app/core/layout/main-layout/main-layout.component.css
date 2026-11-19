@@ -513,10 +513,16 @@
 @media (max-width: 1120px) {
   .nav-desktop,
   .cta-reserve,
-  .auth-link,
-  .user-chip,
-  .btn-icon-logout {
+  .user-chip__name {
     display: none;
+  }
+
+  .user-chip {
+    padding: 3px;
+  }
+
+  .auth-link {
+    padding: 0.4rem 0.7rem;
   }
 
   .burger-btn {
