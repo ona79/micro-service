@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { AuthStore } from '../../../../core/auth/auth.store';
 import { PermissionService } from '../../../../core/auth/permissions';
 import { extractErrorMessage } from '../../../../core/models/api-error.model';
+import { AvisResume } from '../../../../core/models/avis.model';
 import { Circuit } from '../../../../core/models/circuit.model';
 import { GuideProfil, formatGuideStatusLabel, guideStatusBadgeClass } from '../../../../core/models/guide.model';
 import { PaiementStats } from '../../../../core/models/paiement.model';
@@ -126,6 +127,13 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
             tone="ochre"
             subtitle="En attente de finalisation ou publication"
             link="/pro/circuits"
+          />
+          <app-ui-kpi-card
+            label="Note avis voyageurs"
+            [value]="(guideAvisResume()?.totalAvis ?? 0) > 0 ? (guideAvisResume()!.noteMoyenne + ' / 5') : 'Aucun avis'"
+            [tone]="(guideAvisResume()?.totalAvis ?? 0) > 0 ? 'forest' : 'neutral'"
+            subtitle="{{ (guideAvisResume()?.totalAvis ?? 0) > 0 ? ((guideAvisResume()?.totalAvis ?? 0) + ' avis vérifiés') : 'Dépôt post-prestation' }}"
+            link="/pro/mon-profil-guide"
           />
           <app-ui-kpi-card
             label="Notifications non lues"
@@ -297,6 +305,7 @@ export class ProDashboardPageComponent implements OnInit {
 
   protected readonly monProfilGuide = signal<GuideProfil | null>(null);
   protected readonly mesCircuits = signal<Circuit[]>([]);
+  protected readonly guideAvisResume = signal<AvisResume | null>(null);
 
   protected readonly formatGuideStatus = formatGuideStatusLabel;
   protected readonly guideBadge = guideStatusBadgeClass;
@@ -355,6 +364,7 @@ export class ProDashboardPageComponent implements OnInit {
       const tasks: Promise<unknown>[] = [];
 
       if (this.authStore.isGuide()) {
+        const u = this.authStore.user();
         tasks.push(
           firstValueFrom(this.guideApi.getMonProfil())
             .then((p) => this.monProfilGuide.set(p))
@@ -362,6 +372,13 @@ export class ProDashboardPageComponent implements OnInit {
           firstValueFrom(this.circuitApi.getStatistiques()).then((s) => this.circuitStats.set(s)),
           firstValueFrom(this.circuitApi.getMesCircuitsGuide()).then((c) => this.mesCircuits.set(c))
         );
+        if (u?.id) {
+          tasks.push(
+            firstValueFrom(this.avisApi.getResume('GUIDE', u.id))
+              .then((res) => this.guideAvisResume.set(res))
+              .catch(() => this.guideAvisResume.set(null))
+          );
+        }
       } else if (this.authStore.isConservateur()) {
         tasks.push(
           firstValueFrom(this.patrimoineApi.getStatistiques()).then((s) =>

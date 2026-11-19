@@ -143,9 +143,25 @@ import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-b
               <button
                 type="button"
                 class="quick-pill"
+                (click)="fillDemo('alassane.badji@zig.univ.sn', 'Gestion2026!')"
+              >
+                <strong>Guide</strong>
+                <span>alassane.badji&#64;zig.univ.sn</span>
+              </button>
+              <button
+                type="button"
+                class="quick-pill"
+                (click)="fillDemo('fatou.kabore@zig.univ.sn', 'Gestion2026!')"
+              >
+                <strong>Conservateur</strong>
+                <span>fatou.kabore&#64;zig.univ.sn</span>
+              </button>
+              <button
+                type="button"
+                class="quick-pill"
                 (click)="fillDemo('awa.sagna@zig.univ.sn', 'Gestion2026!')"
               >
-                <strong>Gestionnaire de site</strong>
+                <strong>Gestionnaire</strong>
                 <span>awa.sagna&#64;zig.univ.sn</span>
               </button>
               <button
@@ -366,7 +382,7 @@ import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-b
 
     .quick-accounts__grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
       gap: var(--space-2);
     }
 
