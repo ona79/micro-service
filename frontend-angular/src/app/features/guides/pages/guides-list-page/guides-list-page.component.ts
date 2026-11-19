@@ -65,6 +65,7 @@ import { GuideApiService } from '../../data-access/guide-api.service';
               class="filter-input"
               [(ngModel)]="q"
               name="q"
+              aria-label="Recherche par nom, spécialité ou localité"
               placeholder="Nom, spécialité, Carabane..."
             />
           </label>
@@ -75,6 +76,7 @@ import { GuideApiService } from '../../data-access/guide-api.service';
               class="filter-input"
               [(ngModel)]="zone"
               name="zone"
+              aria-label="Filtrer par zone géographique"
               placeholder="Basse-Casamance, Oussouye..."
             />
           </label>
@@ -85,6 +87,7 @@ import { GuideApiService } from '../../data-access/guide-api.service';
               class="filter-input"
               [(ngModel)]="langue"
               name="langue"
+              aria-label="Filtrer par langue parlée"
               placeholder="Français, Diola, Wolof..."
             />
           </label>

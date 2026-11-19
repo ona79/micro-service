@@ -138,7 +138,7 @@ import { DateFrPipe } from '../../pipes/date-fr.pipe';
               @if (elig.reservationsEligiblesIds.length > 1) {
                 <label class="field-group">
                   <span class="field-label">Réservation associée</span>
-                  <select class="field-input" [(ngModel)]="selectedReservationId" name="resId">
+                  <select class="field-input" [(ngModel)]="selectedReservationId" name="resId" aria-label="Sélectionner la réservation associée">
                     @for (rid of elig.reservationsEligiblesIds; track rid) {
                       <option [ngValue]="rid">Réservation confirmée {{ rid }}</option>
                     }
@@ -221,9 +221,10 @@ import { DateFrPipe } from '../../pipes/date-fr.pipe';
                         type="button"
                         class="star-btn"
                         [class.star-btn--active]="s <= editNote"
+                        [attr.aria-label]="'Donner la note de ' + s + ' étoiles sur 5'"
                         (click)="editNote = s"
                       >
-                        <svg lucideStar [size]="16"></svg>
+                        <svg lucideStar [size]="16" aria-hidden="true"></svg>
                       </button>
                     }
                   </div>
@@ -232,6 +233,7 @@ import { DateFrPipe } from '../../pipes/date-fr.pipe';
                     rows="3"
                     [(ngModel)]="editCommentaire"
                     name="editComm_{{ item.id }}"
+                    aria-label="Modifier votre commentaire"
                   ></textarea>
                   <div class="inline-actions">
                     <button type="button" class="btn-mini btn-mini--save" (click)="saveEdit(item)">
@@ -266,6 +268,7 @@ import { DateFrPipe } from '../../pipes/date-fr.pipe';
                     class="field-input"
                     rows="3"
                     [(ngModel)]="replyText"
+                    aria-label="Rédiger votre réponse officielle au voyageur"
                     placeholder="Rédigez votre réponse officielle au voyageur..."
                   ></textarea>
                   <div class="inline-actions">
@@ -312,7 +315,7 @@ import { DateFrPipe } from '../../pipes/date-fr.pipe';
                 <form class="flag-form" (ngSubmit)="submitFlag(item.id)">
                   <label class="field-group">
                     <span class="field-label">Catégorie du signalement</span>
-                    <select class="field-input" [(ngModel)]="flagCategorie" name="cat_{{ item.id }}">
+                    <select class="field-input" [(ngModel)]="flagCategorie" name="cat_{{ item.id }}" aria-label="Catégorie du signalement">
                       <option value="CONTENU_INAPPROPRIE">Contenu inapproprié</option>
                       <option value="PROPOS_OFFENSANTS">Propos offensants</option>
                       <option value="FAUSSE_INFORMATION">Fausse information</option>
@@ -327,6 +330,7 @@ import { DateFrPipe } from '../../pipes/date-fr.pipe';
                       class="field-input"
                       [(ngModel)]="flagMotif"
                       name="motif_{{ item.id }}"
+                      aria-label="Motif détaillé du signalement"
                       placeholder="Expliquez pourquoi cet avis doit être examiné..."
                       minlength="10"
                       required
@@ -662,7 +666,7 @@ import { DateFrPipe } from '../../pipes/date-fr.pipe';
       margin-top: 0.5rem;
       padding: 0.75rem 1rem;
       background: var(--surface-sand, #f8f6f0);
-      border-left: 3px solid var(--brand-primary, #0d9488);
+      border-left: 3px solid var(--color-brand-forest, #28634b);
       border-radius: 0 var(--radius-sm, 6px) var(--radius-sm, 6px) 0;
     }
     .avis-guide-reply__header {
@@ -673,7 +677,7 @@ import { DateFrPipe } from '../../pipes/date-fr.pipe';
       font-size: var(--text-xs);
     }
     .guide-badge-pill {
-      background: var(--brand-primary, #0d9488);
+      background: var(--color-brand-forest, #28634b);
       color: #fff;
       font-size: 0.7rem;
       font-weight: 700;
@@ -697,7 +701,7 @@ import { DateFrPipe } from '../../pipes/date-fr.pipe';
       margin-top: 0.5rem;
       padding: 0.75rem;
       background: var(--surface-sand, #f8f6f0);
-      border: 1px dashed var(--brand-primary, #0d9488);
+      border: 1px dashed var(--color-brand-forest, #28634b);
       border-radius: var(--radius-sm, 6px);
       display: grid;
       gap: 0.5rem;
@@ -706,10 +710,10 @@ import { DateFrPipe } from '../../pipes/date-fr.pipe';
       margin: 0;
       font-size: var(--text-xs);
       font-weight: 700;
-      color: var(--brand-primary, #0d9488);
+      color: var(--color-brand-forest, #28634b);
     }
     .action-link--reply {
-      color: var(--brand-primary, #0d9488);
+      color: var(--color-brand-forest, #28634b);
       font-weight: 600;
     }
     .btn-mini--warn {

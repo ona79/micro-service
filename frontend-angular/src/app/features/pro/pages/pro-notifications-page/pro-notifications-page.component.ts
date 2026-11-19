@@ -96,7 +96,13 @@ import { NotificationStore } from '../../../notifications/data-access/notificati
               <input type="checkbox" [(ngModel)]="nonLuesOnly" (ngModelChange)="loadPerso(0)" />
               <span>Non lues uniquement</span>
             </label>
-            <select class="bo-select" [(ngModel)]="persoType" (ngModelChange)="loadPerso(0)" style="width: auto;">
+            <select
+              class="bo-select"
+              [(ngModel)]="persoType"
+              (ngModelChange)="loadPerso(0)"
+              aria-label="Filtrer mes notifications par type"
+              style="width: auto;"
+            >
               <option value="">Tous les événements</option>
               <option value="RESERVATION_CONFIRMEE">Réservation confirmée</option>
               <option value="PAIEMENT_ACCEPTE">Paiement accepté</option>
@@ -189,7 +195,13 @@ import { NotificationStore } from '../../../notifications/data-access/notificati
       <section class="bo-panel">
         <div class="bo-panel__head">
           <div class="bo-filters" style="margin-bottom: 0;">
-            <select class="bo-select" [(ngModel)]="adminStatut" (ngModelChange)="loadAdmin(0)" style="width: auto;">
+            <select
+              class="bo-select"
+              [(ngModel)]="adminStatut"
+              (ngModelChange)="loadAdmin(0)"
+              aria-label="Filtrer les notifications d'administration par statut"
+              style="width: auto;"
+            >
               <option value="">Tous les statuts</option>
               <option value="ENVOYEE">ENVOYEE</option>
               <option value="EN_ATTENTE">EN_ATTENTE</option>
@@ -200,6 +212,7 @@ import { NotificationStore } from '../../../notifications/data-access/notificati
               type="text"
               class="bo-input"
               [(ngModel)]="adminType"
+              aria-label="Filtrer les notifications d'administration par type d'événement"
               placeholder="Filtrer typeEvenement (ex: PAIEMENT_ACCEPTE)"
               (keyup.enter)="loadAdmin(0)"
               style="width: 240px;"

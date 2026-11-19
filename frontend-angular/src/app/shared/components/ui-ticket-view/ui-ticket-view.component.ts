@@ -179,7 +179,7 @@ interface BilletWithQr extends Billet {
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      background-color: #064e3b;
+      background-color: var(--color-brand-mangrove, #153d30);
       color: #ffffff;
       border-radius: 9999px;
     }
@@ -187,7 +187,7 @@ interface BilletWithQr extends Billet {
     .ticket-view-header__sub {
       margin: 0;
       font-size: 0.88rem;
-      color: var(--ink-secondary, #64748b);
+      color: var(--color-text-secondary, #3d4942);
     }
 
     .ticket-view-header__actions {
@@ -199,7 +199,7 @@ interface BilletWithQr extends Billet {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background-color: #047857;
+      background-color: var(--color-brand-forest, #28634b);
       color: #ffffff;
       border: none;
       padding: 10px 18px;
@@ -211,13 +211,13 @@ interface BilletWithQr extends Billet {
     }
 
     .btn-print:hover {
-      background-color: #065f46;
+      background-color: var(--color-brand-forest-hover, #1e4e3a);
     }
 
     .btn-close {
       background-color: transparent;
-      border: 1px solid #cbd5e1;
-      color: #475569;
+      border: 1px solid var(--border-strong, #cbd5e1);
+      color: var(--color-text-primary, #161f1b);
       padding: 10px 16px;
       border-radius: 8px;
       font-size: 0.88rem;
@@ -255,7 +255,7 @@ interface BilletWithQr extends Billet {
     .ticket-card {
       background: #ffffff;
       border: 2px solid #e2e8f0;
-      border-left: 8px solid #047857;
+      border-left: 8px solid var(--color-brand-forest, #28634b);
       border-radius: 12px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
       overflow: hidden;
@@ -289,13 +289,13 @@ interface BilletWithQr extends Billet {
     .ticket-brand__logo {
       font-size: 0.88rem;
       font-weight: 800;
-      color: #064e3b;
+      color: var(--color-brand-mangrove, #153d30);
       letter-spacing: 0.03em;
     }
 
     .ticket-brand__inst {
       font-size: 0.72rem;
-      color: #64748b;
+      color: var(--color-text-secondary, #3d4942);
     }
 
     .ticket-card__body {
@@ -384,7 +384,7 @@ interface BilletWithQr extends Billet {
     .field-value--prestation {
       font-size: 1.05rem;
       font-weight: 700;
-      color: #047857;
+      color: var(--color-brand-forest, #28634b);
     }
 
     .field-code {
@@ -408,9 +408,9 @@ interface BilletWithQr extends Billet {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      background-color: #ecfdf5;
-      border: 1px solid #a7f3d0;
-      color: #065f46;
+      background-color: var(--color-status-success-bg, #ecfdf5);
+      border: 1px solid var(--color-status-success-border, #a7f3d0);
+      color: var(--color-status-success-ink, #1e4e3a);
       font-size: 0.8rem;
       font-weight: 700;
       padding: 6px 12px;
