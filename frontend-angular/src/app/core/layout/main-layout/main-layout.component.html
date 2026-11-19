@@ -5,7 +5,7 @@
     <div class="container topbar__inner">
       <a routerLink="/" class="brand" (click)="closeMenu()">
         <span class="brand__emblem" aria-hidden="true">
-          <svg lucideCompass [size]="22"></svg>
+          <img src="/logo-emblem.png" width="32" height="32" alt="" class="brand__logo" />
         </span>
         <span class="brand__text">
           <span class="brand__name">{{ config.siteName }}</span>
@@ -252,6 +252,7 @@
     <div class="container site-footer__compact">
       <div class="site-footer__row1">
         <div class="site-footer__brand">
+          <img src="/logo-emblem.png" width="24" height="24" alt="" class="site-footer__logo" />
           <strong class="site-footer__title">{{ config.siteName }}</strong>
           <span class="site-footer__desc">Patrimoines, itinéraires et guides agréés en Casamance.</span>
         </div>

@@ -69,7 +69,7 @@ import { NotificationStore } from '../../data-access/notification.store';
           [activeStatus]="nonLuesOnly() ? 'unread' : 'all'"
           (statusChange)="setNonLuesFilter($event === 'unread')"
           [resultsLabel]="totalElements() + ' notification(s)'"
-          [hasActiveFilters]="Boolean(typeFilter)"
+          [hasActiveFilters]="!!typeFilter"
           (reset)="typeFilter = ''; loadNotifications(0)"
         >
           <ng-container filter-primary>

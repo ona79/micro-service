@@ -81,7 +81,7 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
         <div class="auth-form-wrap">
           <div class="auth-brand">
             <span class="auth-brand__mark" aria-hidden="true">
-              <svg lucideCompass [size]="18"></svg>
+              <img src="/logo-emblem.png" width="30" height="30" alt="" style="object-fit:contain;" />
             </span>
             <span class="auth-brand__name">Casamance Patrimoine</span>
           </div>
@@ -374,11 +374,11 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 34px;
-      height: 34px;
+      width: 36px;
+      height: 36px;
       border-radius: 10px;
-      background-color: #245b45;
-      color: #ffffff;
+      background-color: #ffffff;
+      border: 1px solid var(--border-subtle);
     }
 
     .auth-brand__name {

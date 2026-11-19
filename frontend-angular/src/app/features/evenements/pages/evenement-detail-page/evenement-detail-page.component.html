@@ -132,76 +132,93 @@
           class="event-sidebar"
           [class.event-sidebar--memorial]="isMemorial()"
         >
-          <p class="event-sidebar__eyebrow">Tarif d’entrée</p>
-          <p class="event-sidebar__price tabular-nums">{{ ev.prix | fcfaPrice }}</p>
+          <div class="sidebar-tarif-box">
+            <div class="sidebar-tarif-box__top">
+              <span class="sidebar-tarif-box__label">Tarif d’entrée</span>
+              <span class="ui-badge ui-badge--neutral tabular-nums">{{ ev.capaciteMax }} places max</span>
+            </div>
+            <p class="sidebar-tarif-box__price tabular-nums">{{ ev.prix | fcfaPrice }}</p>
+
+            @if (
+              (ev.statutEvenement ?? 'PUBLIE') === 'PUBLIE' &&
+              ev.ouvertReservation === true
+            ) {
+              <a
+                routerLink="/reserver"
+                [queryParams]="{ type: 'EVENEMENT', evenementId: ev.id }"
+                class="event-cta"
+              >
+                <svg lucideTicket [size]="16" aria-hidden="true"></svg>
+                <span>Réserver cet événement</span>
+              </a>
+            } @else {
+              <div class="memorial-notice" style="margin-top: 0.5rem;">
+                <strong>Consultation uniquement :</strong> événement non ouvert à la réservation en ligne.
+              </div>
+            }
+
+            @if (disponibilite(); as dispo) {
+              <div class="sidebar-dispo-pill" [class.sidebar-dispo-pill--closed]="!dispo.reservable">
+                @if (dispo.reservable) {
+                  <strong>{{ dispo.placesDisponibles }}</strong> place(s) disponible(s) sur {{ dispo.capaciteTotale }}
+                } @else {
+                  {{ dispo.motifIndisponibilite || 'Complet ou fermé' }}
+                }
+              </div>
+            } @else if (ev.ouvertReservation !== false && (ev.statutEvenement ?? 'PUBLIE') === 'PUBLIE') {
+              <button
+                type="button"
+                class="sidebar-check-btn"
+                [disabled]="checkingDispo()"
+                (click)="checkDisponibilite(ev)"
+              >
+                {{ checkingDispo() ? 'Vérification...' : 'Vérifier les places en direct' }}
+              </button>
+            }
+          </div>
 
           <dl class="event-facts">
-            <div>
+            <div class="event-facts__row">
               <dt>Catégorie</dt>
               <dd>{{ ev.typeEvenement | evenementType }}</dd>
             </div>
-            <div>
-              <dt>Date de début</dt>
+            <div class="event-facts__row">
+              <dt>Début</dt>
               <dd>{{ ev.dateDebut | dateFr }}</dd>
             </div>
-            <div>
-              <dt>Date de fin</dt>
+            <div class="event-facts__row">
+              <dt>Fin</dt>
               <dd>{{ ev.dateFin | dateFr }}</dd>
             </div>
             @if (ev.horaires) {
-              <div>
+              <div class="event-facts__row">
                 <dt>Horaires</dt>
-                <dd>{{ ev.horaires }} ({{ ev.fuseauHoraire || 'Africa/Dakar' }})</dd>
+                <dd>{{ ev.horaires }}</dd>
               </div>
             }
-            <div>
+            <div class="event-facts__row">
               <dt>Lieu</dt>
               <dd>{{ ev.lieu || patLie()?.adressePatrimoine || 'Non renseigné' }}</dd>
             </div>
             @if (ev.organisateur) {
-              <div>
+              <div class="event-facts__row">
                 <dt>Organisateur</dt>
                 <dd>{{ ev.organisateur }}</dd>
               </div>
             }
             @if (ev.contactOrganisateur) {
-              <div>
+              <div class="event-facts__row">
                 <dt>Contact</dt>
                 <dd>{{ ev.contactOrganisateur }}</dd>
               </div>
             }
-            <div>
-              <dt>Capacité maximale</dt>
-              <dd class="tabular-nums">{{ ev.capaciteMax }} places</dd>
-            </div>
           </dl>
-
-          @if (disponibilite(); as dispo) {
-            <div class="memorial-notice" style="margin-top: 0.75rem;">
-              @if (dispo.reservable) {
-                <strong>Disponibilité en direct :</strong>
-                {{ dispo.placesDisponibles }} place(s) disponible(s) sur {{ dispo.capaciteTotale }}
-              } @else {
-                <strong>Non réservable :</strong> {{ dispo.motifIndisponibilite || 'Complet ou fermé' }}
-              }
-            </div>
-          } @else if (ev.ouvertReservation !== false && (ev.statutEvenement ?? 'PUBLIE') === 'PUBLIE') {
-            <button
-              type="button"
-              class="ui-btn ui-btn--ghost"
-              style="width: 100%; margin-bottom: 0.75rem;"
-              [disabled]="checkingDispo()"
-              (click)="checkDisponibilite(ev)"
-            >
-              {{ checkingDispo() ? 'Vérification...' : 'Vérifier les places en direct' }}
-            </button>
-          }
 
           @if (hasCoords()) {
             <div class="event-map">
               <app-ui-heritage-map
                 [points]="mapPoints()"
-                [height]="200"
+                [height]="180"
                 [ariaLabel]="'Lieu de ' + ev.nomEvenement"
               />
               @if (osmUrl(); as url) {
@@ -215,25 +232,6 @@
                   <svg lucideExternalLink [size]="14" aria-hidden="true"></svg>
                 </a>
               }
-            </div>
-          }
-
-          @if (
-            (ev.statutEvenement ?? 'PUBLIE') === 'PUBLIE' &&
-            ev.ouvertReservation === true
-          ) {
-            <a
-              routerLink="/reserver"
-              [queryParams]="{ type: 'EVENEMENT', evenementId: ev.id }"
-              class="event-cta"
-            >
-              <svg lucideTicket [size]="16" aria-hidden="true"></svg>
-              <span>Réserver cet événement</span>
-            </a>
-          } @else {
-            <div class="memorial-notice" style="margin-top: 0.75rem;">
-              <strong>Consultation uniquement :</strong> cet événement n’est pas ouvert à la
-              réservation en ligne ({{ ev.ouvertReservation === false ? 'accès libre / commémoration' : ev.statutEvenement }}).
             </div>
           }
         </aside>

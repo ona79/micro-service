@@ -105,14 +105,15 @@ interface DemoRow {
         <app-ui-filter-bar
           searchPlaceholder="Rechercher un site..."
           [searchValue]="search()"
-          [tabs]="tabs"
-          [activeTab]="activeTab()"
-          [showReset]="true"
+          [statusPills]="tabs"
+          [activeStatus]="activeTab()"
+          [hasSecondaryFilters]="true"
+          [hasActiveFilters]="!!search()"
           (searchChange)="search.set($event)"
-          (tabChange)="activeTab.set($event)"
+          (statusChange)="activeTab.set($event)"
         >
           <div filter-secondary class="dev-ui__row">
-            <select class="bo-select" aria-label="Zone">
+            <select class="ui-filter-control" aria-label="Zone">
               <option value="">Toutes les zones</option>
               <option value="ZIGUINCHOR">Ziguinchor</option>
             </select>

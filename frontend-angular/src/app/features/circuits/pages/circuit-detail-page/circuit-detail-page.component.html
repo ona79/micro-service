@@ -136,74 +136,88 @@
         </div>
 
         <aside class="booking-sidebar">
-          <p class="booking-sidebar__eyebrow">Tarif indicatif par personne</p>
-          <p class="booking-sidebar__price tabular-nums">{{ cir.prix | fcfaPrice }}</p>
+          <div class="sidebar-tarif-box">
+            <div class="sidebar-tarif-box__top">
+              <span class="sidebar-tarif-box__label">Tarif par personne</span>
+              <span class="ui-badge ui-badge--neutral tabular-nums">{{ cir.placesMax }} places max</span>
+            </div>
+            <p class="sidebar-tarif-box__price tabular-nums">{{ cir.prix | fcfaPrice }}</p>
+
+            @if ((cir.statutCircuit ?? 'PUBLIE') === 'PUBLIE') {
+              <a
+                routerLink="/reserver"
+                [queryParams]="{ type: 'CIRCUIT', circuitId: cir.id }"
+                class="booking-cta"
+              >
+                <svg lucideTicket [size]="16" aria-hidden="true"></svg>
+                <span>Réserver ce circuit</span>
+              </a>
+            } @else {
+              <p class="ui-badge ui-badge--neutral">
+                Circuit non ouvert à la réservation ({{ cir.statutCircuit }})
+              </p>
+            }
+
+            @if (disponibilite(); as dispo) {
+              <div class="sidebar-dispo-pill" [class.sidebar-dispo-pill--closed]="!dispo.reservable">
+                @if (dispo.reservable) {
+                  <strong>{{ dispo.placesDisponibles }}</strong> place(s) disponible(s) sur {{ dispo.capaciteTotale }}
+                } @else {
+                  {{ dispo.motifIndisponibilite || 'Complet' }}
+                }
+              </div>
+            } @else {
+              <button
+                type="button"
+                class="sidebar-check-btn"
+                [disabled]="checkingDispo()"
+                (click)="checkDisponibilite(cir)"
+              >
+                {{ checkingDispo() ? 'Vérification...' : 'Vérifier les places en direct' }}
+              </button>
+            }
+          </div>
 
           @if (guide(); as g) {
-            <div class="memorial-notice" style="margin-bottom: 0.85rem;">
-              <strong>Guide responsable agréé :</strong><br />
+            <div class="memorial-notice" style="margin-bottom: 0.75rem;">
+              <strong>Guide responsable :</strong>
               <a [routerLink]="['/guides', g.id]">{{ g.prenom }} {{ g.nom }}</a>
               <span> ({{ g.languesParlees }})</span>
             </div>
           }
 
           <dl class="booking-facts">
-            <div>
+            <div class="booking-facts__row">
               <dt>Difficulté</dt>
               <dd>{{ cir.difficulte | difficulteLabel }}</dd>
             </div>
             @if (cir.moyenTransport) {
-              <div>
+              <div class="booking-facts__row">
                 <dt>Déplacement</dt>
                 <dd>{{ cir.moyenTransport }}</dd>
               </div>
             }
             @if (cir.pointDepart) {
-              <div>
-                <dt>Point de départ</dt>
+              <div class="booking-facts__row">
+                <dt>Départ</dt>
                 <dd>{{ cir.pointDepart }}</dd>
               </div>
             }
             @if (cir.pointArrivee) {
-              <div>
-                <dt>Point d'arrivée</dt>
+              <div class="booking-facts__row">
+                <dt>Arrivée</dt>
                 <dd>{{ cir.pointArrivee }}</dd>
               </div>
             }
-            <div>
-              <dt>Durée totale estimée</dt>
+            <div class="booking-facts__row">
+              <dt>Durée estimée</dt>
               <dd class="tabular-nums">{{ cir.dureeEstimee | durationMinutes }}</dd>
             </div>
-            <div>
-              <dt>Distance orthodromique indicative</dt>
+            <div class="booking-facts__row">
+              <dt>Distance indicative</dt>
               <dd class="tabular-nums">~{{ cir.distanceTotale || 0 }} km</dd>
             </div>
-            <div>
-              <dt>Capacité du groupe</dt>
-              <dd class="tabular-nums">{{ cir.placesMax }} places maximum</dd>
-            </div>
           </dl>
-
-          @if (disponibilite(); as dispo) {
-            <div class="memorial-notice" style="margin-top: 0.75rem;">
-              @if (dispo.reservable) {
-                <strong>Disponibilité en direct :</strong>
-                {{ dispo.placesDisponibles }} place(s) disponible(s) sur {{ dispo.capaciteTotale }}
-              } @else {
-                <strong>Indisponible :</strong> {{ dispo.motifIndisponibilite || 'Complet' }}
-              }
-            </div>
-          } @else {
-            <button
-              type="button"
-              class="ui-btn ui-btn--ghost"
-              style="width: 100%; margin-bottom: 0.75rem;"
-              [disabled]="checkingDispo()"
-              (click)="checkDisponibilite(cir)"
-            >
-              {{ checkingDispo() ? 'Vérification...' : 'Vérifier les places en direct' }}
-            </button>
-          }
 
           @if (osmStartUrl(); as url) {
             <a
@@ -215,21 +229,6 @@
               <span>Point de départ sur OpenStreetMap</span>
               <svg lucideExternalLink [size]="14" aria-hidden="true"></svg>
             </a>
-          }
-
-          @if ((cir.statutCircuit ?? 'PUBLIE') === 'PUBLIE') {
-            <a
-              routerLink="/reserver"
-              [queryParams]="{ type: 'CIRCUIT', circuitId: cir.id }"
-              class="booking-cta"
-            >
-              <svg lucideTicket [size]="16" aria-hidden="true"></svg>
-              <span>Réserver ce circuit</span>
-            </a>
-          } @else {
-            <p class="ui-badge ui-badge--neutral">
-              Circuit non ouvert à la réservation publique ({{ cir.statutCircuit }})
-            </p>
           }
         </aside>
       </div>
