@@ -58,37 +58,64 @@
 % =============================================================================
 \begin{titlepage}
     \centering
-    {\Large\bfseries Université Assane Seck de Ziguinchor (UASZ)\par}
-    \vspace{0.3cm}
-    {\large UFR Sciences et Technologies -- Département Informatique\par}
-    {\normalsize Licence 3 en Ingénierie Informatique\par}
-    \vspace{1.2cm}
-    \rule{\textwidth}{1.5pt}\\[0.5cm]
-    {\Huge\bfseries\color{uaszGreen} Plateforme de Gestion et de Valorisation du Patrimoine Touristique de la Casamance\par}
-    \vspace{0.4cm}
-    {\Large\color{uaszDark} Rapport Technique d'Architecture Microservices, Sécurité Zero-Trust, Déploiement Docker et Validation Complète\par}
-    \rule{\textwidth}{1.5pt}
-    \vspace{1.5cm}
-
-    \begin{minipage}[t]{0.48\textwidth}
-        \raggedright
-        \textbf{Réalisé par :}\\
-        \large Ibrahima \textsc{DIALLO}\\
-        \large Matar \textsc{NDOUR}
+    % --- En-tête institutionnel avec les deux logos ---
+    \begin{minipage}[c]{0.20\textwidth}
+        \centering
+        \includegraphics[height=2.4cm]{images/logo_uasz.png}
     \end{minipage}
     \hfill
-    \begin{minipage}[t]{0.48\textwidth}
+    \begin{minipage}[c]{0.56\textwidth}
+        \centering
+        {\large\bfseries\color{uaszDark} RÉPUBLIQUE DU SÉNÉGAL\par}
+        \vspace{0.1cm}
+        {\large\bfseries\color{uaszGreen} Université Assane Seck de Ziguinchor (UASZ)\par}
+        \vspace{0.08cm}
+        {\normalsize UFR Sciences et Technologies -- Département Informatique\par}
+        {\small Licence 3 en Ingénierie Informatique\par}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[c]{0.20\textwidth}
+        \centering
+        \includegraphics[height=2.4cm]{images/logo_casa.png}
+    \end{minipage}
+
+    \vspace{0.8cm}
+    {\color{uaszGreen}\rule{\textwidth}{1.5pt}}
+
+    \vspace{1.2cm}
+    {\large\bfseries\color{uaszGold} RAPPORT TECHNIQUE DE PROJET\par}
+    \vspace{0.4cm}
+    {\huge\bfseries\color{uaszGreen} Plateforme de Gestion et de Valorisation\\du Patrimoine Touristique de la Casamance\par}
+    \vspace{0.5cm}
+    {\large\color{uaszDark} Architecture Microservices Spring Boot \& Angular 22, Sécurité Zero-Trust HMAC/RBAC,\\Refonte UI/UX Unifiée, Déploiement Docker et Validation E2E\par}
+
+    \vspace{0.9cm}
+    \includegraphics[height=3.3cm]{images/logo_casa.png}
+    \vspace{0.9cm}
+
+    {\color{uaszGreen}\rule{\textwidth}{1.5pt}}
+    \vspace{1.1cm}
+
+    % --- Auteurs et encadrant ---
+    \begin{minipage}[t]{0.46\textwidth}
+        \raggedright
+        {\normalsize\bfseries\color{uaszGreen} Réalisé par :}\\[0.2cm]
+        {\large\bfseries Ibrahima \textsc{DIALLO}}\\[0.08cm]
+        {\large\bfseries Matar \textsc{NDOUR}}
+    \end{minipage}
+    \hfill
+    \begin{minipage}[t]{0.46\textwidth}
         \raggedleft
-        \textbf{Enseignant encadrant :}\\
-        \large Dr Lamine \textsc{FATY}\\
-        \normalsize Développement d'Applications Orientées Services
+        {\normalsize\bfseries\color{uaszGreen} Sous la direction de :}\\[0.2cm]
+        {\large\bfseries Dr Lamine \textsc{FATY}}\\[0.08cm]
+        {\normalsize Développement d'Applications Orientées Services}
     \end{minipage}
 
     \vfill
-    {\large Dépôt GitHub : \texttt{https://github.com/ona79/micro-service}\par}
-    \vspace{0.3cm}
-    {\large Année universitaire 2025 -- 2026\par}
-    {\normalsize Ziguinchor, Sénégal -- Novembre 2026\par}
+    {\normalsize Dépôt GitHub : \href{https://github.com/ona79/micro-service}{\texttt{https://github.com/ona79/micro-service}}\par}
+    \vspace{0.25cm}
+    {\large\bfseries\color{uaszDark} Année universitaire 2025 -- 2026\par}
+    {\small Ziguinchor, Sénégal -- Novembre 2026\par}
 \end{titlepage}
 
 % =============================================================================
@@ -208,14 +235,21 @@ L'interface publique permet aux visiteurs de découvrir les sites patrimoniaux, 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{images/PUB-001_accueil.png}
-    \caption{Page d'accueil publique de la plateforme Casamance Tourisme avec nouvelle barre de navigation compacte (60\,px) et emblème officiel \texttt{logo\_casa}.}
+    \caption{Page d'accueil publique de la plateforme Casamance Patrimoine avec barre de navigation compacte (60\,px) et emblème officiel \texttt{logo\_casa}.}
     \label{fig:pub-accueil}
 \end{figure}
 
 \begin{figure}[H]
     \centering
+    \includegraphics[width=0.92\textwidth]{images/PUB-002_patrimoines-catalogue.png}
+    \caption{Catalogue des sites patrimoniaux (\texttt{/patrimoines}) : barre de filtres unifiée \texttt{ui-filter-bar} sur une seule ligne et grille de cartes compactes à cadre unique.}
+    \label{fig:pub-patrimoines-grid}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
     \includegraphics[width=0.92\textwidth]{images/PUB-002_patrimoines-carte.png}
-    \caption{Catalogue des patrimoines avec barre de filtres unifiée \texttt{ui-filter-bar} et vue cartographique interactive (Leaflet / OpenStreetMap).}
+    \caption{Vue cartographique interactive (Leaflet / OpenStreetMap) des sites patrimoniaux de la Casamance.}
     \label{fig:pub-carte}
 \end{figure}
 
@@ -240,14 +274,21 @@ L'interface publique permet aux visiteurs de découvrir les sites patrimoniaux, 
     \label{fig:pub-evenement-tarif}
 \end{figure}
 
-\section{Authentification, Réservation en direct, E-Billet QR et Paiement}
-Les pages de connexion et d'inscription adoptent une mise en page \emph{split-screen} moderne avec accès rapide aux 5 comptes de démonstration pré-configurés (Visiteur, Guide, Gestionnaire, Conservateur, Administrateur). Le parcours \texttt{/reserver} offre un formulaire compact associé à un récapitulatif en temps réel.
+\section{Parcours d'Authentification, Réservation en direct, Paiement et E-Billet QR}
+Les pages de connexion (\texttt{/connexion}) et d'inscription (\texttt{/inscription}) adoptent une mise en page \emph{split-screen} moderne avec l'emblème \texttt{logo\_casa} et un accès rapide aux 5 comptes de démonstration pré-configurés (Visiteur, Guide, Gestionnaire, Conservateur, Administrateur). Le parcours se poursuit de manière fluide avec la réservation en direct (\texttt{/reserver}), le paiement avec idempotence, l'espace personnel (\texttt{/mon-espace}) et l'émission de l'e-billet QR Code.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{images/AUTH-001_connexion.png}
-    \caption{Interface de connexion \emph{split-screen} avec logo officiel, session cookie \texttt{HttpOnly} et sélecteur des 5 comptes de démonstration.}
+    \caption{Interface de connexion \emph{split-screen} (\texttt{/connexion}) avec logo officiel, session cookie \texttt{HttpOnly} et sélecteur des 5 comptes de démonstration.}
     \label{fig:auth-login}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{images/AUTH-002_inscription.png}
+    \caption{Interface d'inscription (\texttt{/inscription}) en mise en page \emph{split-screen} permettant la création d'un compte visiteur ou guide touristique.}
+    \label{fig:auth-register}
 \end{figure}
 
 \begin{figure}[H]
@@ -259,22 +300,22 @@ Les pages de connexion et d'inscription adoptent une mise en page \emph{split-sc
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.92\textwidth]{images/TOUR-001_mon-espace-reservations.png}
-    \caption{Espace personnel du touriste (\texttt{/mon-espace}) : suivi des réservations, barre d'outils sur une ligne et menu d'actions secondaires.}
-    \label{fig:tour-espace}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
     \includegraphics[width=0.92\textwidth]{images/TOUR-004_paiement-checkout-simule.png}
-    \caption{Interface de paiement avec gestion d'idempotence et récapitulatif de transaction.}
+    \caption{Interface de paiement (\texttt{/paiements/:id}) avec gestion d'idempotence et récapitulatif de transaction.}
     \label{fig:tour-paiement}
 \end{figure}
 
 \begin{figure}[H]
     \centering
+    \includegraphics[width=0.92\textwidth]{images/TOUR-001_mon-espace-reservations.png}
+    \caption{Espace personnel du touriste (\texttt{/mon-espace}) : suivi des réservations, action principale unique et menu secondaire.}
+    \label{fig:tour-espace}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
     \includegraphics[width=0.92\textwidth]{images/TOUR-003_reservation-detail-qr.png}
-    \caption{E-billet électronique avec QR Code généré pour le contrôle d'accès sur site.}
+    \caption{E-billet électronique avec QR Code généré (\texttt{/reservations/:id}) pour le contrôle d'accès sur site.}
     \label{fig:tour-qr}
 \end{figure}
 

@@ -60,8 +60,7 @@ const LEGACY_ASSET_FILENAME_MAP: Record<string, string> = {
       position: relative;
       width: 100%;
       height: 100%;
-      min-height: 190px;
-      aspect-ratio: 16 / 10;
+      min-height: 120px;
       overflow: hidden;
       background-color: var(--surface-sand);
     }

@@ -104,20 +104,20 @@ export type UiCardVariant = 'elevated' | 'bordered' | 'flat' | 'interactive';
     }
 
     .ui-card__header-slot {
-      padding: 12px var(--card-padding, 16px) 0;
+      padding: 10px 14px 0;
     }
 
     .ui-card__body-slot {
-      padding: 10px var(--card-padding, 16px) var(--card-padding, 16px);
+      padding: 8px 14px 12px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 6px;
       flex: 1;
     }
 
     .ui-card__footer-slot {
       margin-top: auto;
-      padding: var(--space-3, 12px) var(--card-padding, 16px);
+      padding: 10px 14px;
       border-top: 1px solid var(--border-subtle, #e5dfd3);
       background-color: var(--surface-subtle, #f5f2eb);
     }
