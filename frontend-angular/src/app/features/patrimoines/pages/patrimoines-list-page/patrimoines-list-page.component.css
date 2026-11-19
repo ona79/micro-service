@@ -172,27 +172,13 @@
 }
 
 .pat-card {
-  background-color: var(--surface-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: 12px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-shadow: var(--shadow-xs);
-  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
-}
-
-.pat-card:hover {
-  box-shadow: var(--shadow-md);
-  border-color: var(--border-strong);
-}
-
-.pat-card--memorial {
-  border-color: var(--memorial-border);
+  min-width: 0;
 }
 
 .pat-card__media {
+  display: block;
   height: 140px;
+  overflow: hidden;
 }
 
 .pat-card__body {

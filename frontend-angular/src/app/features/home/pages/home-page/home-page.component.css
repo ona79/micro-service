@@ -358,26 +358,15 @@
 .info-card,
 .guide-home-card {
   min-width: 0;
-  background-color: var(--surface-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-}
-
-.pat-card--memorial {
-  border-color: var(--memorial-border);
-  background-color: var(--memorial-bg);
 }
 
 .pat-card__media {
-  height: 210px;
+  display: block;
+  height: 160px;
+  overflow: hidden;
 }
 
 .pat-card__body {
-  padding: var(--space-5);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -393,8 +382,7 @@
 
 .info-card,
 .guide-home-card {
-  padding: var(--space-5);
-  gap: var(--space-3);
+  min-width: 0;
 }
 
 .info-card__metrics {

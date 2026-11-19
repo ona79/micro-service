@@ -251,14 +251,7 @@ import { GuideApiService } from '../../data-access/guide-api.service';
       gap: var(--space-4);
     }
     .guide-card {
-      background: var(--surface-elevated);
-      border: 1px solid var(--border-subtle);
-      border-radius: 12px;
-      padding: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      box-shadow: var(--shadow-xs);
+      min-width: 0;
     }
     .guide-card__top {
       display: flex;

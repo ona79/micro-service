@@ -244,25 +244,29 @@
             @for (autre of autresEvenements(); track autre.id) {
               @let patAutre = resolvePat(autre);
               <app-ui-card [interactive]="true" class="related-card">
-                <a [routerLink]="['/evenements', autre.id]" class="related-card__media">
-                  <app-ui-patrimoine-image
-                    [codePatrimoine]="patAutre?.codePatrimoine"
-                    [nomPatrimoine]="patAutre?.nomPatrimoine ?? autre.nomEvenement"
-                  />
-                </a>
-                <div class="related-card__body">
+                <div slot="media">
+                  <a [routerLink]="['/evenements', autre.id]" class="related-card__media">
+                    <app-ui-patrimoine-image
+                      [codePatrimoine]="patAutre?.codePatrimoine"
+                      [nomPatrimoine]="patAutre?.nomPatrimoine ?? autre.nomEvenement"
+                    />
+                  </a>
+                </div>
+                <div slot="header">
                   <span class="ui-badge ui-badge--terracotta">
                     {{ autre.typeEvenement | evenementType }}
                   </span>
-                  <h3 class="related-card__title">
-                    <a [routerLink]="['/evenements', autre.id]">
-                      {{ autre.nomEvenement }}
-                    </a>
-                  </h3>
-                  <p class="related-card__meta">
-                    {{ autre.dateDebut | dateFr: 'd MMM yyyy' }} ·
-                    {{ autre.prix | fcfaPrice }}
-                  </p>
+                </div>
+                <h3 class="related-card__title">
+                  <a [routerLink]="['/evenements', autre.id]">
+                    {{ autre.nomEvenement }}
+                  </a>
+                </h3>
+                <p class="related-card__meta">
+                  {{ autre.dateDebut | dateFr: 'd MMM yyyy' }} ·
+                  {{ autre.prix | fcfaPrice }}
+                </p>
+                <div slot="footer">
                   <a [routerLink]="['/evenements', autre.id]" class="related-card__link">
                     <span>Voir l’événement</span>
                     <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>

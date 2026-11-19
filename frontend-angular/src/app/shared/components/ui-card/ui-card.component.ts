@@ -24,30 +24,34 @@ export type UiCardVariant = 'elevated' | 'bordered' | 'flat' | 'interactive';
       (keydown.space)="handleKeydown($event)"
     >
       <div class="ui-card__media-slot">
-        <ng-content select="[card-media]"></ng-content>
+        <ng-content select="[card-media],[slot=media]"></ng-content>
       </div>
 
       <header class="ui-card__header-slot">
-        <ng-content select="[card-header]"></ng-content>
+        <ng-content select="[card-header],[slot=header]"></ng-content>
       </header>
 
       <div class="ui-card__body-slot">
-        <ng-content select="[card-body]"></ng-content>
+        <ng-content select="[card-body],[slot=body]"></ng-content>
         <ng-content></ng-content>
       </div>
 
       <footer class="ui-card__footer-slot">
-        <ng-content select="[card-footer]"></ng-content>
+        <ng-content select="[card-footer],[slot=footer]"></ng-content>
       </footer>
     </article>
   `,
   styles: `
     :host {
-      display: block;
+      display: flex;
+      flex-direction: column;
       max-width: 100%;
     }
 
     .ui-card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
       background-color: var(--surface-elevated, #ffffff);
       border: 1px solid var(--border-subtle, #e5dfd3);
       border-radius: var(--radius-md, 12px);
@@ -88,6 +92,10 @@ export type UiCardVariant = 'elevated' | 'bordered' | 'flat' | 'interactive';
       display: none;
     }
 
+    .ui-card__media-slot {
+      overflow: hidden;
+    }
+
     .ui-card__media-slot img {
       width: 100%;
       max-width: 100%;
@@ -96,14 +104,19 @@ export type UiCardVariant = 'elevated' | 'bordered' | 'flat' | 'interactive';
     }
 
     .ui-card__header-slot {
-      padding: var(--card-padding, 16px) var(--card-padding, 16px) 0;
+      padding: 12px var(--card-padding, 16px) 0;
     }
 
     .ui-card__body-slot {
-      padding: var(--card-padding, 16px);
+      padding: 10px var(--card-padding, 16px) var(--card-padding, 16px);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex: 1;
     }
 
     .ui-card__footer-slot {
+      margin-top: auto;
       padding: var(--space-3, 12px) var(--card-padding, 16px);
       border-top: 1px solid var(--border-subtle, #e5dfd3);
       background-color: var(--surface-subtle, #f5f2eb);

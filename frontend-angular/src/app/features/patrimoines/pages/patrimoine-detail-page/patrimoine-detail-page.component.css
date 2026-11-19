@@ -222,20 +222,13 @@
 }
 
 .related-card {
-  background-color: var(--surface-elevated);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.related-card--memorial {
-  border-color: var(--memorial-border);
+  min-width: 0;
 }
 
 .related-card__media {
-  height: 170px;
+  display: block;
+  height: 150px;
+  overflow: hidden;
 }
 
 .related-card__body {
