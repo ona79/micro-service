@@ -308,6 +308,12 @@ export class ReserverPageComponent implements OnInit {
     return ctrl.invalid && (ctrl.touched || this.submittedAttempt());
   }
 
+  protected readonly openMenuId = signal<number | null>(null);
+
+  protected toggleRowMenu(id: number): void {
+    this.openMenuId.update((curr) => (curr === id ? null : id));
+  }
+
   protected canPayReservation(res: Reservation): boolean {
     return res.statut === 'EN_ATTENTE_PAIEMENT' || res.statut === 'BROUILLON';
   }
@@ -364,11 +370,11 @@ export class ReserverPageComponent implements OnInit {
 
       if (created.statut === 'CONFIRMEE') {
         toast.success(
-          `Réservation ${created.referenceReservation || '#' + created.id} confirmée avec succès (offre gratuite).`
+          `Réservation ${created.referenceReservation || 'n° ' + created.id} confirmée avec succès (offre gratuite).`
         );
       } else if (created.statut === 'EN_ATTENTE_PAIEMENT') {
         toast.success(
-          `Réservation ${created.referenceReservation || '#' + created.id} créée : passez au paiement simulé.`
+          `Réservation ${created.referenceReservation || 'n° ' + created.id} créée : passez au paiement simulé.`
         );
       } else {
         toast.success(`Réservation brouillon ${created.id} enregistrée.`);
@@ -395,7 +401,7 @@ export class ReserverPageComponent implements OnInit {
 
     const dialogRef = this.dialog.open<boolean>(UiConfirmDialogComponent, {
       data: {
-        title: `Annuler la réservation ${res.referenceReservation || '#' + res.id} ?`,
+        title: `Annuler la réservation ${res.referenceReservation || 'n° ' + res.id} ?`,
         message: `Vous êtes sur le point d'annuler la réservation de ${res.nomClient} (${res.nombrePlaces} place(s)) pour « ${targetTitle} ». Cette action libérera les places réservées.`,
         confirmLabel: 'Confirmer l’annulation',
         cancelLabel: 'Conserver',

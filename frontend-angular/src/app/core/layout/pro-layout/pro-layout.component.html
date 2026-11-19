@@ -1,6 +1,6 @@
 <a href="#pro-main-content" class="skip-link">Aller au contenu professionnel</a>
 
-<div class="pro-shell" [class.pro-shell--collapsed]="sidebarCollapsed()">
+<div class="pro-shell" data-density="compact" [class.pro-shell--collapsed]="sidebarCollapsed()">
   @if (mobileDrawerOpen()) {
     <div
       class="pro-backdrop"
@@ -40,9 +40,18 @@
       @for (group of visibleSections(); track group.section) {
         <div class="pro-nav__group">
           @if (!sidebarCollapsed()) {
-            <p class="pro-nav__heading">{{ group.section }}</p>
+            <button
+              type="button"
+              class="pro-nav__heading-btn"
+              [attr.aria-expanded]="!isSectionCollapsed(group.section)"
+              (click)="toggleSection(group.section)"
+            >
+              <span>{{ group.section }}</span>
+              <span class="pro-nav__chevron" aria-hidden="true">{{ isSectionCollapsed(group.section) ? '▸' : '▾' }}</span>
+            </button>
           }
-          <ul class="pro-nav__list">
+          @if (!isSectionCollapsed(group.section) || sidebarCollapsed()) {
+            <ul class="pro-nav__list">
             @for (item of group.items; track item.id) {
               <li>
                 <a
@@ -112,6 +121,7 @@
               </li>
             }
           </ul>
+          }
         </div>
       }
     </nav>
@@ -173,28 +183,34 @@
         </a>
 
         @if (authStore.user(); as currentUser) {
-          <a routerLink="/mon-espace" class="pro-user-pill" title="Accéder à mon espace personnel">
-            <span class="pro-user-pill__avatar" aria-hidden="true">{{ authStore.initials() }}</span>
-            <span class="pro-user-pill__meta">
-              <strong>{{ currentUser.prenom }} {{ currentUser.nom }}</strong>
-              <small>{{ authStore.roleLabel() }}</small>
-            </span>
-          </a>
+          <div class="pro-avatar-menu">
+            <button
+              type="button"
+              class="pro-user-pill"
+              [attr.aria-expanded]="avatarMenuOpen()"
+              aria-haspopup="menu"
+              (click)="toggleAvatarMenu()"
+            >
+              <span class="pro-user-pill__avatar" aria-hidden="true">{{ authStore.initials() }}</span>
+              <span class="pro-user-pill__meta">
+                <strong>{{ currentUser.prenom }} {{ currentUser.nom }}</strong>
+                <small>{{ authStore.roleLabel() }}</small>
+              </span>
+            </button>
+            @if (avatarMenuOpen()) {
+              <div class="pro-avatar-dropdown" role="menu">
+                <a routerLink="/mon-espace" role="menuitem" class="pro-avatar-dropdown__item" (click)="avatarMenuOpen.set(false)">
+                  <svg lucideUser [size]="15" aria-hidden="true"></svg>
+                  <span>Mon espace</span>
+                </a>
+                <button type="button" role="menuitem" class="pro-avatar-dropdown__item pro-avatar-dropdown__item--danger" (click)="logout()">
+                  <svg lucideLogOut [size]="15" aria-hidden="true"></svg>
+                  <span>Se déconnecter</span>
+                </button>
+              </div>
+            }
+          </div>
         }
-
-        <a routerLink="/mon-espace" class="pro-icon-btn" title="Profil & espace personnel" aria-label="Profil personnel">
-          <svg lucideUser [size]="17" aria-hidden="true"></svg>
-        </a>
-
-        <button
-          type="button"
-          class="pro-logout-btn"
-          (click)="logout()"
-          aria-label="Se déconnecter"
-        >
-          <svg lucideLogOut [size]="16" aria-hidden="true"></svg>
-          <span class="pro-logout-btn__text">Déconnexion</span>
-        </button>
       </div>
     </header>
 

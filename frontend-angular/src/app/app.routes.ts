@@ -174,24 +174,6 @@ export const routes: Routes = [
           ).then((m) => m.PaiementCheckoutPageComponent),
       },
       {
-        path: 'connexion',
-        title: 'Connexion',
-        canActivate: [guestGuard],
-        loadComponent: () =>
-          import('./features/auth/pages/login-page/login-page.component').then(
-            (m) => m.LoginPageComponent
-          ),
-      },
-      {
-        path: 'inscription',
-        title: 'Inscription',
-        canActivate: [guestGuard],
-        loadComponent: () =>
-          import('./features/auth/pages/register-page/register-page.component').then(
-            (m) => m.RegisterPageComponent
-          ),
-      },
-      {
         path: 'mon-espace',
         title: 'Mon Espace Personnel',
         canActivate: [authGuard],
@@ -202,15 +184,8 @@ export const routes: Routes = [
       },
       {
         path: 'administration',
-        title: 'Administration & Gestion',
-        canActivate: [
-          authGuard,
-          roleGuard(['ADMINISTRATEUR', 'GESTIONNAIRE_SITE', 'CONSERVATEUR']),
-        ],
-        loadComponent: () =>
-          import(
-            './features/admin/pages/admin-dashboard-page/admin-dashboard-page.component'
-          ).then((m) => m.AdminDashboardPageComponent),
+        redirectTo: '/pro',
+        pathMatch: 'full',
       },
       {
         path: 'acces-refuse',
@@ -220,7 +195,33 @@ export const routes: Routes = [
             (m) => m.ForbiddenPageComponent
           ),
       },
+      {
+        path: 'dev/ui',
+        title: 'Design System — Catalogue UI',
+        loadComponent: () =>
+          import('./features/dev/pages/ui-showcase-page/ui-showcase-page.component').then(
+            (m) => m.UiShowcasePageComponent
+          ),
+      },
     ],
+  },
+  {
+    path: 'connexion',
+    title: 'Connexion',
+    canActivate: [guestGuard],
+    loadComponent: () =>
+      import('./features/auth/pages/login-page/login-page.component').then(
+        (m) => m.LoginPageComponent
+      ),
+  },
+  {
+    path: 'inscription',
+    title: 'Inscription',
+    canActivate: [guestGuard],
+    loadComponent: () =>
+      import('./features/auth/pages/register-page/register-page.component').then(
+        (m) => m.RegisterPageComponent
+      ),
   },
   {
     path: 'pro',

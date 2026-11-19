@@ -1,138 +1,116 @@
-<div class="page-section">
+<div class="page-section" style="padding-top: 14px;">
   <div class="container">
-    <header class="editorial-header">
-      <p class="editorial-header__eyebrow">Carnet d’itinéraires en Casamance</p>
-      <h1 class="editorial-header__title">Circuits &amp; Parcours Touristiques</h1>
-      <p class="editorial-header__subtitle">
-        Suivez des parcours thématiques reliant plusieurs sites patrimoniaux de Casamance, avec
-        durée de visite estimée et distance orthodromique indicative entre étapes.
-      </p>
+    <header class="page-head-compact">
+      <div class="page-head-compact__left">
+        <h1 class="page-head-compact__title">Circuits touristiques</h1>
+        <span
+          class="page-info-tip"
+          title="Parcours thématiques reliant plusieurs sites patrimoniaux avec durée et distance indicatives."
+          aria-label="Informations"
+        >
+          i
+        </span>
+      </div>
     </header>
 
-    <section class="filter-panel" aria-label="Filtres des circuits">
-      <div class="filter-panel__grid">
-        <div class="filter-field filter-field--wide">
-          <label for="cir-search" class="filter-field__label">
-            Recherche par nom, départ ou description
-          </label>
-          <div class="search-wrap">
-            <svg lucideSearch [size]="16" class="search-wrap__icon" aria-hidden="true"></svg>
-            <input
-              id="cir-search"
-              type="search"
-              class="filter-input filter-input--icon"
-              placeholder="Ex: Ziguinchor, Enampore, Carabane, Oussouye..."
-              [ngModel]="search()"
-              (ngModelChange)="onSearchChange($event)"
-            />
-          </div>
-        </div>
+    <app-ui-filter-bar
+      [searchValue]="search()"
+      searchPlaceholder="Rechercher un circuit, un départ..."
+      searchAriaLabel="Rechercher un circuit"
+      [hasSecondaryFilters]="true"
+      [secondaryActiveCount]="secondaryActiveCount()"
+      [resultsLabel]="totalElements() + (totalElements() > 1 ? ' circuits' : ' circuit')"
+      [hasActiveFilters]="hasActiveFilters()"
+      [activeChips]="activeFilterChips()"
+      (searchChange)="onSearchChange($event)"
+      (removeChip)="removeFilterChip($event)"
+      (reset)="resetFilters()"
+    >
+      <ng-container filter-primary>
+        <select
+          id="cir-zone"
+          aria-label="Zone géographique"
+          class="ui-filter-control"
+          [ngModel]="zone()"
+          (ngModelChange)="zone.set($event); onFilterImmediate()"
+        >
+          <option value="">Zone : Toutes</option>
+          <option value="BASSE_CASAMANCE">Basse-Casamance</option>
+          <option value="MOYENNE_CASAMANCE">Moyenne-Casamance</option>
+          <option value="HAUTE_CASAMANCE">Haute-Casamance</option>
+        </select>
 
-        <div class="filter-field">
-          <label for="cir-zone" class="filter-field__label">Zone</label>
-          <select
-            id="cir-zone"
-            class="filter-input"
-            [ngModel]="zone()"
-            (ngModelChange)="zone.set($event); onFilterImmediate()"
-          >
-            <option value="">Toute la Casamance</option>
-            <option value="BASSE_CASAMANCE">Basse-Casamance</option>
-            <option value="MOYENNE_CASAMANCE">Moyenne-Casamance</option>
-            <option value="HAUTE_CASAMANCE">Haute-Casamance</option>
-          </select>
-        </div>
+        <select
+          id="cir-diff"
+          aria-label="Difficulté"
+          class="ui-filter-control"
+          [ngModel]="difficulte()"
+          (ngModelChange)="difficulte.set($event); onFilterImmediate()"
+        >
+          <option value="">Difficulté : Toutes</option>
+          <option value="FACILE">Facile</option>
+          <option value="MOYEN">Modéré (Moyen)</option>
+          <option value="DIFFICILE">Sportif (Difficile)</option>
+        </select>
+      </ng-container>
 
-        <div class="filter-field">
-          <label for="cir-diff" class="filter-field__label">Difficulté</label>
-          <select
-            id="cir-diff"
-            class="filter-input"
-            [ngModel]="difficulte()"
-            (ngModelChange)="difficulte.set($event); onFilterImmediate()"
-          >
-            <option value="">Toutes les difficultés</option>
-            <option value="FACILE">Facile</option>
-            <option value="MOYEN">Modéré (Moyen)</option>
-            <option value="DIFFICILE">Sportif (Difficile)</option>
-          </select>
-        </div>
+      <ng-container filter-secondary>
+        <select
+          id="cir-trans"
+          aria-label="Moyen de déplacement"
+          class="ui-filter-control"
+          [ngModel]="moyenTransport()"
+          (ngModelChange)="moyenTransport.set($event); onFilterImmediate()"
+        >
+          <option value="">Déplacement : Tous</option>
+          <option value="PIED">À pied</option>
+          <option value="PIROGUE">Pirogue fluviale</option>
+          <option value="VELO">Vélo / VTT</option>
+          <option value="VEHICULE_4X4">Véhicule 4x4</option>
+          <option value="MINIBUS">Minibus</option>
+          <option value="MIXTE">Mixte (Terre &amp; Bolongs)</option>
+        </select>
 
-        <div class="filter-field">
-          <label for="cir-trans" class="filter-field__label">Déplacement</label>
-          <select
-            id="cir-trans"
-            class="filter-input"
-            [ngModel]="moyenTransport()"
-            (ngModelChange)="moyenTransport.set($event); onFilterImmediate()"
-          >
-            <option value="">Tous les modes</option>
-            <option value="PIED">À pied</option>
-            <option value="PIROGUE">Pirogue fluviale</option>
-            <option value="VELO">Vélo / VTT</option>
-            <option value="VEHICULE_4X4">Véhicule 4x4</option>
-            <option value="MINIBUS">Minibus</option>
-            <option value="MIXTE">Mixte (Terre &amp; Bolongs)</option>
-          </select>
-        </div>
+        <input
+          id="cir-duree"
+          type="number"
+          min="0"
+          step="30"
+          aria-label="Durée maximale en minutes"
+          class="ui-filter-control"
+          placeholder="Durée max (min)"
+          [ngModel]="dureeMax()"
+          (ngModelChange)="dureeMax.set($event); onNumericFilterChange()"
+        />
 
-        <div class="filter-field">
-          <label for="cir-duree" class="filter-field__label">Durée max (min)</label>
-          <input
-            id="cir-duree"
-            type="number"
-            min="0"
-            step="30"
-            class="filter-input"
-            placeholder="Ex: 240"
-            [ngModel]="dureeMax()"
-            (ngModelChange)="dureeMax.set($event); onNumericFilterChange()"
-          />
-        </div>
+        <input
+          id="cir-dist"
+          type="number"
+          min="0"
+          step="10"
+          aria-label="Distance maximale en kilomètres"
+          class="ui-filter-control"
+          placeholder="Distance max (km)"
+          [ngModel]="distanceMax()"
+          (ngModelChange)="distanceMax.set($event); onNumericFilterChange()"
+        />
+      </ng-container>
 
-        <div class="filter-field">
-          <label for="cir-dist" class="filter-field__label">Distance max (km)</label>
-          <input
-            id="cir-dist"
-            type="number"
-            min="0"
-            step="10"
-            class="filter-input"
-            placeholder="Ex: 100"
-            [ngModel]="distanceMax()"
-            (ngModelChange)="distanceMax.set($event); onNumericFilterChange()"
-          />
-        </div>
-
-        <div class="filter-field">
-          <label for="cir-sort" class="filter-field__label">Trier par</label>
-          <select
-            id="cir-sort"
-            class="filter-input"
-            [ngModel]="sortBy()"
-            (ngModelChange)="sortBy.set($event); onFilterImmediate()"
-          >
-            <option value="nom_asc">Nom (A → Z)</option>
-            <option value="prix_asc">Tarif croissant</option>
-            <option value="duree_asc">Durée la plus courte</option>
-            <option value="distance_asc">Distance la plus courte</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="filter-panel__footer">
-        <p class="filter-panel__count tabular-nums">
-          <strong>{{ totalElements() }}</strong>
-          circuit{{ totalElements() > 1 ? 's' : '' }} publié{{ totalElements() > 1 ? 's' : '' }}
-        </p>
-
-        @if (hasActiveFilters()) {
-          <button type="button" class="btn-reset" (click)="resetFilters()">
-            Réinitialiser les filtres
-          </button>
-        }
-      </div>
-    </section>
+      <ng-container filter-sort>
+        <select
+          id="cir-sort"
+          aria-label="Trier par"
+          class="ui-filter-control"
+          [ngModel]="sortBy()"
+          (ngModelChange)="sortBy.set($event); onFilterImmediate()"
+        >
+          <option value="nom_asc">Nom (A → Z)</option>
+          <option value="prix_asc">Tarif croissant</option>
+          <option value="duree_asc">Durée la plus courte</option>
+          <option value="distance_asc">Distance la plus courte</option>
+        </select>
+      </ng-container>
+    </app-ui-filter-bar>
 
     @if (loading() && publishedCircuits().length === 0) {
       <app-ui-loading-state label="Chargement des circuits touristiques de Casamance..." />

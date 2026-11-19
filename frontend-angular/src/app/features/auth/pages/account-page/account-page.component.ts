@@ -12,9 +12,12 @@ import { Router, RouterLink } from '@angular/router';
 import {
   LucideBell,
   LucideCheckCircle2,
+  LucideChevronDown,
+  LucideChevronRight,
   LucideCreditCard,
   LucideEye,
   LucideLogOut,
+  LucideMoreHorizontal,
   LucideShieldCheck,
   LucideStar,
   LucideTicket,
@@ -41,6 +44,7 @@ import { SeoService } from '../../../../core/services/seo.service';
 import { Billet } from '../../../../core/models/billet.model';
 import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confirm-dialog/ui-confirm-dialog.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import { UiModalComponent } from '../../../../shared/components/ui-modal/ui-modal.component';
 import { UiTicketViewComponent } from '../../../../shared/components/ui-ticket-view/ui-ticket-view.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
@@ -63,6 +67,7 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
     RouterLink,
     FcfaPricePipe,
     DateFrPipe,
+    UiModalComponent,
     UiErrorBannerComponent,
     UiTicketViewComponent,
     LucideShieldCheck,
@@ -74,27 +79,26 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
     LucideStar,
     LucideEye,
     LucideUser,
+    LucideChevronDown,
+    LucideChevronRight,
+    LucideMoreHorizontal,
   ],
   template: `
-    <div class="page-section">
-      <div class="container">
+    <div class="account-page">
+      <div class="account-shell">
         @if (authStore.user(); as currentUser) {
           <header class="account-hero">
             <div class="account-hero__identity">
               <div class="account-avatar" aria-hidden="true">
                 {{ authStore.initials() }}
               </div>
-              <div>
-                <div class="account-hero__badges">
+              <div class="account-hero__info">
+                <div class="account-hero__title-row">
+                  <h1 class="account-hero__name">
+                    {{ currentUser.prenom }} {{ currentUser.nom }}
+                  </h1>
                   <span class="ui-badge ui-badge--terracotta">{{ authStore.roleLabel() }}</span>
-                  <span class="ui-badge ui-badge--success">
-                    <svg lucideShieldCheck [size]="13" aria-hidden="true"></svg>
-                    Session HttpOnly active
-                  </span>
                 </div>
-                <h1 class="account-hero__name">
-                  {{ currentUser.prenom }} {{ currentUser.nom }}
-                </h1>
                 <p class="account-hero__meta">
                   {{ currentUser.email }}
                   @if (currentUser.telephone) {
@@ -104,54 +108,50 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
               </div>
             </div>
 
-            <div class="account-hero__actions">
-              @if (authStore.isBackOfficeRole()) {
-                <a routerLink="/pro/tableau-de-bord" class="btn-admin">
-                  <svg lucideShieldCheck [size]="16" aria-hidden="true"></svg>
-                  <span>Ouvrir l'Espace Pro ({{ authStore.roleLabel() }})</span>
-                </a>
-              }
-              <a routerLink="/reserver" class="btn-primary">
-                <svg lucideTicket [size]="16" aria-hidden="true"></svg>
-                <span>Nouvelle réservation</span>
-              </a>
-              <button type="button" class="btn-logout" (click)="onLogout()">
-                <svg lucideLogOut [size]="16" aria-hidden="true"></svg>
-                <span>Se déconnecter</span>
-              </button>
-            </div>
-          </header>
-
-          @if (nextVisit(); as next) {
-            <div class="next-visit-card" style="display:flex;align-items:center;justify-content:space-between;padding:1.25rem 1.5rem;background:linear-gradient(135deg, var(--surface-forest) 0%, var(--brand-primary) 100%);color:#ffffff;border-radius:var(--radius-xl);margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
-              <div>
-                <span class="ui-badge ui-badge--ochre" style="margin-bottom:0.4rem;display:inline-block;">Prochaine visite confirmée</span>
-                <h2 style="margin:0 0 0.35rem;font-size:var(--text-xl);color:#ffffff;">
-                  {{ next.circuit?.nomCircuit || next.evenement?.nomEvenement || ('Réservation #' + next.id) }}
-                </h2>
-                <p style="margin:0;font-size:var(--text-sm);opacity:0.9;">
-                  @if (next.datePrestation) {
-                    {{ next.datePrestation | dateFr: 'date' }}
-                    @if (next.creneauPrestation) { · {{ next.creneauPrestation }} }
-                  } @else {
-                    {{ next.dateReservation | dateFr }}
-                  }
-                  · {{ next.nombrePlaces }} place(s) réservée(s)
-                </p>
-              </div>
-              <div style="display:flex;gap:0.75rem;align-items:center;">
+            @if (nextVisit(); as next) {
+              <div class="next-visit-inline">
+                <div class="next-visit-inline__text">
+                  <span class="next-visit-inline__label">Prochaine visite</span>
+                  <strong class="next-visit-inline__title" [title]="next.circuit?.nomCircuit || next.evenement?.nomEvenement || ('Réservation n° ' + next.id)">
+                    {{ next.circuit?.nomCircuit || next.evenement?.nomEvenement || ('Réservation n° ' + next.id) }}
+                  </strong>
+                  <span class="next-visit-inline__date">
+                    @if (next.datePrestation) {
+                      {{ next.datePrestation | dateFr: 'date' }}
+                    } @else {
+                      {{ next.dateReservation | dateFr }}
+                    }
+                    · {{ next.nombrePlaces }} pl.
+                  </span>
+                </div>
                 <button
                   type="button"
-                  class="ui-btn ui-btn--primary"
-                  style="background:#ffffff;color:var(--brand-primary);font-weight:700;border:none;cursor:pointer;"
+                  class="btn-qr-inline"
                   (click)="openBilletsTab()"
                 >
-                  <svg lucideTicket [size]="16" aria-hidden="true"></svg>
+                  <svg lucideTicket [size]="15" aria-hidden="true"></svg>
                   <span>Afficher mes billets QR</span>
                 </button>
               </div>
+            }
+
+            <div class="account-hero__actions">
+              @if (authStore.isBackOfficeRole()) {
+                <a routerLink="/pro/tableau-de-bord" class="btn-admin">
+                  <svg lucideShieldCheck [size]="15" aria-hidden="true"></svg>
+                  <span>Espace Pro</span>
+                </a>
+              }
+              <a routerLink="/reserver" class="btn-primary">
+                <svg lucideTicket [size]="15" aria-hidden="true"></svg>
+                <span>Nouvelle réservation</span>
+              </a>
+              <button type="button" class="btn-logout" (click)="onLogout()">
+                <svg lucideLogOut [size]="15" aria-hidden="true"></svg>
+                <span>Déconnexion</span>
+              </button>
             </div>
-          }
+          </header>
 
           <nav class="account-tabs" role="tablist" aria-label="Sections de mon espace personnel">
             <button
@@ -162,8 +162,8 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
               [attr.aria-selected]="activeTab() === 'reservations'"
               (click)="activeTab.set('reservations')"
             >
-              <svg lucideTicket [size]="15" aria-hidden="true"></svg>
-              <span>Réservations ({{ myReservations().length }})</span>
+              <span>Réservations</span>
+              <span class="tab-count">{{ myReservations().length }}</span>
             </button>
             <button
               type="button"
@@ -173,8 +173,8 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
               [attr.aria-selected]="activeTab() === 'billets'"
               (click)="openBilletsTab()"
             >
-              <svg lucideTicket [size]="15" aria-hidden="true"></svg>
-              <span>Mes billets QR ({{ confirmedReservations().length }})</span>
+              <span>Billets QR</span>
+              <span class="tab-count">{{ confirmedReservations().length }}</span>
             </button>
             <button
               type="button"
@@ -184,8 +184,8 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
               [attr.aria-selected]="activeTab() === 'paiements'"
               (click)="activeTab.set('paiements')"
             >
-              <svg lucideCreditCard [size]="15" aria-hidden="true"></svg>
-              <span>Paiements simulés ({{ paiements().length }})</span>
+              <span>Paiements</span>
+              <span class="tab-count">{{ paiements().length }}</span>
             </button>
             <button
               type="button"
@@ -195,8 +195,8 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
               [attr.aria-selected]="activeTab() === 'avis'"
               (click)="activeTab.set('avis')"
             >
-              <svg lucideStar [size]="15" aria-hidden="true"></svg>
-              <span>Mes avis ({{ mesAvis().length }})</span>
+              <span>Mes avis</span>
+              <span class="tab-count">{{ mesAvis().length }}</span>
             </button>
             <button
               type="button"
@@ -206,8 +206,8 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
               [attr.aria-selected]="activeTab() === 'notifications'"
               (click)="activeTab.set('notifications')"
             >
-              <svg lucideBell [size]="15" aria-hidden="true"></svg>
-              <span>Notifications ({{ myNotifications().length }})</span>
+              <span>Notifications</span>
+              <span class="tab-count">{{ myNotifications().length }}</span>
             </button>
             <button
               type="button"
@@ -217,8 +217,7 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
               [attr.aria-selected]="activeTab() === 'profil'"
               (click)="openProfileTab()"
             >
-              <svg lucideUser [size]="15" aria-hidden="true"></svg>
-              <span>Profil &amp; coordonnées</span>
+              <span>Profil</span>
             </button>
           </nav>
 
@@ -226,8 +225,7 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
             <section class="account-card" aria-labelledby="my-res-heading">
               <div class="account-card__header">
                 <h2 id="my-res-heading" class="account-card__title">
-                  <svg lucideTicket [size]="18" aria-hidden="true"></svg>
-                  <span>Mes réservations ({{ myReservations().length }})</span>
+                  <span>Mes réservations</span>
                 </h2>
               </div>
 
@@ -237,112 +235,134 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
                   <a routerLink="/reserver" class="btn-primary">Réserver un circuit ou événement</a>
                 </div>
               } @else {
-                <div class="res-stack">
-                  @for (res of myReservations(); track res.id) {
-                    @let latestPay = getPaymentForReservation(res.id);
-                    <article
-                      class="res-row"
-                      [class.res-row--cancelled]="res.statut === 'ANNULEE' || res.statut === 'EXPIREE'"
-                    >
-                      <div class="res-row__main">
-                        <div class="res-row__badges">
-                          <span class="ui-badge">{{ res.referenceReservation || ('#' + res.id) }}</span>
-                          <span class="ui-badge ui-badge--ochre">{{ res.typeReservation }}</span>
-                          <span [class]="reservationStatusBadgeClass(res.statut)">
-                            {{ formatReservationStatusLabel(res.statut) }}
-                          </span>
-                          @if (latestPay) {
-                            <span [class]="paiementStatusBadgeClass(latestPay.statut)">
-                              <svg lucideCheckCircle2 [size]="12" aria-hidden="true"></svg>
-                              {{ latestPay.modePaiement }} · {{ latestPay.referenceTransaction }}
-                              ({{ formatPaiementStatusLabel(latestPay.statut) }})
+                <div class="bo-table-wrap">
+                  <table class="bo-table res-compact-table">
+                    <thead>
+                      <tr>
+                        <th>Référence</th>
+                        <th>Prestation</th>
+                        <th>Date</th>
+                        <th>Places</th>
+                        <th>Montant</th>
+                        <th>Statut</th>
+                        <th style="text-align:right;">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (res of pagedReservations(); track res.id) {
+                        @let resTitle = res.circuit?.nomCircuit || res.evenement?.nomEvenement || (res.typeReservation === 'CIRCUIT' ? 'Circuit n° ' + res.circuitId : 'Événement n° ' + res.evenementId);
+                        <tr>
+                          <td class="cell-nowrap tabular-nums" [title]="res.referenceReservation || ('n° ' + res.id)">
+                            <a [routerLink]="['/reservations', res.id]" class="res-title-link">
+                              {{ res.referenceReservation || ('n° ' + res.id) }}
+                            </a>
+                          </td>
+                          <td class="cell-ellipsis" [title]="resTitle">{{ resTitle }}</td>
+                          <td class="cell-nowrap">{{ (res.datePrestation || res.dateReservation) | dateFr: 'date' }}</td>
+                          <td class="cell-nowrap tabular-nums">{{ res.nombrePlaces }} pl.</td>
+                          <td class="cell-nowrap tabular-nums"><strong>{{ res.montantTotal | fcfaPrice }}</strong></td>
+                          <td class="cell-nowrap">
+                            <span [class]="reservationStatusBadgeClass(res.statut)">
+                              {{ formatReservationStatusLabel(res.statut) }}
                             </span>
-                          }
-                        </div>
+                          </td>
+                          <td class="cell-nowrap" style="text-align:right;">
+                            <div class="bo-actions-cell" style="justify-content:flex-end;">
+                              @if (res.statut === 'EN_ATTENTE_PAIEMENT') {
+                                <button
+                                  type="button"
+                                  class="bo-btn bo-btn--sm bo-btn--primary"
+                                  [disabled]="payingId() === res.id"
+                                  (click)="startSimulatedCheckout(res)"
+                                >
+                                  {{ payingId() === res.id ? 'Ouverture...' : 'Régler' }}
+                                </button>
+                              } @else if (res.statut === 'BROUILLON') {
+                                <button
+                                  type="button"
+                                  class="bo-btn bo-btn--sm bo-btn--primary"
+                                  (click)="submitDraft(res.id)"
+                                >
+                                  Soumettre
+                                </button>
+                              } @else if (res.statut === 'CONFIRMEE') {
+                                <button
+                                  type="button"
+                                  class="bo-btn bo-btn--sm bo-btn--primary"
+                                  (click)="openTicketForReservation(res.id)"
+                                >
+                                  Billets QR
+                                </button>
+                              } @else {
+                                <a [routerLink]="['/reservations', res.id]" class="bo-btn bo-btn--sm">
+                                  Détail
+                                </a>
+                              }
 
-                        <h3 class="res-row__title">
-                          <a [routerLink]="['/reservations', res.id]" class="res-title-link">
-                            {{
-                              res.circuit?.nomCircuit ||
-                                res.evenement?.nomEvenement ||
-                                (res.typeReservation === 'CIRCUIT'
-                                  ? 'Circuit #' + res.circuitId
-                                  : 'Événement #' + res.evenementId)
-                            }}
-                          </a>
-                        </h3>
-                        <p class="res-row__meta tabular-nums">
-                          {{ res.nombrePlaces }} place(s) · Total :
-                          <strong>{{ res.montantTotal | fcfaPrice }}</strong> ·
-                          {{ res.dateReservation | dateFr }}
-                        </p>
-                      </div>
-
-                      <div class="res-row__pay">
-                        <a [routerLink]="['/reservations', res.id]" class="btn-detail-sm">
-                          <svg lucideEye [size]="14" aria-hidden="true"></svg>
-                          <span>Détail</span>
-                        </a>
-
-                        @if (res.statut === 'CONFIRMEE') {
-                          <a [routerLink]="['/reservations', res.id]" class="btn-tickets-sm" title="Voir mes billets électroniques et QR codes">
-                            <svg lucideTicket [size]="14" aria-hidden="true"></svg>
-                            <span>Billets QR</span>
-                          </a>
-                        }
-
-                        @if (res.statut === 'EN_ATTENTE_PAIEMENT') {
-                          <label [attr.for]="'pay-mode-' + res.id" class="sr-only">
-                            Portefeuille simulé
-                          </label>
-                          <select
-                            [id]="'pay-mode-' + res.id"
-                            class="pay-select"
-                            [ngModel]="getSelectedMode(res.id)"
-                            (ngModelChange)="setSelectedMode(res.id, $event)"
-                          >
-                            <option value="WAVE">Wave Sénégal (Simulé)</option>
-                            <option value="ORANGE_MONEY">Orange Money (Simulé)</option>
-                          </select>
-                          <button
-                            type="button"
-                            class="btn-pay"
-                            [disabled]="payingId() === res.id"
-                            (click)="startSimulatedCheckout(res)"
-                          >
-                            <svg lucideCreditCard [size]="15" aria-hidden="true"></svg>
-                            <span>
-                              {{ payingId() === res.id ? 'Ouverture...' : 'Régler (Simulé)' }}
-                            </span>
-                          </button>
-                        } @else if (res.statut === 'BROUILLON') {
-                          <button
-                            type="button"
-                            class="btn-admin"
-                            (click)="submitDraft(res.id)"
-                          >
-                            Soumettre
-                          </button>
-                        } @else {
-                          <a [routerLink]="['/paiements', res.id]" class="btn-admin">
-                            Suivi paiement
-                          </a>
-                        }
-
-                        @if (canCancel(res)) {
-                          <button
-                            type="button"
-                            class="btn-cancel-sm"
-                            [disabled]="reservationStore.cancelingId() === res.id"
-                            (click)="confirmCancel(res)"
-                          >
-                            Annuler
-                          </button>
-                        }
-                      </div>
-                    </article>
-                  }
+                              <div class="bo-row-menu">
+                                <button
+                                  type="button"
+                                  class="bo-btn bo-btn--sm bo-btn--icon"
+                                  aria-label="Plus d'actions"
+                                  (click)="toggleRowMenu(res.id)"
+                                >
+                                  <svg lucideMoreHorizontal [size]="15" aria-hidden="true"></svg>
+                                </button>
+                                @if (openMenuId() === res.id) {
+                                  <div class="bo-row-menu__dropdown" role="menu">
+                                    <a [routerLink]="['/reservations', res.id]" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null)">
+                                      Détail
+                                    </a>
+                                    <a [routerLink]="['/paiements', res.id]" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null)">
+                                      Suivi paiement
+                                    </a>
+                                    @if (canCancel(res)) {
+                                      <button
+                                        type="button"
+                                        class="bo-row-menu__item bo-row-menu__item--danger"
+                                        role="menuitem"
+                                        [disabled]="reservationStore.cancelingId() === res.id"
+                                        (click)="openMenuId.set(null); confirmCancel(res)"
+                                      >
+                                        Annuler
+                                      </button>
+                                    }
+                                  </div>
+                                }
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
                 </div>
+
+                @if (myReservations().length > resPageSize) {
+                  <div class="res-pagination">
+                    <span class="res-pagination__info">
+                      Affichage {{ resStartIndex() }}–{{ resEndIndex() }} sur {{ myReservations().length }}
+                    </span>
+                    <div class="res-pagination__btns">
+                      <button
+                        type="button"
+                        class="bo-btn bo-btn--sm"
+                        [disabled]="resPage() === 0"
+                        (click)="resPage.set(resPage() - 1)"
+                      >
+                        Précédent
+                      </button>
+                      <button
+                        type="button"
+                        class="bo-btn bo-btn--sm"
+                        [disabled]="resEndIndex() >= myReservations().length"
+                        (click)="resPage.set(resPage() + 1)"
+                      >
+                        Suivant
+                      </button>
+                    </div>
+                  </div>
+                }
               }
             </section>
           }
@@ -351,8 +371,7 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
             <section class="account-card" aria-labelledby="billets-heading">
               <div class="account-card__header">
                 <h2 id="billets-heading" class="account-card__title">
-                  <svg lucideTicket [size]="18" aria-hidden="true"></svg>
-                  <span>Mes billets électroniques &amp; QR Codes ({{ confirmedReservations().length }})</span>
+                  <span>Mes billets électroniques &amp; QR Codes</span>
                 </h2>
               </div>
 
@@ -362,26 +381,41 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
                   <a routerLink="/reserver" class="btn-primary">Réserver un circuit ou événement</a>
                 </div>
               } @else {
-                <div class="tickets-container" style="display:grid;gap:1.5rem;">
+                <div class="tickets-accordion">
                   @for (res of confirmedReservations(); track res.id) {
-                    <article class="ticket-group-card" style="border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:1.25rem;background:var(--surface-elevated);">
-                      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
-                        <div>
-                          <span class="ui-badge ui-badge--success">Accès confirmé</span>
-                          <span class="ui-badge ui-badge--neutral" style="margin-left:0.5rem;">Réf: {{ res.referenceReservation || ('#' + res.id) }}</span>
-                          <h3 style="margin:0.35rem 0 0;font-size:var(--text-lg);color:var(--ink-primary);">
-                            {{ res.circuit?.nomCircuit || res.evenement?.nomEvenement || ('Réservation #' + res.id) }}
-                          </h3>
+                    @let isExpanded = expandedTicketResId() === res.id;
+                    <article class="ticket-group-card">
+                      <button
+                        type="button"
+                        class="ticket-group-header"
+                        [attr.aria-expanded]="isExpanded"
+                        (click)="toggleTicketGroup(res.id)"
+                      >
+                        <div class="ticket-group-header__left">
+                          @if (isExpanded) {
+                            <svg lucideChevronDown [size]="16" aria-hidden="true"></svg>
+                          } @else {
+                            <svg lucideChevronRight [size]="16" aria-hidden="true"></svg>
+                          }
+                          <span class="ui-badge ui-badge--neutral">{{ res.referenceReservation || ('n° ' + res.id) }}</span>
+                          <strong class="ticket-group-title">
+                            {{ res.circuit?.nomCircuit || res.evenement?.nomEvenement || ('Réservation n° ' + res.id) }}
+                          </strong>
                         </div>
-                        <a [routerLink]="['/reservations', res.id]" class="btn-detail-sm">
-                          Consulter la fiche complète
-                        </a>
-                      </div>
+                        <div class="ticket-group-header__right">
+                          <span class="ticket-group-meta">{{ res.nombrePlaces }} billet(s) · {{ (res.datePrestation || res.dateReservation) | dateFr: 'date' }}</span>
+                          <span class="ui-badge ui-badge--success">{{ isExpanded ? 'Masquer QR' : 'Afficher QR' }}</span>
+                        </div>
+                      </button>
 
-                      <app-ui-ticket-view
-                        [billets]="ticketsByReservation()[res.id] || []"
-                        [loading]="loadingBillets()"
-                      />
+                      @if (isExpanded) {
+                        <div class="ticket-group-body">
+                          <app-ui-ticket-view
+                            [billets]="ticketsByReservation()[res.id] || []"
+                            [loading]="loadingBillets()"
+                          />
+                        </div>
+                      }
                     </article>
                   }
                 </div>
@@ -504,19 +538,38 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
 
           @if (activeTab() === 'profil') {
             <section class="account-card" aria-labelledby="profile-heading">
-              <div class="account-card__header">
+              <div class="account-card__header" style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);">
                 <h2 id="profile-heading" class="account-card__title">
                   <svg lucideUser [size]="18" aria-hidden="true"></svg>
                   <span>Mes informations personnelles</span>
                 </h2>
+                <button type="button" class="bo-btn bo-btn--primary" (click)="editProfileOpen.set(true)">
+                  Modifier
+                </button>
               </div>
 
-              <app-ui-error-banner
-                title="Impossible de mettre à jour le profil"
-                [message]="profileError()"
-              />
+              @if (authStore.user(); as u) {
+                <dl class="bo-kv-list">
+                  <div class="bo-kv-row"><dt>Prénom</dt><dd>{{ u.prenom }}</dd></div>
+                  <div class="bo-kv-row"><dt>Nom</dt><dd>{{ u.nom }}</dd></div>
+                  <div class="bo-kv-row"><dt>Adresse e-mail</dt><dd>{{ u.email }}</dd></div>
+                  <div class="bo-kv-row"><dt>Téléphone</dt><dd>{{ u.telephone || '—' }}</dd></div>
+                  <div class="bo-kv-row"><dt>Rôle</dt><dd>{{ authStore.roleLabel() }}</dd></div>
+                </dl>
+              }
 
-              <form [formGroup]="profileForm" (ngSubmit)="saveProfile()" class="profile-form" novalidate>
+              <app-ui-modal
+                [open]="editProfileOpen()"
+                title="Modifier mes coordonnées"
+                [showFooter]="false"
+                (closed)="editProfileOpen.set(false)"
+              >
+                <app-ui-error-banner
+                  title="Impossible de mettre à jour le profil"
+                  [message]="profileError()"
+                />
+
+                <form [formGroup]="profileForm" (ngSubmit)="saveProfile()" class="profile-form" novalidate>
                 <div class="profile-grid">
                   <div class="profile-field">
                     <label for="prof-prenom" class="profile-label">Prénom *</label>
@@ -590,7 +643,8 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
                   }
                 </div>
 
-                <div class="profile-actions">
+                <div class="profile-actions" style="display: flex; gap: var(--space-2); justify-content: flex-end;">
+                  <button type="button" class="bo-btn" (click)="editProfileOpen.set(false)">Annuler</button>
                   <button
                     type="submit"
                     class="btn-primary"
@@ -600,6 +654,7 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
                   </button>
                 </div>
               </form>
+              </app-ui-modal>
             </section>
           }
         }
@@ -607,90 +662,190 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
     </div>
   `,
   styles: `
+    .account-page {
+      width: 100%;
+    }
+
+    .account-shell {
+      width: 100%;
+      max-width: 100%;
+      padding: 20px 24px;
+    }
+
     .account-hero {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
       justify-content: space-between;
-      gap: var(--space-5);
-      padding: var(--space-6);
+      gap: 14px 20px;
+      padding: 14px 18px;
+      min-height: 92px;
       background-color: var(--surface-elevated);
       border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-xl);
-      box-shadow: var(--shadow-sm);
-      margin-bottom: var(--space-6);
+      border-radius: 12px;
+      margin-bottom: 16px;
     }
 
     .account-hero__identity {
       display: flex;
       align-items: center;
-      gap: var(--space-4);
+      gap: 12px;
+      min-width: 0;
     }
 
     .account-avatar {
-      width: 64px;
-      height: 64px;
+      width: 44px;
+      height: 44px;
       border-radius: 50%;
       background-color: var(--brand-primary);
       color: var(--ink-on-dark);
-      font-family: var(--font-display);
-      font-size: var(--text-xl);
+      font-family: var(--font-sans);
+      font-size: 15px;
       font-weight: 700;
       display: grid;
       place-items: center;
       flex-shrink: 0;
     }
 
-    .account-hero__badges {
+    .account-hero__title-row {
       display: flex;
+      align-items: center;
       flex-wrap: wrap;
-      gap: var(--space-2);
-      margin-bottom: var(--space-1);
+      gap: 8px;
     }
 
     .account-hero__name {
-      font-size: var(--text-xl);
-      margin: 0 0 0.15rem;
+      font-family: var(--font-sans);
+      font-size: 18px;
+      font-weight: 600;
+      margin: 0;
     }
 
     .account-hero__meta {
-      font-size: var(--text-sm);
+      font-size: 13px;
       color: var(--ink-secondary);
-      margin: 0;
+      margin: 2px 0 0;
+    }
+
+    .next-visit-inline {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background-color: var(--brand-soft);
+      border: 1px solid rgba(36, 91, 70, 0.2);
+      flex-wrap: wrap;
+    }
+
+    .next-visit-inline__text {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 4px 8px;
+      font-size: 13px;
+    }
+
+    .next-visit-inline__label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--brand-primary);
+    }
+
+    .next-visit-inline__title {
+      color: var(--ink-primary);
+      max-width: 240px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .next-visit-inline__date {
+      font-size: 12px;
+      color: var(--ink-secondary);
+    }
+
+    .btn-qr-inline {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 34px;
+      padding: 0 12px;
+      border-radius: 8px;
+      border: none;
+      background-color: var(--brand-primary);
+      color: #ffffff;
+      font-family: var(--font-sans);
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .btn-qr-inline:hover {
+      background-color: var(--brand-primary-hover);
     }
 
     .account-hero__actions {
       display: flex;
       flex-wrap: wrap;
-      gap: var(--space-3);
+      gap: 8px;
     }
 
     .account-tabs {
       display: flex;
-      flex-wrap: wrap;
-      gap: var(--space-2);
-      margin-bottom: var(--space-5);
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      gap: 20px;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 16px;
     }
 
     .account-tab {
       display: inline-flex;
       align-items: center;
-      gap: var(--space-2);
-      padding: 0.6rem 1rem;
-      border-radius: var(--radius-pill);
-      border: 1px solid var(--border-strong);
-      background-color: var(--surface-elevated);
+      gap: 6px;
+      padding: 10px 2px;
+      border: none;
+      border-bottom: 2px solid transparent;
+      background: transparent;
       color: var(--ink-secondary);
       font-family: var(--font-sans);
-      font-size: var(--text-sm);
-      font-weight: 700;
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
       cursor: pointer;
+      margin-bottom: -1px;
+    }
+
+    .account-tab:hover {
+      color: var(--ink-primary);
     }
 
     .account-tab--active {
-      background-color: var(--brand-primary);
-      border-color: var(--brand-primary);
-      color: var(--ink-on-dark);
+      color: var(--brand-primary);
+      border-bottom-color: var(--brand-primary);
+    }
+
+    .tab-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 20px;
+      height: 20px;
+      padding: 0 6px;
+      border-radius: 999px;
+      background-color: var(--surface-sand);
+      color: var(--ink-secondary);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .account-tab--active .tab-count {
+      background-color: var(--brand-soft);
+      color: var(--brand-primary);
     }
 
     .btn-primary,
@@ -699,14 +854,17 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
     .btn-detail-sm {
       display: inline-flex;
       align-items: center;
-      gap: var(--space-2);
-      padding: 0.58rem 1.05rem;
-      border-radius: var(--radius-pill);
-      font-size: var(--text-sm);
-      font-weight: 700;
+      justify-content: center;
+      gap: 6px;
+      height: 36px;
+      padding: 0 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
       cursor: pointer;
       font-family: var(--font-sans);
       text-decoration: none;
+      white-space: nowrap;
     }
 
     .btn-primary {
@@ -716,61 +874,159 @@ type AccountTab = 'reservations' | 'billets' | 'paiements' | 'avis' | 'notificat
     }
 
     .btn-admin {
-      background-color: var(--accent-terracotta);
-      color: #ffffff;
-      border: none;
+      background-color: var(--surface-elevated);
+      color: var(--ink-primary);
+      border: 1px solid var(--border-strong);
     }
 
     .btn-detail-sm {
-      padding: 0.45rem 0.85rem;
+      height: 32px;
+      padding: 0 10px;
       background-color: var(--surface-sand);
       color: var(--ink-primary);
       border: 1px solid var(--border-strong);
-      font-size: var(--text-xs);
-    }
-
-    .btn-tickets-sm {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      padding: 0.45rem 0.85rem;
-      background-color: var(--brand-primary);
-      color: #ffffff;
-      border: 1px solid var(--brand-primary);
-      border-radius: var(--radius-pill);
-      font-size: var(--text-xs);
-      font-weight: 700;
-      text-decoration: none;
-      cursor: pointer;
+      font-size: 12px;
     }
 
     .btn-logout {
-      background-color: var(--surface-sand);
+      background-color: transparent;
       color: var(--danger);
-      border: 1px solid rgba(166, 44, 44, 0.25);
+      border: 1px solid rgba(166, 44, 44, 0.28);
     }
 
     .account-card {
       background-color: var(--surface-elevated);
       border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg);
-      padding: var(--space-6);
+      border-radius: 12px;
+      padding: 16px 20px;
       box-shadow: var(--shadow-xs);
     }
 
     .account-card__header {
-      margin-bottom: var(--space-5);
-      padding-bottom: var(--space-3);
+      margin-bottom: 12px;
+      padding-bottom: 10px;
       border-bottom: 1px solid var(--border-subtle);
     }
 
     .account-card__title {
       display: flex;
       align-items: center;
-      gap: var(--space-2);
-      font-size: var(--text-lg);
+      gap: 8px;
+      font-family: var(--font-sans);
+      font-size: 16px;
+      font-weight: 600;
       color: var(--ink-primary);
       margin: 0;
+    }
+
+    .res-compact-table td {
+      height: 44px;
+      max-height: 44px;
+      padding-top: 6px;
+      padding-bottom: 6px;
+      vertical-align: middle;
+    }
+
+    .cell-nowrap {
+      white-space: nowrap;
+    }
+
+    .cell-ellipsis {
+      max-width: 260px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .res-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding-top: 12px;
+      font-size: 13px;
+      color: var(--ink-secondary);
+    }
+
+    .res-pagination__btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    .tickets-accordion {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .ticket-group-card {
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      background-color: var(--surface-elevated);
+      overflow: hidden;
+    }
+
+    .ticket-group-header {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      text-align: left;
+      font-family: var(--font-sans);
+      flex-wrap: wrap;
+    }
+
+    .ticket-group-header:hover {
+      background-color: var(--surface-canvas);
+    }
+
+    .ticket-group-header__left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .ticket-group-title {
+      font-size: 14px;
+      color: var(--ink-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 340px;
+    }
+
+    .ticket-group-header__right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ticket-group-meta {
+      font-size: 12px;
+      color: var(--ink-secondary);
+      white-space: nowrap;
+    }
+
+    .ticket-group-body {
+      padding: 14px;
+      border-top: 1px solid var(--border-subtle);
+      background-color: var(--surface-canvas);
+    }
+
+    @media (max-width: 767px) {
+      .account-shell {
+        padding: 16px;
+      }
+
+      .account-hero {
+        padding: 12px 14px;
+      }
     }
 
     .res-stack,
@@ -986,11 +1242,16 @@ export class AccountPageComponent implements OnInit {
   protected readonly notifications = signal<NotificationItem[]>([]);
   protected readonly mesAvis = signal<Avis[]>([]);
   protected readonly payingId = signal<number | null>(null);
+  protected readonly editProfileOpen = signal<boolean>(false);
   protected readonly savingProfile = signal<boolean>(false);
   protected readonly profileError = signal<string | null>(null);
   protected readonly selectedModes = signal<Record<number, ModePaiement>>({});
   protected readonly ticketsByReservation = signal<Record<number, Billet[]>>({});
   protected readonly loadingBillets = signal(false);
+  protected readonly resPage = signal(0);
+  protected readonly resPageSize = 20;
+  protected readonly openMenuId = signal<number | null>(null);
+  protected readonly expandedTicketResId = signal<number | null>(null);
 
   protected readonly formatReservationStatusLabel = formatReservationStatusLabel;
   protected readonly reservationStatusBadgeClass = reservationStatusBadgeClass;
@@ -1024,6 +1285,19 @@ export class AccountPageComponent implements OnInit {
     return this.myReservations().filter((r) => r.statut === 'CONFIRMEE');
   });
 
+  protected readonly pagedReservations = computed(() => {
+    const start = this.resPage() * this.resPageSize;
+    return this.myReservations().slice(start, start + this.resPageSize);
+  });
+
+  protected readonly resStartIndex = computed(() =>
+    this.myReservations().length === 0 ? 0 : this.resPage() * this.resPageSize + 1
+  );
+
+  protected readonly resEndIndex = computed(() =>
+    Math.min((this.resPage() + 1) * this.resPageSize, this.myReservations().length)
+  );
+
   protected readonly nextVisit = computed<Reservation | null>(() => {
     const list = this.confirmedReservations();
     return list.length > 0 ? list[0] : null;
@@ -1045,6 +1319,19 @@ export class AccountPageComponent implements OnInit {
   protected openBilletsTab(): void {
     this.activeTab.set('billets');
     void this.loadConfirmedTickets();
+  }
+
+  protected openTicketForReservation(resId: number): void {
+    this.expandedTicketResId.set(resId);
+    this.openBilletsTab();
+  }
+
+  protected toggleTicketGroup(resId: number): void {
+    this.expandedTicketResId.update((curr) => (curr === resId ? null : resId));
+  }
+
+  protected toggleRowMenu(resId: number): void {
+    this.openMenuId.update((curr) => (curr === resId ? null : resId));
   }
 
   protected async loadConfirmedTickets(): Promise<void> {
@@ -1163,7 +1450,7 @@ export class AccountPageComponent implements OnInit {
   protected async confirmCancel(res: Reservation): Promise<void> {
     const ref = this.dialog.open<boolean>(UiConfirmDialogComponent, {
       data: {
-        title: `Annuler la réservation ${res.referenceReservation || '#' + res.id} ?`,
+        title: `Annuler la réservation ${res.referenceReservation || 'n° ' + res.id} ?`,
         message: `Voulez-vous annuler cette réservation de ${res.nombrePlaces} place(s) ?`,
         confirmLabel: 'Confirmer l’annulation',
         cancelLabel: 'Conserver',

@@ -98,7 +98,7 @@ import { ReservationApiService } from '../../data-access/reservation-api.service
           <header class="detail-header">
             <div>
               <div class="badge-row">
-                <span class="ui-badge">{{ res.referenceReservation || ('#' + res.id) }}</span>
+                <span class="ui-badge">{{ res.referenceReservation || ('n° ' + res.id) }}</span>
                 <span class="ui-badge ui-badge--ochre">{{ res.typeReservation }}</span>
                 <span [class]="reservationStatusBadgeClass(res.statut)">
                   {{ formatReservationStatusLabel(res.statut) }}
@@ -106,7 +106,7 @@ import { ReservationApiService } from '../../data-access/reservation-api.service
               </div>
               <h1 class="detail-title">{{ prestationTitle() }}</h1>
               <p class="detail-subtitle">
-                Réservation enregistrée le {{ res.dateReservation | dateFr }} (Africa/Dakar)
+                Réservation enregistrée le {{ res.dateReservation | dateFr }}
               </p>
             </div>
 
@@ -634,7 +634,7 @@ export class ReservationDetailPageComponent {
     if (!r) return;
     const ref = this.dialog.open<boolean>(UiConfirmDialogComponent, {
       data: {
-        title: `Annuler ${r.referenceReservation || '#' + r.id} ?`,
+        title: `Annuler ${r.referenceReservation || 'n° ' + r.id} ?`,
         message: `Voulez-vous annuler cette réservation (${r.nombrePlaces} place(s)) ?`,
         confirmLabel: 'Confirmer l’annulation',
         cancelLabel: 'Conserver',
@@ -676,8 +676,8 @@ export class ReservationDetailPageComponent {
         this.billets.set([]);
       }
       this.seo.update({
-        title: `Réservation ${detail.referenceReservation || '#' + detail.id}`,
-        description: `Suivi détaillé de la réservation ${detail.referenceReservation || '#' + detail.id}.`,
+        title: `Réservation ${detail.referenceReservation || 'n° ' + detail.id}`,
+        description: `Suivi détaillé de la réservation ${detail.referenceReservation || 'n° ' + detail.id}.`,
         canonicalPath: `/reservations/${detail.id}`,
       });
     } catch (err) {

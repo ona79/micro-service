@@ -18,6 +18,7 @@ import {
 import { ChartDatum, UiBarChartComponent } from '../../../../shared/components/ui-bar-chart/ui-bar-chart.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
 import { UiKpiCardComponent } from '../../../../shared/components/ui-kpi-card/ui-kpi-card.component';
+import { UiPageHeaderComponent } from '../../../../shared/components/ui-page-header/ui-page-header.component';
 import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skeleton-grid/ui-skeleton-grid.component';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
 import { AvisApiService } from '../../../avis/data-access/avis-api.service';
@@ -36,25 +37,24 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
   imports: [
     LucideRefreshCw,
     UiKpiCardComponent,
+    UiPageHeaderComponent,
     UiBarChartComponent,
     UiErrorBannerComponent,
     UiSkeletonGridComponent,
     FcfaPricePipe,
   ],
   template: `
-    <header class="bo-header">
-      <div>
-        <p class="bo-header__eyebrow">Analytics serveur · {{ authStore.roleLabel() }}</p>
-        <h1 class="bo-header__title">Statistiques et indicateurs métier</h1>
-        <p class="bo-header__lead">
-          Données agrégées directement par les microservices selon votre périmètre de permissions.
-        </p>
+    <app-ui-page-header
+      title="Statistiques"
+      subtitle="Indicateurs d'activité selon votre périmètre."
+    >
+      <div header-actions>
+        <button type="button" class="bo-btn" (click)="load()" [disabled]="loading()">
+          <svg lucideRefreshCw [size]="15" aria-hidden="true"></svg>
+          <span>Actualiser</span>
+        </button>
       </div>
-      <button type="button" class="bo-btn" (click)="load()" [disabled]="loading()">
-        <svg lucideRefreshCw [size]="15" aria-hidden="true"></svg>
-        <span>Actualiser</span>
-      </button>
-    </header>
+    </app-ui-page-header>
 
     @if (error()) {
       <app-ui-error-banner [message]="error()!" (retry)="load()" />
@@ -62,7 +62,7 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
       <app-ui-skeleton-grid [count]="4" />
     } @else {
       @if (patrimoineStats(); as p) {
-        <section class="bo-panel">
+        <section class="bo-stat-section" style="margin-bottom: var(--space-6);">
           <div class="bo-panel__head">
             <h2 class="bo-panel__title">Patrimoine de Casamance</h2>
             <span class="ui-badge ui-badge--neutral">Périmètre : {{ p.scope }}</span>
@@ -81,7 +81,7 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
       }
 
       @if (circuitStats(); as c) {
-        <section class="bo-panel">
+        <section class="bo-stat-section" style="margin-bottom: var(--space-6);">
           <div class="bo-panel__head">
             <h2 class="bo-panel__title">Circuits touristiques</h2>
             <span class="ui-badge ui-badge--neutral">Périmètre : {{ c.scope }}</span>
@@ -100,7 +100,7 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
       }
 
       @if (evenementStats(); as e) {
-        <section class="bo-panel">
+        <section class="bo-stat-section" style="margin-bottom: var(--space-6);">
           <div class="bo-panel__head">
             <h2 class="bo-panel__title">Agenda culturel &amp; événements</h2>
           </div>
@@ -118,7 +118,7 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
       }
 
       @if (guideStats(); as g) {
-        <section class="bo-panel">
+        <section class="bo-stat-section" style="margin-bottom: var(--space-6);">
           <div class="bo-panel__head">
             <h2 class="bo-panel__title">Corps des guides touristiques</h2>
           </div>
@@ -136,7 +136,7 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
       }
 
       @if (reservationStats(); as r) {
-        <section class="bo-panel">
+        <section class="bo-stat-section" style="margin-bottom: var(--space-6);">
           <div class="bo-panel__head">
             <h2 class="bo-panel__title">Réservations &amp; Modération</h2>
           </div>
@@ -158,7 +158,7 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
       }
 
       @if (paiementStats(); as pay) {
-        <section class="bo-panel">
+        <section class="bo-stat-section" style="margin-bottom: var(--space-6);">
           <div class="bo-panel__head">
             <h2 class="bo-panel__title">Transactions simulées, Notifications &amp; Utilisateurs</h2>
           </div>
@@ -177,7 +177,7 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
               <app-ui-bar-chart title="Notifications par canal" [data]="toChart(n.parCanal)" />
             }
             @if (userStats(); as u) {
-              <app-ui-bar-chart title="Comptes par rôle RBAC" [data]="toChart(u.parRole)" />
+              <app-ui-bar-chart title="Comptes par rôle" [data]="toChart(u.parRole)" />
             }
           </div>
         </section>

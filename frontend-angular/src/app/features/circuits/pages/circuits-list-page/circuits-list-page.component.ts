@@ -32,6 +32,10 @@ import { UiLoadingStateComponent } from '../../../../shared/components/ui-loadin
 import { UiPaginationComponent } from '../../../../shared/components/ui-pagination/ui-pagination.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import {
+  ActiveFilterChip,
+  UiFilterBarComponent,
+} from '../../../../shared/components/ui-filter-bar/ui-filter-bar.component';
 import { UiPatrimoineImageComponent } from '../../../../shared/components/ui-patrimoine-image/ui-patrimoine-image.component';
 import { DifficulteLabelPipe } from '../../../../shared/pipes/difficulte-label.pipe';
 import { DurationMinutesPipe } from '../../../../shared/pipes/duration-minutes.pipe';
@@ -63,6 +67,7 @@ type CircuitSortOption = 'nom_asc' | 'prix_asc' | 'duree_asc' | 'distance_asc';
     UiPatrimoineImageComponent,
     UiErrorBannerComponent,
     UiEmptyStateComponent,
+    UiFilterBarComponent,
     DurationMinutesPipe,
     DifficulteLabelPipe,
     FcfaPricePipe,
@@ -84,7 +89,35 @@ export class CircuitsListPageComponent implements OnInit {
   protected readonly distanceMax = signal<number | null>(null);
   protected readonly sortBy = signal<CircuitSortOption>('nom_asc');
   protected readonly currentPage = signal(1);
-  protected readonly pageSize = 8;
+  protected readonly pageSize = 24;
+
+  protected readonly secondaryActiveCount = computed(() => {
+    let count = 0;
+    if (this.moyenTransport()) count++;
+    if (this.dureeMax() !== null && this.dureeMax()! > 0) count++;
+    if (this.distanceMax() !== null && this.distanceMax()! > 0) count++;
+    return count;
+  });
+
+  protected readonly activeFilterChips = computed<ActiveFilterChip[]>(() => {
+    const chips: ActiveFilterChip[] = [];
+    if (this.search().trim()) chips.push({ key: 'q', label: `Recherche : ${this.search().trim()}` });
+    if (this.zone()) chips.push({ key: 'zone', label: `Zone : ${this.zone()}` });
+    if (this.difficulte()) chips.push({ key: 'diff', label: `Difficulté : ${this.difficulte()}` });
+    if (this.moyenTransport()) chips.push({ key: 'trans', label: `Transport : ${this.moyenTransport()}` });
+    if (this.dureeMax() && this.dureeMax()! > 0) chips.push({ key: 'duree', label: `≤ ${this.dureeMax()} min` });
+    if (this.distanceMax() && this.distanceMax()! > 0) chips.push({ key: 'dist', label: `≤ ${this.distanceMax()} km` });
+    return chips;
+  });
+
+  protected removeFilterChip(key: string): void {
+    if (key === 'q') this.onSearchChange('');
+    else if (key === 'zone') { this.zone.set(''); this.onFilterImmediate(); }
+    else if (key === 'diff') { this.difficulte.set(''); this.onFilterImmediate(); }
+    else if (key === 'trans') { this.moyenTransport.set(''); this.onFilterImmediate(); }
+    else if (key === 'duree') { this.dureeMax.set(null); this.onFilterImmediate(); }
+    else if (key === 'dist') { this.distanceMax.set(null); this.onFilterImmediate(); }
+  }
 
   protected readonly items = signal<Circuit[]>([]);
   protected readonly totalElements = signal(0);

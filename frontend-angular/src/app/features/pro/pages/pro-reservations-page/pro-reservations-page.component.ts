@@ -1,8 +1,8 @@
 import { Dialog } from '@angular/cdk/dialog';
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { LucideEye, LucideRefreshCw, LucideXCircle } from '@lucide/angular';
+import { LucideEye, LucideMoreHorizontal, LucideRefreshCw, LucideXCircle } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { toast } from 'ngx-sonner';
 import { PermissionService } from '../../../../core/auth/permissions';
@@ -19,6 +19,10 @@ import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confi
 import { UiDetailDrawerComponent } from '../../../../shared/components/ui-detail-drawer/ui-detail-drawer.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import {
+  FilterStatusPill,
+  UiFilterBarComponent,
+} from '../../../../shared/components/ui-filter-bar/ui-filter-bar.component';
 import { UiKpiCardComponent } from '../../../../shared/components/ui-kpi-card/ui-kpi-card.component';
 import { UiPaginationComponent } from '../../../../shared/components/ui-pagination/ui-pagination.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
@@ -39,18 +43,20 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
     UiDetailDrawerComponent,
     UiEmptyStateComponent,
     UiErrorBannerComponent,
+    UiFilterBarComponent,
     LucideEye,
+    LucideMoreHorizontal,
     LucideRefreshCw,
     LucideXCircle,
   ],
   template: `
     <header class="bo-header">
       <div>
-        <p class="bo-header__eyebrow">Supervision ms-reservation · Workflow P04 strict</p>
+        <p class="bo-header__eyebrow">Réservations</p>
         <h1 class="bo-header__title">Gestion des réservations</h1>
         <p class="bo-header__lead">
           Suivez l’ensemble des réservations clients, consultez leurs transitions d’état, synchronisez
-          un dossier avec ms-paiement ou annulez une réservation autorisée.
+          un dossier ou annulez une réservation autorisée.
         </p>
       </div>
       <button type="button" class="bo-btn" (click)="loadAll(page())" [disabled]="loading()">
@@ -61,7 +67,7 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
 
     <p class="bo-notice" style="margin-bottom: var(--space-4);">
       Règle métier P04 : une réservation n'est confirmée qu'à réception d'un événement de paiement
-      ACCEPTE émis par ms-paiement (aucune confirmation manuelle autorisée).
+      accepté.
     </p>
 
     @if (stats(); as s) {
@@ -78,42 +84,32 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
     }
 
     <section class="bo-panel">
-      <div class="bo-filters">
-        <div class="bo-field bo-field--grow">
-          <label for="resa-q" class="bo-label">Recherche</label>
-          <input id="resa-q" type="search" class="bo-input" [(ngModel)]="q" placeholder="Référence, nom client, email..." (keyup.enter)="loadPage(0)" />
-        </div>
-        <div class="bo-field">
-          <label for="resa-statut" class="bo-label">Statut</label>
-          <select id="resa-statut" class="bo-select" [(ngModel)]="statutFilter" (ngModelChange)="loadPage(0)">
-            <option value="">Tous</option>
-            <option value="BROUILLON">BROUILLON</option>
-            <option value="EN_ATTENTE_PAIEMENT">EN_ATTENTE_PAIEMENT</option>
-            <option value="CONFIRMEE">CONFIRMEE</option>
-            <option value="EXPIREE">EXPIREE</option>
-            <option value="ANNULEE">ANNULEE</option>
-            <option value="ECHEC">ECHEC</option>
-            <option value="REMBOURSEE">REMBOURSEE</option>
-          </select>
-        </div>
-        <div class="bo-field">
-          <label for="resa-type" class="bo-label">Type</label>
-          <select id="resa-type" class="bo-select" [(ngModel)]="typeFilter" (ngModelChange)="loadPage(0)">
-            <option value="">Tous</option>
+      <app-ui-filter-bar
+        [statusPills]="statusPills()"
+        [activeStatus]="statutFilter || 'ALL'"
+        (statusChange)="statutFilter = $event === 'ALL' ? '' : $any($event); loadPage(0)"
+        [searchValue]="q"
+        searchPlaceholder="Référence, client, email..."
+        searchAriaLabel="Rechercher une réservation"
+        [hasSecondaryFilters]="true"
+        [secondaryActiveCount]="(dateMin ? 1 : 0) + (dateMax ? 1 : 0)"
+        [resultsLabel]="totalElements() + ' réservation(s)'"
+        [hasActiveFilters]="Boolean(q.trim() || statutFilter || typeFilter || dateMin || dateMax)"
+        (searchChange)="q = $event; loadPage(0)"
+        (reset)="q = ''; statutFilter = ''; typeFilter = ''; dateMin = ''; dateMax = ''; loadPage(0)"
+      >
+        <ng-container filter-primary>
+          <select id="resa-type" aria-label="Type" class="ui-filter-control" [(ngModel)]="typeFilter" (ngModelChange)="loadPage(0)">
+            <option value="">Type : Tous</option>
             <option value="CIRCUIT">CIRCUIT</option>
             <option value="EVENEMENT">EVENEMENT</option>
           </select>
-        </div>
-        <div class="bo-field">
-          <label for="resa-dmin" class="bo-label">Du</label>
-          <input id="resa-dmin" type="date" class="bo-input" [(ngModel)]="dateMin" />
-        </div>
-        <div class="bo-field">
-          <label for="resa-dmax" class="bo-label">Au</label>
-          <input id="resa-dmax" type="date" class="bo-input" [(ngModel)]="dateMax" />
-        </div>
-        <button type="button" class="bo-btn bo-btn--primary" (click)="loadPage(0)">Filtrer</button>
-      </div>
+        </ng-container>
+        <ng-container filter-secondary>
+          <input id="resa-dmin" type="date" aria-label="Date début" class="ui-filter-control" [(ngModel)]="dateMin" (ngModelChange)="loadPage(0)" />
+          <input id="resa-dmax" type="date" aria-label="Date fin" class="ui-filter-control" [(ngModel)]="dateMax" (ngModelChange)="loadPage(0)" />
+        </ng-container>
+      </app-ui-filter-bar>
 
       @if (error()) {
         <app-ui-error-banner [message]="error()!" (retry)="loadPage(page())" />
@@ -137,27 +133,19 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
             <tbody>
               @for (r of items(); track r.id) {
                 <tr>
-                  <td>
-                    <span class="bo-cell-title tabular-nums">{{ r.referenceReservation || ('RES-' + r.id) }}</span>
-                    <span class="bo-cell-sub">{{ r.dateReservation | dateFr: 'd MMM yyyy HH:mm' }}</span>
+                  <td class="tabular-nums" [title]="(r.referenceReservation || 'RES-' + r.id) + ' · ' + (r.dateReservation | dateFr: 'd MMM yyyy HH:mm')">
+                    <strong>{{ r.referenceReservation || ('RES-' + r.id) }}</strong>
                   </td>
                   <td>
-                    <span class="bo-cell-title">{{ r.nomClient }}</span>
-                    <span class="bo-cell-sub">{{ r.emailClient }} · {{ r.telephoneClient || 'N/A' }}</span>
+                    <span class="bo-cell-one" [title]="r.nomClient + ' (' + r.emailClient + ')'">{{ r.nomClient }}</span>
                   </td>
                   <td>
-                    <span class="ui-badge ui-badge--neutral">{{ r.typeReservation }}</span>
-                    <span class="bo-cell-sub">
-                      @if (r.typeReservation === 'CIRCUIT') {
-                        Circuit {{ r.circuitId }}
-                      } @else {
-                        Événement {{ r.evenementId }}
-                      }
+                    <span class="ui-badge ui-badge--neutral" [title]="r.typeReservation === 'CIRCUIT' ? 'Circuit ' + r.circuitId : 'Événement ' + r.evenementId">
+                      {{ r.typeReservation }}
                     </span>
                   </td>
-                  <td class="tabular-nums">
-                    {{ r.montantTotal | fcfaPrice }}
-                    <span class="bo-cell-sub">{{ r.nombrePlaces }} place(s)</span>
+                  <td class="tabular-nums" [title]="(r.montantTotal | fcfaPrice) + ' · ' + r.nombrePlaces + ' place(s)'">
+                    {{ r.montantTotal | fcfaPrice }} · {{ r.nombrePlaces }} pl.
                   </td>
                   <td>
                     <span [class]="statusBadge(r.statut)">{{ statusLabel(r.statut) }}</span>
@@ -165,19 +153,30 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
                   <td>
                     <div class="bo-actions-cell">
                       <button type="button" class="bo-btn bo-btn--sm" (click)="openDetail(r)">
-                        <svg lucideEye [size]="13" aria-hidden="true"></svg>
-                        <span>Détail</span>
+                        Détail
                       </button>
-                      <button type="button" class="bo-btn bo-btn--sm" (click)="synchroniser(r)" [disabled]="busy()">
-                        <svg lucideRefreshCw [size]="12" aria-hidden="true"></svg>
-                        <span>Sync</span>
-                      </button>
-                      @if (canCancel(r) && permissions.has('RESERVATION:GERER')) {
-                        <button type="button" class="bo-btn bo-btn--sm bo-btn--danger" (click)="annuler(r)" [disabled]="busy()">
-                          <svg lucideXCircle [size]="12" aria-hidden="true"></svg>
-                          <span>Annuler</span>
+                      <div class="bo-row-menu">
+                        <button
+                          type="button"
+                          class="bo-btn bo-btn--sm bo-btn--icon"
+                          aria-label="Plus d'actions"
+                          (click)="toggleRowMenu(r.id)"
+                        >
+                          <svg lucideMoreHorizontal [size]="15" aria-hidden="true"></svg>
                         </button>
-                      }
+                        @if (openMenuId() === r.id) {
+                          <div class="bo-row-menu__dropdown" role="menu">
+                            <button type="button" class="bo-row-menu__item" role="menuitem" [disabled]="busy()" (click)="openMenuId.set(null); synchroniser(r)">
+                              Synchroniser
+                            </button>
+                            @if (canCancel(r) && permissions.has('RESERVATION:GERER')) {
+                              <button type="button" class="bo-row-menu__item bo-row-menu__item--danger" role="menuitem" [disabled]="busy()" (click)="openMenuId.set(null); annuler(r)">
+                                Annuler
+                              </button>
+                            }
+                          </div>
+                        }
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -198,7 +197,7 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
 
     <app-ui-detail-drawer
       [open]="selectedItem() !== null"
-      [title]="selectedItem()?.referenceReservation || 'Réservation #' + (selectedItem()?.id ?? '')"
+      [title]="selectedItem()?.referenceReservation || 'Réservation n° ' + (selectedItem()?.id ?? '')"
       eyebrow="Dossier réservation complet"
       (close)="selectedItem.set(null)"
     >
@@ -257,6 +256,29 @@ export class ProReservationsPageComponent implements OnInit {
   private readonly dialog = inject(Dialog);
   protected readonly permissions = inject(PermissionService);
   private readonly api = inject(ReservationApiService);
+  protected readonly openMenuId = signal<number | null>(null);
+  private searchTimer?: ReturnType<typeof setTimeout>;
+
+  protected onSearchInput(): void {
+    clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => void this.loadPage(0), 250);
+  }
+
+  protected toggleRowMenu(id: number): void {
+    this.openMenuId.update((curr) => (curr === id ? null : id));
+  }
+
+  protected readonly statusPills = computed<FilterStatusPill[]>(() => {
+    const s = this.stats();
+    return [
+      { id: 'ALL', label: 'Toutes', count: s?.totalReservations },
+      { id: 'CONFIRMEE', label: 'Confirmées', count: s?.confirmees },
+      { id: 'EN_ATTENTE_PAIEMENT', label: 'En attente', count: s?.enAttentePaiement },
+      { id: 'BROUILLON', label: 'Brouillons' },
+      { id: 'ANNULEE', label: 'Annulées', count: s?.annulees },
+      { id: 'EXPIREE', label: 'Expirées', count: s?.expirees },
+    ];
+  });
 
   protected readonly loading = signal(true);
   protected readonly busy = signal(false);
@@ -342,7 +364,7 @@ export class ProReservationsPageComponent implements OnInit {
     this.actionError.set(null);
     try {
       const updated = await firstValueFrom(this.api.synchroniser(r.id));
-      toast.success(`Réservation ${updated.referenceReservation || '#' + r.id} synchronisée (${updated.statut}).`);
+      toast.success(`Réservation ${updated.referenceReservation || 'n° ' + r.id} synchronisée (${updated.statut}).`);
       await this.loadAll(this.page());
     } catch (err) {
       this.actionError.set(extractErrorMessage(err));
@@ -356,7 +378,7 @@ export class ProReservationsPageComponent implements OnInit {
       this.dialog
         .open<boolean>(UiConfirmDialogComponent, {
           data: {
-            title: `Annuler la réservation ${r.referenceReservation || '#' + r.id} ?`,
+            title: `Annuler la réservation ${r.referenceReservation || 'n° ' + r.id} ?`,
             message: 'Les places réservées seront libérées immédiatement.',
             confirmLabel: 'Confirmer l’annulation',
             cancelLabel: 'Conserver',

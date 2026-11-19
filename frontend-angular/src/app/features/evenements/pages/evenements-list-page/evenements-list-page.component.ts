@@ -27,6 +27,10 @@ import { UiLoadingStateComponent } from '../../../../shared/components/ui-loadin
 import { UiPaginationComponent } from '../../../../shared/components/ui-pagination/ui-pagination.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import {
+  ActiveFilterChip,
+  UiFilterBarComponent,
+} from '../../../../shared/components/ui-filter-bar/ui-filter-bar.component';
 import { UiPatrimoineImageComponent } from '../../../../shared/components/ui-patrimoine-image/ui-patrimoine-image.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { EvenementTypePipe } from '../../../../shared/pipes/evenement-type.pipe';
@@ -55,6 +59,7 @@ import { EvenementApiService } from '../../data-access/evenement-api.service';
     UiPatrimoineImageComponent,
     UiErrorBannerComponent,
     UiEmptyStateComponent,
+    UiFilterBarComponent,
     DateFrPipe,
     EvenementTypePipe,
     FcfaPricePipe,
@@ -75,7 +80,25 @@ export class EvenementsListPageComponent implements OnInit {
   protected readonly aVenirOnly = signal(false);
   protected readonly sortBy = signal<'dateDebut' | 'prix' | 'nomEvenement'>('dateDebut');
   protected readonly currentPage = signal(1);
-  protected readonly pageSize = 8;
+  protected readonly pageSize = 24;
+
+  protected readonly activeFilterChips = computed<ActiveFilterChip[]>(() => {
+    const chips: ActiveFilterChip[] = [];
+    if (this.search().trim()) chips.push({ key: 'q', label: `Recherche : ${this.search().trim()}` });
+    if (this.selectedType()) chips.push({ key: 'type', label: `Type : ${this.selectedType()}` });
+    if (this.selectedZone()) chips.push({ key: 'zone', label: `Zone : ${this.selectedZone()}` });
+    if (this.fromDate()) chips.push({ key: 'date', label: `À partir du ${this.fromDate()}` });
+    if (this.aVenirOnly()) chips.push({ key: 'avenir', label: 'À venir uniquement' });
+    return chips;
+  });
+
+  protected removeFilterChip(key: string): void {
+    if (key === 'q') this.onSearchChange('');
+    else if (key === 'type') this.selectType('');
+    else if (key === 'zone') { this.selectedZone.set(''); this.onFilterImmediate(); }
+    else if (key === 'date') { this.fromDate.set(''); this.onFilterImmediate(); }
+    else if (key === 'avenir') this.toggleAVenir();
+  }
 
   protected readonly items = signal<Evenement[]>([]);
   protected readonly totalElements = signal(0);

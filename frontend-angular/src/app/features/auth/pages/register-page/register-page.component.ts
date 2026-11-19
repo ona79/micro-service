@@ -8,7 +8,11 @@ import {
 } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import {
+  LucideArrowLeft,
   LucideArrowRight,
+  LucideCompass,
+  LucideEye,
+  LucideEyeOff,
   LucideLock,
   LucideMail,
   LucidePhone,
@@ -34,43 +38,55 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
   imports: [
     ReactiveFormsModule,
     RouterLink,
-    LucideUser,
+    LucideArrowLeft,
+    LucideArrowRight,
+    LucideCompass,
+    LucideEye,
+    LucideEyeOff,
+    LucideLock,
     LucideMail,
     LucidePhone,
-    LucideLock,
-    LucideArrowRight,
+    LucideUser,
     UiErrorBannerComponent,
   ],
   template: `
-    <section class="auth-section">
-      <div class="container auth-grid">
-        <aside class="auth-visual">
-          <img
-            src="/images/hero.jpg"
-            alt="Île de Gorée et patrimoine culturel du Sénégal"
-            class="auth-visual__img"
-          />
-          <div class="auth-visual__overlay">
-            <span class="ui-badge ui-badge--terracotta">Carnet de Visiteur · Teranga</span>
-            <h2 class="auth-visual__title">
-              Créez votre compte pour réserver vos parcours et événements culturels
-            </h2>
-            <p class="auth-visual__caption">
-              Retrouvez l’historique de vos réservations, réglez vos visites par Wave,
-              Orange Money ou Carte Bancaire et recevez vos confirmations.
-            </p>
-          </div>
-        </aside>
+    <div class="auth-split">
+      <aside class="auth-left" aria-label="Présentation Casamance Patrimoine">
+        <img
+          src="/images/hero.webp"
+          width="800"
+          height="600"
+          alt=""
+          class="auth-left__img"
+        />
+        <div class="auth-left__veil" aria-hidden="true"></div>
+        <div class="auth-left__content">
+          <h2 class="auth-left__title">
+            Accès à <span class="auth-left__accent">Casamance Patrimoine</span>
+          </h2>
+          <p class="auth-left__desc">
+            Créez votre compte visiteur pour réserver vos circuits et événements culturels.
+          </p>
+        </div>
+      </aside>
 
-        <div class="auth-panel">
-          <header class="auth-header">
-            <p class="auth-header__eyebrow">Nouveau Membre</p>
-            <h1 class="auth-header__title">Inscription</h1>
-            <p class="auth-header__subtitle">
-              Tous les nouveaux comptes créés via ce formulaire reçoivent automatiquement
-              le statut sécurisé de <strong>Visiteur / Touriste</strong>.
-            </p>
-          </header>
+      <main class="auth-right">
+        <div class="auth-topbar">
+          <a routerLink="/" class="auth-back-btn">
+            <svg lucideArrowLeft [size]="15" aria-hidden="true"></svg>
+            <span>Retour au site</span>
+          </a>
+        </div>
+
+        <div class="auth-form-wrap">
+          <div class="auth-brand">
+            <span class="auth-brand__mark" aria-hidden="true">
+              <svg lucideCompass [size]="18"></svg>
+            </span>
+            <span class="auth-brand__name">Casamance Patrimoine</span>
+          </div>
+
+          <h1 class="auth-title">Créer un compte</h1>
 
           @if (serverError()) {
             <app-ui-error-banner
@@ -83,50 +99,54 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
           <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" class="auth-form" novalidate>
             <div class="form-row">
               <div class="form-field">
-                <label for="reg-prenom" class="form-label">Prénom *</label>
+                <label for="reg-prenom" class="sr-only">Prénom</label>
                 <div class="input-icon-wrap">
                   <svg lucideUser [size]="15" class="input-icon" aria-hidden="true"></svg>
                   <input
                     id="reg-prenom"
                     type="text"
                     formControlName="prenom"
-                    placeholder="Ex: Aminata"
-                    class="form-input form-input--with-icon"
+                    aria-label="Prénom"
+                    placeholder="Prénom *"
+                    class="form-input"
                   />
                 </div>
                 @if (isFieldInvalid('prenom')) {
-                  <p class="field-error" role="alert">Le prénom est obligatoire.</p>
+                  <p class="field-error" role="alert">Prénom obligatoire.</p>
                 }
               </div>
 
               <div class="form-field">
-                <label for="reg-nom" class="form-label">Nom *</label>
+                <label for="reg-nom" class="sr-only">Nom</label>
                 <div class="input-icon-wrap">
                   <svg lucideUser [size]="15" class="input-icon" aria-hidden="true"></svg>
                   <input
                     id="reg-nom"
                     type="text"
                     formControlName="nom"
-                    placeholder="Ex: Ndiaye"
-                    class="form-input form-input--with-icon"
+                    aria-label="Nom"
+                    placeholder="Nom *"
+                    class="form-input"
                   />
                 </div>
                 @if (isFieldInvalid('nom')) {
-                  <p class="field-error" role="alert">Le nom est obligatoire.</p>
+                  <p class="field-error" role="alert">Nom obligatoire.</p>
                 }
               </div>
             </div>
 
             <div class="form-field">
-              <label for="reg-email" class="form-label">Adresse email *</label>
+              <label for="reg-email" class="sr-only">Adresse email</label>
               <div class="input-icon-wrap">
                 <svg lucideMail [size]="15" class="input-icon" aria-hidden="true"></svg>
                 <input
                   id="reg-email"
                   type="email"
                   formControlName="email"
-                  placeholder="aminata.ndiaye@zig.univ.sn"
-                  class="form-input form-input--with-icon"
+                  autocomplete="email"
+                  aria-label="Adresse email"
+                  placeholder="Adresse email *"
+                  class="form-input"
                 />
               </div>
               @if (isFieldInvalid('email')) {
@@ -137,55 +157,81 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
             </div>
 
             <div class="form-field">
-              <label for="reg-telephone" class="form-label">Téléphone</label>
+              <label for="reg-telephone" class="sr-only">Téléphone</label>
               <div class="input-icon-wrap">
                 <svg lucidePhone [size]="15" class="input-icon" aria-hidden="true"></svg>
                 <input
                   id="reg-telephone"
                   type="tel"
                   formControlName="telephone"
-                  placeholder="+221 77 123 45 67"
-                  class="form-input form-input--with-icon"
+                  autocomplete="tel"
+                  aria-label="Téléphone"
+                  placeholder="Téléphone (+221 77 ...)"
+                  class="form-input"
                 />
               </div>
             </div>
 
             <div class="form-row">
               <div class="form-field">
-                <label for="reg-password" class="form-label">Mot de passe * (min. 6 car.)</label>
+                <label for="reg-password" class="sr-only">Mot de passe (minimum 6 caractères)</label>
                 <div class="input-icon-wrap">
                   <svg lucideLock [size]="15" class="input-icon" aria-hidden="true"></svg>
                   <input
                     id="reg-password"
-                    type="password"
+                    [type]="showPassword() ? 'text' : 'password'"
                     formControlName="motDePasse"
-                    placeholder="Minimum 6 caractères"
-                    class="form-input form-input--with-icon"
+                    autocomplete="new-password"
+                    aria-label="Mot de passe"
+                    placeholder="Mot de passe *"
+                    class="form-input form-input--has-toggle"
                   />
+                  <button
+                    type="button"
+                    class="password-toggle"
+                    (click)="showPassword.set(!showPassword())"
+                    [attr.aria-label]="showPassword() ? 'Masquer' : 'Afficher'"
+                  >
+                    @if (showPassword()) {
+                      <svg lucideEyeOff [size]="15" aria-hidden="true"></svg>
+                    } @else {
+                      <svg lucideEye [size]="15" aria-hidden="true"></svg>
+                    }
+                  </button>
                 </div>
                 @if (isFieldInvalid('motDePasse')) {
-                  <p class="field-error" role="alert">
-                    Le mot de passe doit contenir au moins 6 caractères.
-                  </p>
+                  <p class="field-error" role="alert">Min. 6 caractères.</p>
                 }
               </div>
 
               <div class="form-field">
-                <label for="reg-confirm" class="form-label">Confirmer le mot de passe *</label>
+                <label for="reg-confirm" class="sr-only">Confirmer le mot de passe</label>
                 <div class="input-icon-wrap">
                   <svg lucideLock [size]="15" class="input-icon" aria-hidden="true"></svg>
                   <input
                     id="reg-confirm"
-                    type="password"
+                    [type]="showConfirm() ? 'text' : 'password'"
                     formControlName="confirmationMotDePasse"
-                    placeholder="Répétez le mot de passe"
-                    class="form-input form-input--with-icon"
+                    autocomplete="new-password"
+                    aria-label="Confirmer le mot de passe"
+                    placeholder="Confirmation *"
+                    class="form-input form-input--has-toggle"
                   />
+                  <button
+                    type="button"
+                    class="password-toggle"
+                    (click)="showConfirm.set(!showConfirm())"
+                    [attr.aria-label]="showConfirm() ? 'Masquer' : 'Afficher'"
+                  >
+                    @if (showConfirm()) {
+                      <svg lucideEyeOff [size]="15" aria-hidden="true"></svg>
+                    } @else {
+                      <svg lucideEye [size]="15" aria-hidden="true"></svg>
+                    }
+                  </button>
                 </div>
                 @if (hasPasswordMismatch()) {
-                  <p class="field-error" role="alert">
-                    Les deux mots de passe ne correspondent pas.
-                  </p>
+                  <p class="field-error" role="alert">Mots de passe différents.</p>
                 }
               </div>
             </div>
@@ -196,7 +242,7 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
               [disabled]="authStore.loading()"
             >
               @if (authStore.loading()) {
-                <span>Création du compte en cours...</span>
+                <span>Création du compte...</span>
               } @else {
                 <span>Créer mon compte</span>
                 <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
@@ -205,118 +251,167 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
           </form>
 
           <footer class="auth-footer">
-            <span>Vous avez déjà un compte ?</span>
+            <span>Déjà inscrit ?</span>
             <a routerLink="/connexion" class="auth-footer__link">Se connecter</a>
           </footer>
         </div>
-      </div>
-    </section>
+      </main>
+    </div>
   `,
   styles: `
-    .auth-section {
-      padding: var(--space-10) 0 var(--space-16);
-    }
-
-    .auth-grid {
+    .auth-split {
       display: grid;
-      grid-template-columns: 1fr 1.15fr;
-      background-color: var(--surface-elevated);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-xl);
+      grid-template-columns: 45% 55%;
+      height: 100dvh;
+      min-height: 100dvh;
+      background-color: #ffffff;
       overflow: hidden;
-      box-shadow: var(--shadow-lg);
     }
 
-    .auth-visual {
+    .auth-left {
       position: relative;
-      min-height: 560px;
-      background-color: var(--surface-ink);
       display: flex;
-      align-items: flex-end;
+      align-items: center;
+      padding: 40px 44px;
+      background-color: #1f4d3b;
+      border-top-right-radius: 36px;
+      border-bottom-right-radius: 36px;
+      overflow: hidden;
     }
 
-    .auth-visual__img {
+    .auth-left__img {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
-      opacity: 0.84;
     }
 
-    .auth-visual__overlay {
+    .auth-left__veil {
+      position: absolute;
+      inset: 0;
+      background-color: rgba(31, 77, 59, 0.85);
+    }
+
+    .auth-left__content {
       position: relative;
       z-index: 1;
-      padding: var(--space-8);
-      background: linear-gradient(to top, rgba(20, 17, 15, 0.92) 15%, rgba(20, 17, 15, 0.15) 100%);
-      color: var(--ink-on-dark);
-      width: 100%;
+      max-width: 440px;
     }
 
-    .auth-visual__title {
-      font-size: var(--text-2xl);
+    .auth-left__title {
+      font-family: var(--font-sans);
+      font-size: clamp(1.75rem, 2.8vw, 2.5rem);
+      font-weight: 700;
+      line-height: 1.15;
       color: #ffffff;
-      margin: var(--space-3) 0 var(--space-2);
-      line-height: 1.22;
+      margin: 0 0 14px;
     }
 
-    .auth-visual__caption {
-      font-size: var(--text-sm);
-      color: rgba(250, 246, 240, 0.85);
-      line-height: 1.55;
+    .auth-left__accent {
+      color: #d9a441;
     }
 
-    .auth-panel {
-      padding: var(--space-8) var(--space-10);
+    .auth-left__desc {
+      font-size: 0.95rem;
+      line-height: 1.5;
+      color: rgba(255, 255, 255, 0.88);
+      margin: 0;
+    }
+
+    .auth-right {
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      gap: var(--space-5);
+      background-color: #ffffff;
+      padding: 18px 28px;
+      overflow-y: auto;
     }
 
-    .auth-header__eyebrow {
-      font-size: var(--text-xs);
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--accent-terracotta);
-      margin-bottom: var(--space-1);
+    .auth-topbar {
+      display: flex;
+      justify-content: flex-end;
+      flex-shrink: 0;
     }
 
-    .auth-header__title {
-      font-size: var(--text-2xl);
+    .auth-back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 36px;
+      padding: 0 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border-strong);
+      background-color: #ffffff;
       color: var(--ink-primary);
-      margin-bottom: var(--space-2);
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background-color 140ms ease, border-color 140ms ease;
     }
 
-    .auth-header__subtitle {
-      font-size: var(--text-sm);
-      color: var(--ink-secondary);
-      line-height: 1.55;
+    .auth-back-btn:hover {
+      background-color: var(--surface-canvas);
+      border-color: var(--brand-primary);
+    }
+
+    .auth-form-wrap {
+      width: 100%;
+      max-width: 420px;
+      margin: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 8px 0;
+    }
+
+    .auth-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .auth-brand__mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background-color: #245b45;
+      color: #ffffff;
+    }
+
+    .auth-brand__name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--ink-primary);
+    }
+
+    .auth-title {
+      font-family: var(--font-sans);
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--ink-primary);
+      margin: 0;
     }
 
     .auth-form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-4);
+      gap: 12px;
     }
 
     .form-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: var(--space-4);
+      gap: 10px;
     }
 
     .form-field {
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
-    }
-
-    .form-label {
-      font-size: var(--text-sm);
-      font-weight: 600;
-      color: var(--ink-primary);
+      gap: 4px;
+      min-width: 0;
     }
 
     .input-icon-wrap {
@@ -327,87 +422,138 @@ function passwordMatchValidator(group: AbstractControl): ValidationErrors | null
 
     .input-icon {
       position: absolute;
-      left: 0.85rem;
+      left: 12px;
       color: var(--ink-muted);
       pointer-events: none;
     }
 
     .form-input {
       width: 100%;
-      padding: 0.68rem 0.9rem;
-      border-radius: var(--radius-md);
+      height: 44px;
+      padding: 0 12px 0 36px;
+      border-radius: 10px;
       border: 1px solid var(--border-strong);
-      background-color: var(--surface-canvas);
+      background-color: #f9fafb;
       font-family: var(--font-sans);
-      font-size: var(--text-sm);
+      font-size: 14px;
       color: var(--ink-primary);
     }
 
-    .form-input--with-icon {
-      padding-left: 2.4rem;
+    .form-input--has-toggle {
+      padding-right: 38px;
     }
 
     .form-input:focus {
-      outline: 2px solid var(--brand-primary);
+      outline: 2px solid #245b45;
       outline-offset: 1px;
-      background-color: var(--surface-elevated);
+      background-color: #ffffff;
+    }
+
+    .password-toggle {
+      position: absolute;
+      right: 4px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: transparent;
+      color: var(--ink-muted);
+      cursor: pointer;
+      border-radius: 8px;
+    }
+
+    .password-toggle:hover {
+      color: var(--ink-primary);
+      background-color: rgba(0, 0, 0, 0.04);
     }
 
     .field-error {
-      font-size: var(--text-xs);
+      font-size: 12px;
       color: var(--danger);
       font-weight: 600;
+      margin: 0;
     }
 
     .auth-submit-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: var(--space-2);
-      padding: 0.78rem 1.4rem;
-      border-radius: var(--radius-pill);
+      gap: 8px;
+      width: 100%;
+      height: 44px;
+      border-radius: 10px;
       border: none;
-      background-color: var(--brand-primary);
-      color: var(--ink-on-dark);
+      background-color: #245b45;
+      color: #ffffff;
       font-family: var(--font-sans);
-      font-size: var(--text-sm);
-      font-weight: 700;
+      font-size: 14px;
+      font-weight: 600;
       cursor: pointer;
-      margin-top: var(--space-1);
+      margin-top: 2px;
+      transition: background-color 140ms ease;
     }
 
     .auth-submit-btn:hover:not(:disabled) {
-      background-color: var(--brand-primary-hover);
+      background-color: #1c4736;
+    }
+
+    .auth-submit-btn:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
     }
 
     .auth-footer {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: var(--space-2);
-      font-size: var(--text-sm);
+      gap: 6px;
+      font-size: 13px;
       color: var(--ink-secondary);
-      padding-top: var(--space-3);
-      border-top: 1px solid var(--border-subtle);
+      padding-top: 4px;
     }
 
     .auth-footer__link {
       font-weight: 700;
-      color: var(--brand-primary);
+      color: #245b45;
     }
 
-    @media (max-width: 920px) {
-      .auth-grid,
+    @media (max-width: 767px) {
+      .auth-split {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        height: auto;
+        min-height: 100dvh;
+        overflow: visible;
+      }
+
+      .auth-left {
+        height: 120px;
+        padding: 16px 20px;
+        border-radius: 0;
+      }
+
+      .auth-left__title {
+        font-size: 1.25rem;
+        margin: 0;
+      }
+
+      .auth-left__desc {
+        display: none;
+      }
+
+      .auth-right {
+        padding: 16px 20px 24px;
+        overflow-y: visible;
+      }
+
+      .auth-form-wrap {
+        margin: 12px auto 0;
+      }
+
       .form-row {
         grid-template-columns: 1fr;
-      }
-
-      .auth-visual {
-        min-height: 220px;
-      }
-
-      .auth-panel {
-        padding: var(--space-6);
       }
     }
   `,
@@ -418,6 +564,8 @@ export class RegisterPageComponent {
   protected readonly authStore = inject(AuthStore);
 
   protected readonly submitted = signal(false);
+  protected readonly showPassword = signal(false);
+  protected readonly showConfirm = signal(false);
   protected readonly serverError = signal<string | null>(null);
 
   protected readonly registerForm = this.fb.nonNullable.group(

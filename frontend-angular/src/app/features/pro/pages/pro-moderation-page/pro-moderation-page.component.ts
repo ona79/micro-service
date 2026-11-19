@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { LucideEye, LucideRefreshCw } from '@lucide/angular';
+import { LucideEye, LucideMoreHorizontal, LucideRefreshCw } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { toast } from 'ngx-sonner';
 import { extractErrorMessage } from '../../../../core/models/api-error.model';
@@ -18,6 +18,10 @@ import { ModerationStats } from '../../../../core/models/statistics.model';
 import { UiDetailDrawerComponent } from '../../../../shared/components/ui-detail-drawer/ui-detail-drawer.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import {
+  FilterStatusPill,
+  UiFilterBarComponent,
+} from '../../../../shared/components/ui-filter-bar/ui-filter-bar.component';
 import { UiKpiCardComponent } from '../../../../shared/components/ui-kpi-card/ui-kpi-card.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { AvisApiService } from '../../../avis/data-access/avis-api.service';
@@ -33,14 +37,16 @@ import { AvisApiService } from '../../../avis/data-access/avis-api.service';
     UiDetailDrawerComponent,
     UiEmptyStateComponent,
     UiErrorBannerComponent,
+    UiFilterBarComponent,
     LucideEye,
+    LucideMoreHorizontal,
     LucideRefreshCw,
   ],
   template: `
     <header class="bo-header">
       <div>
-        <p class="bo-header__eyebrow">Modération &amp; Qualité ms-reservation</p>
-        <h1 class="bo-header__title">Modération des avis &amp; signalements</h1>
+        <p class="bo-header__eyebrow">Modération</p>
+        <h1 class="bo-header__title">Modération</h1>
         <p class="bo-header__lead">
           Traitez les signalements ouverts et modérez les avis avec justification obligatoire (5
           caractères min.) et journalisation immuable.
@@ -76,17 +82,13 @@ import { AvisApiService } from '../../../avis/data-access/avis-api.service';
 
     @if (activeTab() === 'signalements') {
       <section class="bo-panel">
-        <div class="bo-filters">
-          <div class="bo-field">
-            <label for="sig-statut" class="bo-label">Statut signalement</label>
-            <select id="sig-statut" class="bo-select" [(ngModel)]="sigStatut" (ngModelChange)="loadSignalements()">
-              <option value="OUVERT">OUVERT (à traiter)</option>
-              <option value="VALIDE_CONTENU_RETIRE">VALIDE_CONTENU_RETIRE</option>
-              <option value="REJETE_ABUSIF">REJETE_ABUSIF</option>
-              <option value="">Tous</option>
-            </select>
-          </div>
-        </div>
+        <app-ui-filter-bar
+          [showSearch]="false"
+          [statusPills]="sigStatusPills()"
+          [activeStatus]="sigStatut || 'ALL'"
+          (statusChange)="sigStatut = $event === 'ALL' ? '' : $any($event); loadSignalements()"
+          [resultsLabel]="signalements().length + ' signalement(s)'"
+        />
 
         @if (error()) {
           <app-ui-error-banner [message]="error()!" (retry)="loadAll()" />
@@ -115,10 +117,9 @@ import { AvisApiService } from '../../../avis/data-access/avis-api.service';
                     </td>
                     <td>{{ s.motif }}</td>
                     <td>
-                      <span class="bo-cell-title">Avis {{ s.avisId }} ({{ s.avisStatutActuel || 'INCONNU' }})</span>
-                      @if (s.avis) {
-                        <span class="bo-cell-sub">« {{ s.avis.commentaire }} »</span>
-                      }
+                      <span class="bo-cell-one bo-cell-title" [title]="s.avis?.commentaire || ('Avis ' + s.avisId)">
+                        Avis {{ s.avisId }} ({{ s.avisStatutActuel || 'INCONNU' }})
+                      </span>
                     </td>
                     <td>
                       <span class="ui-badge" [class.ui-badge--warning]="s.statut === 'OUVERT'" [class.ui-badge--danger]="s.statut === 'VALIDE_CONTENU_RETIRE'" [class.ui-badge--neutral]="s.statut === 'REJETE_ABUSIF'">
@@ -127,19 +128,40 @@ import { AvisApiService } from '../../../avis/data-access/avis-api.service';
                     </td>
                     <td>
                       <div class="bo-actions-cell">
-                        @if (s.avis) {
+                        @if (s.statut === 'OUVERT') {
+                          <button type="button" class="bo-btn bo-btn--sm bo-btn--primary" (click)="openSigDecision(s, 'REJETE_ABUSIF')">
+                            Rejeter sig.
+                          </button>
+                        } @else if (s.avis) {
                           <button type="button" class="bo-btn bo-btn--sm" (click)="openAvisHistory(s.avis!)">
-                            <svg lucideEye [size]="12" aria-hidden="true"></svg>
-                            <span>Historique</span>
+                            Historique
                           </button>
                         }
-                        @if (s.statut === 'OUVERT') {
-                          <button type="button" class="bo-btn bo-btn--sm bo-btn--danger" (click)="openSigDecision(s, 'VALIDE_CONTENU_RETIRE')">
-                            Retirer / Masquer avis
-                          </button>
-                          <button type="button" class="bo-btn bo-btn--sm" (click)="openSigDecision(s, 'REJETE_ABUSIF')">
-                            Rejeter signalement
-                          </button>
+                        @if (s.avis || s.statut === 'OUVERT') {
+                          <div class="bo-row-menu">
+                            <button
+                              type="button"
+                              class="bo-btn bo-btn--sm bo-btn--icon"
+                              aria-label="Plus d'actions"
+                              (click)="toggleSigMenu(s.id)"
+                            >
+                              <svg lucideMoreHorizontal [size]="15" aria-hidden="true"></svg>
+                            </button>
+                            @if (openSigMenuId() === s.id) {
+                              <div class="bo-row-menu__dropdown" role="menu">
+                                @if (s.avis) {
+                                  <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openSigMenuId.set(null); openAvisHistory(s.avis!)">
+                                    Historique
+                                  </button>
+                                }
+                                @if (s.statut === 'OUVERT') {
+                                  <button type="button" class="bo-row-menu__item bo-row-menu__item--danger" role="menuitem" (click)="openSigMenuId.set(null); openSigDecision(s, 'VALIDE_CONTENU_RETIRE')">
+                                    Retirer / Masquer avis
+                                  </button>
+                                }
+                              </div>
+                            }
+                          </div>
                         }
                       </div>
                     </td>
@@ -152,28 +174,25 @@ import { AvisApiService } from '../../../avis/data-access/avis-api.service';
       </section>
     } @else {
       <section class="bo-panel">
-        <div class="bo-filters">
-          <div class="bo-field">
-            <label for="mod-cible" class="bo-label">Cible</label>
-            <select id="mod-cible" class="bo-select" [(ngModel)]="cibleFilter" (ngModelChange)="loadAvis()">
-              <option value="">Toutes</option>
+        <app-ui-filter-bar
+          [showSearch]="false"
+          [statusPills]="avisStatusPills()"
+          [activeStatus]="avisStatutFilter || 'ALL'"
+          (statusChange)="avisStatutFilter = $event === 'ALL' ? '' : $any($event); loadAvis()"
+          [resultsLabel]="avis().length + ' avis'"
+          [hasActiveFilters]="Boolean(cibleFilter || avisStatutFilter)"
+          (reset)="cibleFilter = ''; avisStatutFilter = ''; loadAvis()"
+        >
+          <ng-container filter-primary>
+            <select id="mod-cible" aria-label="Cible" class="ui-filter-control" [(ngModel)]="cibleFilter" (ngModelChange)="loadAvis()">
+              <option value="">Cible : Toutes</option>
               <option value="PATRIMOINE">PATRIMOINE</option>
               <option value="CIRCUIT">CIRCUIT</option>
               <option value="EVENEMENT">EVENEMENT</option>
               <option value="GUIDE">GUIDE</option>
             </select>
-          </div>
-          <div class="bo-field">
-            <label for="mod-statut" class="bo-label">Statut modération</label>
-            <select id="mod-statut" class="bo-select" [(ngModel)]="avisStatutFilter" (ngModelChange)="loadAvis()">
-              <option value="">Tous</option>
-              <option value="APPROUVE">APPROUVE</option>
-              <option value="EN_ATTENTE">EN_ATTENTE</option>
-              <option value="MASQUE">MASQUE</option>
-              <option value="REJETE">REJETE</option>
-            </select>
-          </div>
-        </div>
+          </ng-container>
+        </app-ui-filter-bar>
 
         @if (avis().length === 0) {
           <app-ui-empty-state title="Aucun avis" description="Aucun avis trouvé pour ce filtre." />
@@ -192,31 +211,48 @@ import { AvisApiService } from '../../../avis/data-access/avis-api.service';
                 @for (a of avis(); track a.id) {
                   <tr>
                     <td>
-                      <span class="bo-cell-title">{{ a.auteurNom }}</span>
-                      <span class="bo-cell-sub">{{ a.note }} / 5 · {{ a.datePublication | dateFr: 'd MMM yyyy' }}</span>
+                      <span class="bo-cell-one bo-cell-title" [title]="a.auteurNom + ' · ' + a.note + '/5'">{{ a.auteurNom }} ({{ a.note }}/5)</span>
                     </td>
                     <td>
-                      <span class="ui-badge ui-badge--neutral">{{ a.cibleType }} {{ a.cibleId }}</span>
-                      <span class="bo-cell-sub">{{ a.commentaire }}</span>
+                      <span class="bo-cell-one" [title]="a.commentaire">{{ a.cibleType }} {{ a.cibleId }} · {{ a.commentaire }}</span>
                     </td>
                     <td>
                       <span [class]="modBadge(a.statutModeration)">{{ modLabel(a.statutModeration) }}</span>
                     </td>
                     <td>
                       <div class="bo-actions-cell">
-                        <button type="button" class="bo-btn bo-btn--sm" (click)="openAvisHistory(a)">
-                          <svg lucideEye [size]="12" aria-hidden="true"></svg>
-                          <span>Audit</span>
-                        </button>
-                        @if (a.statutModeration !== 'MASQUE' && a.statutModeration !== 'REJETE') {
-                          <button type="button" class="bo-btn bo-btn--sm bo-btn--terracotta" (click)="openAvisDecision(a, 'MASQUE')">Masquer</button>
-                        }
                         @if (a.statutModeration === 'MASQUE' || a.statutModeration === 'EN_ATTENTE') {
                           <button type="button" class="bo-btn bo-btn--sm bo-btn--primary" (click)="openAvisDecision(a, 'APPROUVE')">Approuver</button>
+                        } @else {
+                          <button type="button" class="bo-btn bo-btn--sm" (click)="openAvisHistory(a)">Audit</button>
                         }
-                        @if (a.statutModeration !== 'REJETE') {
-                          <button type="button" class="bo-btn bo-btn--sm bo-btn--danger" (click)="openAvisDecision(a, 'REJETE')">Rejeter</button>
-                        }
+                        <div class="bo-row-menu">
+                          <button
+                            type="button"
+                            class="bo-btn bo-btn--sm bo-btn--icon"
+                            aria-label="Plus d'actions"
+                            (click)="toggleAvisMenu(a.id)"
+                          >
+                            <svg lucideMoreHorizontal [size]="15" aria-hidden="true"></svg>
+                          </button>
+                          @if (openAvisMenuId() === a.id) {
+                            <div class="bo-row-menu__dropdown" role="menu">
+                              <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openAvisMenuId.set(null); openAvisHistory(a)">
+                                Audit
+                              </button>
+                              @if (a.statutModeration !== 'MASQUE' && a.statutModeration !== 'REJETE') {
+                                <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openAvisMenuId.set(null); openAvisDecision(a, 'MASQUE')">
+                                  Masquer
+                                </button>
+                              }
+                              @if (a.statutModeration !== 'REJETE') {
+                                <button type="button" class="bo-row-menu__item bo-row-menu__item--danger" role="menuitem" (click)="openAvisMenuId.set(null); openAvisDecision(a, 'REJETE')">
+                                  Rejeter
+                                </button>
+                              }
+                            </div>
+                          }
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -298,6 +334,37 @@ export class ProModerationPageComponent implements OnInit {
   protected readonly justifError = signal<string | null>(null);
   protected readonly stats = signal<ModerationStats | null>(null);
   protected readonly signalements = signal<SignalementAvis[]>([]);
+  protected readonly openSigMenuId = signal<number | null>(null);
+  protected readonly openAvisMenuId = signal<number | null>(null);
+
+  protected toggleSigMenu(id: number): void {
+    this.openSigMenuId.update((curr) => (curr === id ? null : id));
+  }
+
+  protected toggleAvisMenu(id: number): void {
+    this.openAvisMenuId.update((curr) => (curr === id ? null : id));
+  }
+
+  protected readonly sigStatusPills = computed<FilterStatusPill[]>(() => {
+    const s = this.stats();
+    return [
+      { id: 'OUVERT', label: 'Ouverts', count: s?.signalementsOuverts, tone: 'danger' },
+      { id: 'VALIDE_CONTENU_RETIRE', label: 'Retirés' },
+      { id: 'REJETE_ABUSIF', label: 'Rejetés' },
+      { id: 'ALL', label: 'Tous' },
+    ];
+  });
+
+  protected readonly avisStatusPills = computed<FilterStatusPill[]>(() => {
+    const s = this.stats();
+    return [
+      { id: 'ALL', label: 'Tous', count: s?.totalAvis },
+      { id: 'APPROUVE', label: 'Approuvés', count: s?.avisApprouves },
+      { id: 'EN_ATTENTE', label: 'En attente' },
+      { id: 'MASQUE', label: 'Masqués', count: s?.avisMasques },
+      { id: 'REJETE', label: 'Rejetés', count: s?.avisRejetes },
+    ];
+  });
   protected readonly avis = signal<Avis[]>([]);
   protected readonly historique = signal<AvisModerationHistorique[]>([]);
 

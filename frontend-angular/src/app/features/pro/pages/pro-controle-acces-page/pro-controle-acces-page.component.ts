@@ -79,7 +79,7 @@ interface ScanHistoryEntry {
       <div>
         <p class="bo-header__eyebrow">
           <svg lucideShieldCheck [size]="14" aria-hidden="true"></svg>
-          Contrôle d'accès & Billetterie · Horodatage sécurisé ms-reservation
+          Contrôle d'accès
         </p>
         <h1 class="bo-header__title">Contrôle d'accès & Validation des Billets</h1>
         <p class="bo-header__lead">

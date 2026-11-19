@@ -1,5 +1,5 @@
 import { Dialog } from '@angular/cdk/dialog';
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormArray, FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
   LucideArchive,
@@ -7,6 +7,7 @@ import {
   LucideArrowUp,
   LucideCheckCircle2,
   LucideEye,
+  LucideMoreHorizontal,
   LucidePencil,
   LucidePlus,
   LucideRefreshCw,
@@ -29,9 +30,15 @@ import { Patrimoine } from '../../../../core/models/patrimoine.model';
 import { CircuitStats } from '../../../../core/models/statistics.model';
 import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confirm-dialog/ui-confirm-dialog.component';
 import { UiDetailDrawerComponent } from '../../../../shared/components/ui-detail-drawer/ui-detail-drawer.component';
+import { UiDrawerComponent } from '../../../../shared/components/ui-drawer/ui-drawer.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import {
+  FilterStatusPill,
+  UiFilterBarComponent,
+} from '../../../../shared/components/ui-filter-bar/ui-filter-bar.component';
 import { UiKpiCardComponent } from '../../../../shared/components/ui-kpi-card/ui-kpi-card.component';
+import { UiPageHeaderComponent } from '../../../../shared/components/ui-page-header/ui-page-header.component';
 import { UiPaginationComponent } from '../../../../shared/components/ui-pagination/ui-pagination.component';
 import { DurationMinutesPipe } from '../../../../shared/pipes/duration-minutes.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
@@ -48,11 +55,14 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
     ReactiveFormsModule,
     FcfaPricePipe,
     DurationMinutesPipe,
+    UiPageHeaderComponent,
+    UiDrawerComponent,
     UiKpiCardComponent,
     UiPaginationComponent,
     UiDetailDrawerComponent,
     UiEmptyStateComponent,
     UiErrorBannerComponent,
+    UiFilterBarComponent,
     LucidePlus,
     LucidePencil,
     LucideTrash2,
@@ -63,23 +73,14 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
     LucideRefreshCw,
     LucideArrowUp,
     LucideArrowDown,
+    LucideMoreHorizontal,
   ],
   template: `
-    <header class="bo-header">
-      <div>
-        <p class="bo-header__eyebrow">Itinéraires ms-circuit</p>
-        <h1 class="bo-header__title">
-          {{ authStore.isGuide() ? 'Mes circuits assignés (périmètre BOLA)' : 'Gestion des circuits touristiques' }}
-        </h1>
-        <p class="bo-header__lead">
-          @if (authStore.isGuide()) {
-            Modifiez les étapes des circuits dont vous êtes responsable et soumettez-les à publication.
-          } @else {
-            Assemblez les étapes patrimoniales, affectez un guide agréé, publiez et supervisez le catalogue.
-          }
-        </p>
-      </div>
-      <div class="bo-header__actions">
+    <app-ui-page-header
+      [title]="authStore.isGuide() ? 'Mes circuits' : 'Circuits'"
+      subtitle="Gérez les étapes, les guides affectés et la publication des circuits."
+    >
+      <div header-actions>
         <button type="button" class="bo-btn" (click)="load()" [disabled]="loading()">
           <svg lucideRefreshCw [size]="14" aria-hidden="true"></svg>
           <span>Actualiser</span>
@@ -91,7 +92,7 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
           </button>
         }
       </div>
-    </header>
+    </app-ui-page-header>
 
     @if (stats(); as s) {
       <div class="bo-kpi-grid">
@@ -106,15 +107,13 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
       <app-ui-error-banner [message]="actionError()!" [showRetry]="false" />
     }
 
-    @if (formOpen()) {
-      <section class="bo-panel" aria-label="Éditeur de circuit">
-        <div class="bo-panel__head">
-          <h2 class="bo-panel__title">
-            {{ editingId() ? 'Modifier le circuit #' + editingId() : 'Créer un circuit Casamance' }}
-          </h2>
-          <button type="button" class="bo-btn" (click)="closeForm()">Fermer</button>
-        </div>
-
+    <app-ui-drawer
+      [open]="formOpen()"
+      width="lg"
+      [title]="editingId() ? 'Modifier le circuit n° ' + editingId() : 'Créer un circuit Casamance'"
+      [showFooter]="false"
+      (closed)="closeForm()"
+    >
         <form [formGroup]="form" (ngSubmit)="saveCircuit()" class="bo-form-grid" novalidate>
           <div class="bo-field">
             <label for="cir-nom" class="bo-label">Titre du circuit *</label>
@@ -272,37 +271,31 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
             <button type="button" class="bo-btn" (click)="closeForm()">Annuler</button>
           </div>
         </form>
-      </section>
-    }
+    </app-ui-drawer>
 
     <section class="bo-panel">
       @if (!authStore.isGuide()) {
-        <div class="bo-filters">
-          <div class="bo-field bo-field--grow">
-            <label for="cir-search" class="bo-label">Recherche</label>
-            <input id="cir-search" type="search" class="bo-input" [(ngModel)]="q" placeholder="Nom, point de départ..." (keyup.enter)="loadPage(0)" />
-          </div>
-          <div class="bo-field">
-            <label for="cir-fstatut" class="bo-label">Statut</label>
-            <select id="cir-fstatut" class="bo-select" [(ngModel)]="statutFilter" (ngModelChange)="loadPage(0)">
-              <option value="">Tous</option>
-              <option value="BROUILLON">BROUILLON</option>
-              <option value="SOUMIS">SOUMIS</option>
-              <option value="PUBLIE">PUBLIE</option>
-              <option value="ARCHIVE">ARCHIVE</option>
-            </select>
-          </div>
-          <div class="bo-field">
-            <label for="cir-fdiff" class="bo-label">Difficulté</label>
-            <select id="cir-fdiff" class="bo-select" [(ngModel)]="diffFilter" (ngModelChange)="loadPage(0)">
-              <option value="">Toutes</option>
+        <app-ui-filter-bar
+          [statusPills]="statusPills()"
+          [activeStatus]="statutFilter || 'ALL'"
+          (statusChange)="statutFilter = $event === 'ALL' ? '' : $any($event); loadPage(0)"
+          [searchValue]="q"
+          searchPlaceholder="Rechercher nom, point de départ..."
+          searchAriaLabel="Rechercher un circuit"
+          [resultsLabel]="totalElements() + ' circuit(s)'"
+          [hasActiveFilters]="Boolean(q.trim() || statutFilter || diffFilter)"
+          (searchChange)="q = $event; loadPage(0)"
+          (reset)="q = ''; statutFilter = ''; diffFilter = ''; loadPage(0)"
+        >
+          <ng-container filter-primary>
+            <select id="cir-fdiff" aria-label="Difficulté" class="ui-filter-control" [(ngModel)]="diffFilter" (ngModelChange)="loadPage(0)">
+              <option value="">Difficulté : Toutes</option>
               <option value="FACILE">FACILE</option>
               <option value="MOYEN">MOYEN</option>
               <option value="DIFFICILE">DIFFICILE</option>
             </select>
-          </div>
-          <button type="button" class="bo-btn bo-btn--primary" (click)="loadPage(0)">Filtrer</button>
-        </div>
+          </ng-container>
+        </app-ui-filter-bar>
       }
 
       @if (error()) {
@@ -330,14 +323,12 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
               @for (c of items(); track c.id) {
                 <tr>
                   <td>
-                    <span class="bo-cell-title">{{ c.nomCircuit }}</span>
-                    <span class="bo-cell-sub">
-                      {{ c.etapes.length }} étape(s) · {{ c.difficulte || 'FACILE' }} · {{ c.moyenTransport || 'MIXTE' }}
+                    <span class="bo-cell-one bo-cell-title" [title]="c.nomCircuit + ' · ' + c.etapes.length + ' étape(s)'">
+                      {{ c.nomCircuit }}
                     </span>
                   </td>
-                  <td class="tabular-nums">
+                  <td class="tabular-nums" [title]="(c.prix | fcfaPrice) + ' · ' + c.placesMax + ' pl. · ' + c.distanceTotale + ' km'">
                     {{ c.prix | fcfaPrice }} · {{ c.placesMax }} pl.
-                    <span class="bo-cell-sub">{{ c.dureeEstimee | durationMinutes }} · {{ c.distanceTotale }} km</span>
                   </td>
                   <td>
                     @if (c.guideResponsableId) {
@@ -358,40 +349,61 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
                   </td>
                   <td>
                     <div class="bo-actions-cell">
-                      <button type="button" class="bo-btn bo-btn--sm" (click)="selectedItem.set(c)">
-                        <svg lucideEye [size]="13" aria-hidden="true"></svg>
-                        <span>Détail</span>
-                      </button>
-                      @if (canEditCircuit(c)) {
-                        <button type="button" class="bo-btn bo-btn--sm" (click)="openEditForm(c)">
-                          <svg lucidePencil [size]="13" aria-hidden="true"></svg>
-                          <span>Éditer</span>
-                        </button>
-                        @if (c.statutCircuit === 'BROUILLON') {
-                          <button type="button" class="bo-btn bo-btn--sm" (click)="soumettre(c)">
-                            <svg lucideSend [size]="13" aria-hidden="true"></svg>
-                            <span>Soumettre</span>
-                          </button>
-                        }
-                      }
                       @if (permissions.has('CIRCUIT:PUBLIER') && (c.statutCircuit === 'BROUILLON' || c.statutCircuit === 'SOUMIS' || c.statutCircuit === 'ARCHIVE')) {
                         <button type="button" class="bo-btn bo-btn--sm bo-btn--primary" (click)="publier(c)">
-                          <svg lucideCheckCircle2 [size]="13" aria-hidden="true"></svg>
-                          <span>Publier</span>
+                          Publier
+                        </button>
+                      } @else if (canEditCircuit(c) && c.statutCircuit === 'BROUILLON') {
+                        <button type="button" class="bo-btn bo-btn--sm bo-btn--primary" (click)="soumettre(c)">
+                          Soumettre
+                        </button>
+                      } @else if (canEditCircuit(c)) {
+                        <button type="button" class="bo-btn bo-btn--sm" (click)="openEditForm(c)">
+                          Éditer
+                        </button>
+                      } @else {
+                        <button type="button" class="bo-btn bo-btn--sm" (click)="selectedItem.set(c)">
+                          Détail
                         </button>
                       }
-                      @if (permissions.has('CIRCUIT:ARCHIVER') && c.statutCircuit !== 'ARCHIVE') {
-                        <button type="button" class="bo-btn bo-btn--sm" (click)="archiver(c)">
-                          <svg lucideArchive [size]="13" aria-hidden="true"></svg>
-                          <span>Archiver</span>
+
+                      <div class="bo-row-menu">
+                        <button
+                          type="button"
+                          class="bo-btn bo-btn--sm bo-btn--icon"
+                          aria-label="Plus d'actions"
+                          (click)="toggleRowMenu(c.id)"
+                        >
+                          <svg lucideMoreHorizontal [size]="15" aria-hidden="true"></svg>
                         </button>
-                      }
-                      @if (permissions.has('CIRCUIT:SUPPRIMER') && (c.statutCircuit === 'BROUILLON' || c.statutCircuit === 'ARCHIVE')) {
-                        <button type="button" class="bo-btn bo-btn--sm bo-btn--danger" (click)="supprimer(c)">
-                          <svg lucideTrash2 [size]="13" aria-hidden="true"></svg>
-                          <span>Supprimer</span>
-                        </button>
-                      }
+                        @if (openMenuId() === c.id) {
+                          <div class="bo-row-menu__dropdown" role="menu">
+                            <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null); selectedItem.set(c)">
+                              Détail
+                            </button>
+                            @if (canEditCircuit(c)) {
+                              <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null); openEditForm(c)">
+                                Éditer
+                              </button>
+                              @if (c.statutCircuit === 'BROUILLON') {
+                                <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null); soumettre(c)">
+                                  Soumettre
+                                </button>
+                              }
+                            }
+                            @if (permissions.has('CIRCUIT:ARCHIVER') && c.statutCircuit !== 'ARCHIVE') {
+                              <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null); archiver(c)">
+                                Archiver
+                              </button>
+                            }
+                            @if (permissions.has('CIRCUIT:SUPPRIMER') && (c.statutCircuit === 'BROUILLON' || c.statutCircuit === 'ARCHIVE')) {
+                              <button type="button" class="bo-row-menu__item bo-row-menu__item--danger" role="menuitem" (click)="openMenuId.set(null); supprimer(c)">
+                                Supprimer
+                              </button>
+                            }
+                          </div>
+                        }
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -415,7 +427,7 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
     <app-ui-detail-drawer
       [open]="selectedItem() !== null"
       [title]="selectedItem()?.nomCircuit || ''"
-      [eyebrow]="'Circuit #' + (selectedItem()?.id ?? '')"
+      [eyebrow]="'Circuit n° ' + (selectedItem()?.id ?? '')"
       (close)="selectedItem.set(null)"
     >
       @if (selectedItem(); as d) {
@@ -441,7 +453,7 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
           </div>
 
           <div class="bo-panel" style="margin: 0;">
-            <p class="bo-label" style="margin-bottom: var(--space-2);">Test communication TP2 (ms-circuit → ms-patrimoine)</p>
+            <p class="bo-label" style="margin-bottom: var(--space-2);">Vérification liaison site patrimonial</p>
             <div class="bo-actions-cell">
               <button type="button" class="bo-btn bo-btn--sm" (click)="testerComm('feign', d)">OpenFeign</button>
               <button type="button" class="bo-btn bo-btn--sm" (click)="testerComm('resttemplate', d)">RestTemplate</button>
@@ -483,6 +495,28 @@ export class ProCircuitsPageComponent implements OnInit {
   protected readonly editingId = signal<number | null>(null);
   protected readonly selectedItem = signal<Circuit | null>(null);
   protected readonly tp2Result = signal<string | null>(null);
+  protected readonly openMenuId = signal<number | null>(null);
+  private searchTimer?: ReturnType<typeof setTimeout>;
+
+  protected onSearchInput(): void {
+    clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => void this.loadPage(0), 250);
+  }
+
+  protected toggleRowMenu(id: number): void {
+    this.openMenuId.update((curr) => (curr === id ? null : id));
+  }
+
+  protected readonly statusPills = computed<FilterStatusPill[]>(() => {
+    const s = this.stats();
+    return [
+      { id: 'ALL', label: 'Tous', count: s?.total },
+      { id: 'PUBLIE', label: 'Publiés', count: s?.publies },
+      { id: 'BROUILLON', label: 'Brouillons', count: s?.brouillons },
+      { id: 'SOUMIS', label: 'Soumis', count: s?.soumis },
+      { id: 'ARCHIVE', label: 'Archivés', count: s?.archives },
+    ];
+  });
 
   protected q = '';
   protected statutFilter: StatutCircuit | '' = '';

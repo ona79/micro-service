@@ -1,21 +1,83 @@
-<div class="page-section">
+<div class="page-section" style="padding-top: 14px;">
   <div class="container">
-    <header class="editorial-header">
-      <p class="editorial-header__eyebrow">Agenda culturel · Fuseau officiel Africa/Dakar</p>
-      <h1 class="editorial-header__title">Agenda Culturel &amp; Événements</h1>
-      <p class="editorial-header__subtitle">
-        Conférences, ateliers vivants, visites guidées thématiques, cérémonies et festivals
-        programmés autour des sites patrimoniaux de Casamance.
-      </p>
+    <header class="page-head-compact">
+      <div class="page-head-compact__left">
+        <h1 class="page-head-compact__title">Agenda culturel</h1>
+        <span
+          class="page-info-tip"
+          title="Conférences, ateliers vivants, visites guidées, cérémonies et festivals en Casamance."
+          aria-label="Informations"
+        >
+          i
+        </span>
+      </div>
     </header>
 
-    <section class="agenda-controls" aria-label="Filtres de l’agenda culturel">
-      <div class="type-chips" role="group" aria-label="Filtrer par type d’événement">
+    <app-ui-filter-bar
+      [searchValue]="search()"
+      searchPlaceholder="Rechercher un événement, un lieu..."
+      searchAriaLabel="Rechercher un événement"
+      [resultsLabel]="totalElements() + (totalElements() > 1 ? ' événements' : ' événement')"
+      [hasActiveFilters]="hasActiveFilters()"
+      [activeChips]="activeFilterChips()"
+      (searchChange)="onSearchChange($event)"
+      (removeChip)="removeFilterChip($event)"
+      (reset)="resetFilters()"
+    >
+      <ng-container filter-primary>
+        <select
+          id="ev-zone"
+          aria-label="Zone géographique"
+          class="ui-filter-control"
+          [ngModel]="selectedZone()"
+          (ngModelChange)="selectedZone.set($event); onFilterImmediate()"
+        >
+          <option value="">Zone : Toutes</option>
+          <option value="BASSE_CASAMANCE">Basse-Casamance</option>
+          <option value="MOYENNE_CASAMANCE">Moyenne-Casamance</option>
+          <option value="HAUTE_CASAMANCE">Haute-Casamance</option>
+        </select>
+
+        <input
+          id="ev-date"
+          type="date"
+          aria-label="À partir du"
+          class="ui-filter-control"
+          [ngModel]="fromDate()"
+          (ngModelChange)="fromDate.set($event); onFilterImmediate()"
+        />
+
+        <button
+          type="button"
+          class="ui-filter-toggle"
+          [class.ui-filter-toggle--active]="aVenirOnly()"
+          [attr.aria-pressed]="aVenirOnly()"
+          (click)="toggleAVenir()"
+        >
+          À venir
+        </button>
+      </ng-container>
+
+      <ng-container filter-sort>
+        <select
+          id="ev-sort"
+          aria-label="Trier par"
+          class="ui-filter-control"
+          [ngModel]="sortBy()"
+          (ngModelChange)="sortBy.set($event); onFilterImmediate()"
+        >
+          <option value="dateDebut">Date (prochains)</option>
+          <option value="prix">Tarif croissant</option>
+          <option value="nomEvenement">Nom (A → Z)</option>
+        </select>
+      </ng-container>
+
+      <div filter-subrow class="type-chips-scroll" role="group" aria-label="Filtrer par type d’événement">
         @for (t of eventTypes; track t.value) {
           <button
             type="button"
-            class="type-chip"
-            [class.type-chip--active]="selectedType() === t.value"
+            class="type-chip-sm"
+            [class.type-chip-sm--active]="selectedType() === t.value"
             [attr.aria-pressed]="selectedType() === t.value"
             (click)="selectType(t.value)"
           >
@@ -23,89 +85,7 @@
           </button>
         }
       </div>
-
-      <div class="agenda-controls__inputs">
-        <div class="agenda-field agenda-field--wide">
-          <label for="ev-search" class="agenda-field__label">Rechercher</label>
-          <div class="search-wrap">
-            <svg lucideSearch [size]="16" class="search-wrap__icon" aria-hidden="true"></svg>
-            <input
-              id="ev-search"
-              type="search"
-              class="agenda-input agenda-input--icon"
-              placeholder="Nom, lieu, description ou site associé..."
-              [ngModel]="search()"
-              (ngModelChange)="onSearchChange($event)"
-            />
-          </div>
-        </div>
-
-        <div class="agenda-field">
-          <label for="ev-zone" class="agenda-field__label">Zone</label>
-          <select
-            id="ev-zone"
-            class="agenda-input"
-            [ngModel]="selectedZone()"
-            (ngModelChange)="selectedZone.set($event); onFilterImmediate()"
-          >
-            <option value="">Toute la Casamance</option>
-            <option value="BASSE_CASAMANCE">Basse-Casamance</option>
-            <option value="MOYENNE_CASAMANCE">Moyenne-Casamance</option>
-            <option value="HAUTE_CASAMANCE">Haute-Casamance</option>
-          </select>
-        </div>
-
-        <div class="agenda-field">
-          <label for="ev-date" class="agenda-field__label">À partir du</label>
-          <input
-            id="ev-date"
-            type="date"
-            class="agenda-input"
-            [ngModel]="fromDate()"
-            (ngModelChange)="fromDate.set($event); onFilterImmediate()"
-          />
-        </div>
-
-        <div class="agenda-field">
-          <label for="ev-sort" class="agenda-field__label">Trier par</label>
-          <select
-            id="ev-sort"
-            class="agenda-input"
-            [ngModel]="sortBy()"
-            (ngModelChange)="sortBy.set($event); onFilterImmediate()"
-          >
-            <option value="dateDebut">Date (prochains d’abord)</option>
-            <option value="prix">Tarif croissant</option>
-            <option value="nomEvenement">Nom (A → Z)</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="agenda-controls__footer">
-        <p class="agenda-controls__count tabular-nums">
-          <strong>{{ totalElements() }}</strong>
-          événement{{ totalElements() > 1 ? 's' : '' }} publié{{ totalElements() > 1 ? 's' : '' }}
-        </p>
-
-        <div style="display:flex;gap:0.65rem;flex-wrap:wrap;align-items:center;">
-          <button
-            type="button"
-            class="type-chip"
-            [class.type-chip--active]="aVenirOnly()"
-            [attr.aria-pressed]="aVenirOnly()"
-            (click)="toggleAVenir()"
-          >
-            À venir uniquement
-          </button>
-
-          @if (hasActiveFilters()) {
-            <button type="button" class="btn-reset" (click)="resetFilters()">
-              Réinitialiser les filtres
-            </button>
-          }
-        </div>
-      </div>
-    </section>
+    </app-ui-filter-bar>
 
     @if (loading() && publishedEvents().length === 0) {
       <app-ui-loading-state label="Chargement de l’agenda culturel de Casamance..." />
@@ -131,7 +111,7 @@
           @let sobre = isMemorialEvent(ev);
           <article class="agenda-row" [class.agenda-row--memorial]="sobre">
             <div class="agenda-date-stamp">
-              <span class="agenda-date-stamp__day tabular-nums">{{ ev.dateDebut | dateFr: 'dd' }}</span>
+              <span class="agenda-date-stamp__day tabular-nums">{{ ev.dateDebut | dateFr: 'dd' }}&nbsp;</span>
               <span class="agenda-date-stamp__month">{{ ev.dateDebut | dateFr: 'MMM yyyy' }}</span>
             </div>
 
@@ -191,7 +171,7 @@
                 <div class="agenda-row__meta">
                   <span>
                     <svg lucideCalendar [size]="14" aria-hidden="true"></svg>
-                    {{ ev.dateDebut | dateFr }} (Africa/Dakar)
+                    {{ ev.dateDebut | dateFr }}
                   </span>
                   <span>
                     <svg lucideMapPin [size]="14" aria-hidden="true"></svg>

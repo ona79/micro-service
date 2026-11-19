@@ -17,6 +17,8 @@ import { GuideAgendaItem } from '../../../../core/models/reservation.model';
 import { UiAvisSectionComponent } from '../../../../shared/components/ui-avis-section/ui-avis-section.component';
 import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confirm-dialog/ui-confirm-dialog.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import { UiModalComponent } from '../../../../shared/components/ui-modal/ui-modal.component';
+import { UiPageHeaderComponent } from '../../../../shared/components/ui-page-header/ui-page-header.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { GuideApiService } from '../../../guides/data-access/guide-api.service';
 import { ReservationApiService } from '../../../reservations/data-access/reservation-api.service';
@@ -31,6 +33,8 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
     DateFrPipe,
     UiAvisSectionComponent,
     UiErrorBannerComponent,
+    UiPageHeaderComponent,
+    UiModalComponent,
     LucideAward,
     LucideSend,
     LucideCheckCircle2,
@@ -38,20 +42,19 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
     LucideAlertCircle,
   ],
   template: `
-    <header class="bo-header">
-      <div>
-        <p class="bo-header__eyebrow">Espace Guide Touristique Local</p>
-        <h1 class="bo-header__title">Mon dossier professionnel &amp; disponibilité</h1>
-        <p class="bo-header__lead">
-          Complétez vos informations agréées, gérez votre visibilité dans l’annuaire et suivez les
-          décisions de validation administrative.
-        </p>
-      </div>
-      <div class="bo-header__actions">
+    <app-ui-page-header
+      eyebrow="Espace Guide Touristique Local"
+      title="Mon dossier professionnel & disponibilité"
+      subtitle="Consultez vos informations agréées, gérez votre visibilité et suivez vos validations."
+    >
+      <div header-actions>
         <a routerLink="/pro/circuits" class="bo-btn">Mes circuits</a>
         <a routerLink="/pro/manifestes" class="bo-btn">Mes manifestes</a>
+        <button type="button" class="bo-btn bo-btn--primary" (click)="editOpen.set(true)">
+          Modifier mon dossier
+        </button>
       </div>
-    </header>
+    </app-ui-page-header>
 
     @if (loadError()) {
       <app-ui-error-banner [message]="loadError()!" (retry)="loadWorkspace()" />
@@ -116,9 +119,29 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
       <div class="bo-charts-grid">
         <section class="bo-panel">
           <div class="bo-panel__head">
-            <h2 class="bo-panel__title">Éditer mon profil guide</h2>
+            <h2 class="bo-panel__title">Mon dossier guide</h2>
+            <button type="button" class="bo-btn" (click)="editOpen.set(true)">Modifier</button>
           </div>
+          @if (profil(); as p) {
+            <dl class="bo-kv-list">
+              <div class="bo-kv-row"><dt>Présentation</dt><dd>{{ p.presentationCourte }}</dd></div>
+              <div class="bo-kv-row"><dt>Zones d'intervention</dt><dd>{{ p.zonesIntervention }}</dd></div>
+              <div class="bo-kv-row"><dt>Langues parlées</dt><dd>{{ p.languesParlees }}</dd></div>
+              <div class="bo-kv-row"><dt>Spécialités</dt><dd>{{ p.specialites || '—' }}</dd></div>
+              <div class="bo-kv-row"><dt>Tarif journalier</dt><dd>{{ p.tarifJournalierIndicatif ?? '—' }} XOF</dd></div>
+              <div class="bo-kv-row"><dt>N° carte pro</dt><dd>{{ p.numeroCarteProfessionnelle || '—' }}</dd></div>
+            </dl>
+          } @else {
+            <p class="bo-cell-sub">Dossier non encore initialisé. Cliquez sur « Modifier mon dossier » pour le compléter.</p>
+          }
+        </section>
 
+        <app-ui-modal
+          [open]="editOpen()"
+          title="Éditer mon profil guide"
+          [showFooter]="false"
+          (closed)="editOpen.set(false)"
+        >
           <form [formGroup]="guideForm" (ngSubmit)="saveProfil()" class="bo-form-grid" novalidate>
             <div class="bo-field bo-form-span2">
               <label for="guide-pres" class="bo-label">Présentation courte *</label>
@@ -171,14 +194,15 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
               <input id="guide-docs" type="text" class="bo-input" formControlName="documentsJustificatifs" />
             </div>
 
-            <div class="bo-form-span2">
+            <div class="bo-form-span2 bo-actions-cell">
               <button type="submit" class="bo-btn bo-btn--primary" [disabled]="busy()">
                 <svg lucideCheckCircle2 [size]="15" aria-hidden="true"></svg>
                 <span>{{ busy() ? 'Enregistrement...' : 'Enregistrer mon dossier' }}</span>
               </button>
+              <button type="button" class="bo-btn" (click)="editOpen.set(false)">Annuler</button>
             </div>
           </form>
-        </section>
+        </app-ui-modal>
 
         <section class="bo-panel">
           <div class="bo-panel__head">
@@ -305,6 +329,7 @@ export class ProGuideWorkspacePageComponent implements OnInit {
 
   protected readonly loading = signal(true);
   protected readonly busy = signal(false);
+  protected readonly editOpen = signal(false);
   protected readonly loadError = signal<string | null>(null);
   protected readonly actionError = signal<string | null>(null);
 

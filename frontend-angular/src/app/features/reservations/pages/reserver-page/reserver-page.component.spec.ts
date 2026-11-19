@@ -114,7 +114,10 @@ describe('ReserverPageComponent', () => {
     fixture.detectChanges();
 
     dialogSpy.open.mockReturnValue({ closed: of(true) });
-    const cancelButton: HTMLButtonElement = fixture.nativeElement.querySelector('.cancel-btn');
+    const menuTrigger: HTMLButtonElement = fixture.nativeElement.querySelector('.bo-row-menu button');
+    menuTrigger.click();
+    fixture.detectChanges();
+    const cancelButton: HTMLButtonElement = fixture.nativeElement.querySelector('.bo-row-menu__item--danger');
     cancelButton.click();
 
     await Promise.resolve();

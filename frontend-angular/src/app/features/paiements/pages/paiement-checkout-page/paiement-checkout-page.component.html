@@ -42,15 +42,15 @@
           </span>
           <span class="ref-chip">
             <svg lucideTicket [size]="14" aria-hidden="true"></svg>
-            {{ res.referenceReservation || ('#' + res.id) }}
+            {{ res.referenceReservation || ('n° ' + res.id) }}
           </span>
         </div>
 
         <h2 class="summary-title">
           @if (res.typeReservation === 'CIRCUIT') {
-            {{ res.circuit?.nomCircuit || ('Circuit #' + res.circuitId) }}
+            {{ res.circuit?.nomCircuit || ('Circuit n° ' + res.circuitId) }}
           } @else {
-            {{ res.evenement?.nomEvenement || ('Événement #' + res.evenementId) }}
+            {{ res.evenement?.nomEvenement || ('Événement n° ' + res.evenementId) }}
           }
         </h2>
 

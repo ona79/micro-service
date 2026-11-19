@@ -1,7 +1,7 @@
 import { Dialog } from '@angular/cdk/dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { LucideCheckCircle2, LucideEye, LucideRefreshCw } from '@lucide/angular';
+import { LucideCheckCircle2, LucideEye, LucideMoreHorizontal, LucideRefreshCw } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { toast } from 'ngx-sonner';
 import { PermissionService } from '../../../../core/auth/permissions';
@@ -18,6 +18,10 @@ import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confi
 import { UiDetailDrawerComponent } from '../../../../shared/components/ui-detail-drawer/ui-detail-drawer.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import {
+  FilterStatusPill,
+  UiFilterBarComponent,
+} from '../../../../shared/components/ui-filter-bar/ui-filter-bar.component';
 import { UiKpiCardComponent } from '../../../../shared/components/ui-kpi-card/ui-kpi-card.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
@@ -35,14 +39,16 @@ import { GuideApiService } from '../../../guides/data-access/guide-api.service';
     UiDetailDrawerComponent,
     UiEmptyStateComponent,
     UiErrorBannerComponent,
+    UiFilterBarComponent,
     LucideEye,
+    LucideMoreHorizontal,
     LucideRefreshCw,
     LucideCheckCircle2,
   ],
   template: `
     <header class="bo-header">
       <div>
-        <p class="bo-header__eyebrow">Corps des guides ms-utilisateur</p>
+        <p class="bo-header__eyebrow">Guides</p>
         <h1 class="bo-header__title">Instruction &amp; validation des guides touristiques</h1>
         <p class="bo-header__lead">
           Examinez les pièces justificatives, validez les dossiers complets ou appliquez des mesures
@@ -69,24 +75,18 @@ import { GuideApiService } from '../../../guides/data-access/guide-api.service';
     }
 
     <section class="bo-panel">
-      <div class="bo-filters">
-        <div class="bo-field bo-field--grow">
-          <label for="guide-q" class="bo-label">Recherche</label>
-          <input id="guide-q" type="search" class="bo-input" [(ngModel)]="q" placeholder="Nom, email, zone, langue..." />
-        </div>
-        <div class="bo-field">
-          <label for="guide-fstatut" class="bo-label">Statut validation</label>
-          <select id="guide-fstatut" class="bo-select" [(ngModel)]="statutFilter" (ngModelChange)="loadGuides()">
-            <option value="">Tous les statuts</option>
-            <option value="EN_ATTENTE_VALIDATION">EN_ATTENTE_VALIDATION</option>
-            <option value="VALIDE">VALIDE</option>
-            <option value="BROUILLON">BROUILLON</option>
-            <option value="REJETE">REJETE</option>
-            <option value="SUSPENDU">SUSPENDU</option>
-            <option value="DESACTIVE">DESACTIVE</option>
-          </select>
-        </div>
-      </div>
+      <app-ui-filter-bar
+        [statusPills]="statusPills()"
+        [activeStatus]="statutFilter || 'ALL'"
+        (statusChange)="statutFilter = $event === 'ALL' ? '' : $any($event); loadGuides()"
+        [searchValue]="q"
+        searchPlaceholder="Rechercher nom, email, zone, langue..."
+        searchAriaLabel="Rechercher un guide"
+        [resultsLabel]="filteredGuides().length + ' guide(s)'"
+        [hasActiveFilters]="Boolean(q.trim() || statutFilter)"
+        (searchChange)="q = $event"
+        (reset)="q = ''; statutFilter = ''; loadGuides()"
+      />
 
       @if (error()) {
         <app-ui-error-banner [message]="error()!" (retry)="loadAll()" />
@@ -110,16 +110,15 @@ import { GuideApiService } from '../../../guides/data-access/guide-api.service';
               @for (g of filteredGuides(); track g.id) {
                 <tr>
                   <td>
-                    <span class="bo-cell-title">{{ g.prenom }} {{ g.nom }}</span>
-                    <span class="bo-cell-sub">{{ g.email || 'User #' + g.utilisateurId }} · {{ g.telephone || 'N/A' }}</span>
+                    <span class="bo-cell-one bo-cell-title" [title]="g.prenom + ' ' + g.nom + ' · ' + (g.email || '')">
+                      {{ g.prenom }} {{ g.nom }}
+                    </span>
                   </td>
                   <td>
-                    <span>{{ g.zonesIntervention }}</span>
-                    <span class="bo-cell-sub">{{ g.languesParlees }}</span>
+                    <span class="bo-cell-one" [title]="g.zonesIntervention + ' · ' + g.languesParlees">{{ g.zonesIntervention }}</span>
                   </td>
-                  <td class="tabular-nums">
+                  <td class="tabular-nums" [title]="'Carte : ' + (g.numeroCarteProfessionnelle || 'Non renseignée')">
                     {{ g.anneesExperience }} an(s)
-                    <span class="bo-cell-sub">Carte : {{ g.numeroCarteProfessionnelle || 'Non renseignée' }}</span>
                   </td>
                   <td>
                     <span [class]="badgeClass(g.statutValidation)">
@@ -128,16 +127,32 @@ import { GuideApiService } from '../../../guides/data-access/guide-api.service';
                   </td>
                   <td>
                     <div class="bo-actions-cell">
-                      <button type="button" class="bo-btn bo-btn--sm" (click)="openDetail(g)">
-                        <svg lucideEye [size]="13" aria-hidden="true"></svg>
-                        <span>Instruire / Détail</span>
-                      </button>
                       @if (g.statutValidation === 'EN_ATTENTE_VALIDATION' || g.statutValidation === 'REJETE') {
                         <button type="button" class="bo-btn bo-btn--sm bo-btn--primary" (click)="valider(g)" [disabled]="busy()">
-                          <svg lucideCheckCircle2 [size]="13" aria-hidden="true"></svg>
-                          <span>Valider</span>
+                          Valider
+                        </button>
+                      } @else {
+                        <button type="button" class="bo-btn bo-btn--sm" (click)="openDetail(g)">
+                          Détail
                         </button>
                       }
+                      <div class="bo-row-menu">
+                        <button
+                          type="button"
+                          class="bo-btn bo-btn--sm bo-btn--icon"
+                          aria-label="Plus d'actions"
+                          (click)="toggleRowMenu(g.id)"
+                        >
+                          <svg lucideMoreHorizontal [size]="15" aria-hidden="true"></svg>
+                        </button>
+                        @if (openMenuId() === g.id) {
+                          <div class="bo-row-menu__dropdown" role="menu">
+                            <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null); openDetail(g)">
+                              Instruire / Détail
+                            </button>
+                          </div>
+                        }
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -151,7 +166,7 @@ import { GuideApiService } from '../../../guides/data-access/guide-api.service';
     <app-ui-detail-drawer
       [open]="selectedGuide() !== null"
       [title]="selectedGuide() ? selectedGuide()!.prenom + ' ' + selectedGuide()!.nom : ''"
-      [eyebrow]="'Dossier Guide #' + (selectedGuide()?.id ?? '')"
+      [eyebrow]="'Dossier Guide n° ' + (selectedGuide()?.id ?? '')"
       (close)="selectedGuide.set(null)"
     >
       @if (selectedGuide(); as g) {
@@ -230,6 +245,11 @@ export class ProGuidesAdminPageComponent implements OnInit {
   protected readonly guides = signal<GuideProfil[]>([]);
   protected readonly selectedGuide = signal<GuideProfil | null>(null);
   protected readonly historique = signal<GuideHistorique[]>([]);
+  protected readonly openMenuId = signal<number | null>(null);
+
+  protected toggleRowMenu(id: number): void {
+    this.openMenuId.update((curr) => (curr === id ? null : id));
+  }
 
   protected q = '';
   protected statutFilter: StatutValidationGuide | '' = '';
@@ -237,6 +257,19 @@ export class ProGuidesAdminPageComponent implements OnInit {
 
   protected readonly formatStatus = formatGuideStatusLabel;
   protected readonly badgeClass = guideStatusBadgeClass;
+
+  protected readonly statusPills = computed<FilterStatusPill[]>(() => {
+    const s = this.stats();
+    return [
+      { id: 'ALL', label: 'Tous', count: s?.total },
+      { id: 'EN_ATTENTE_VALIDATION', label: 'En attente', count: s?.enAttenteValidation },
+      { id: 'VALIDE', label: 'Validés', count: s?.valides },
+      { id: 'REJETE', label: 'Rejetés', count: s?.rejetes },
+      { id: 'SUSPENDU', label: 'Suspendus', count: s?.suspendus },
+      { id: 'BROUILLON', label: 'Brouillons' },
+      { id: 'DESACTIVE', label: 'Désactivés' },
+    ];
+  });
 
   protected readonly filteredGuides = computed(() => {
     const query = this.q.trim().toLowerCase();

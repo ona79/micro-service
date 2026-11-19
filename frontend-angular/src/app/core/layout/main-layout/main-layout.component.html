@@ -235,51 +235,26 @@
   </main>
 
   <footer class="site-footer">
-    <div class="container site-footer__grid">
-      <div class="site-footer__brand">
-        <h2 class="site-footer__title">{{ config.siteName }}</h2>
-        <p class="site-footer__desc">
-          {{ config.siteSlogan }}. Découvrez Basse-Casamance (Ziguinchor, Oussouye, Carabane),
-          Moyenne-Casamance (Sédhiou) et Haute-Casamance (Kolda) avec nos circuits et guides agréés.
-        </p>
+    <div class="container site-footer__compact">
+      <div class="site-footer__row1">
+        <div class="site-footer__brand">
+          <strong class="site-footer__title">{{ config.siteName }}</strong>
+          <span class="site-footer__desc">Patrimoines, itinéraires et guides agréés en Casamance.</span>
+        </div>
+
+        <nav class="site-footer__nav" aria-label="Navigation pied de page">
+          <a routerLink="/patrimoines">Patrimoines</a>
+          <a routerLink="/circuits">Circuits</a>
+          <a routerLink="/evenements">Événements</a>
+          <a routerLink="/guides">Guides</a>
+          <a routerLink="/reserver">Réserver</a>
+          <a routerLink="/connexion">Contact</a>
+          <a routerLink="/acces-refuse" aria-disabled="true" (click)="$event.preventDefault()">Mentions légales</a>
+        </nav>
       </div>
 
-      <div>
-        <h3 class="site-footer__heading">Explorer &amp; Réserver</h3>
-        <ul class="site-footer__links">
-          @for (item of navItems; track item.to) {
-            <li>
-              <a [routerLink]="item.to">{{ item.label }}</a>
-            </li>
-          }
-          <li>
-            <a [routerLink]="['/patrimoines']" [queryParams]="{ zone: 'BASSE_CASAMANCE' }">Basse-Casamance</a>
-          </li>
-          <li>
-            <a [routerLink]="['/patrimoines']" [queryParams]="{ zone: 'MOYENNE_CASAMANCE' }">Moyenne-Casamance</a>
-          </li>
-          <li>
-            <a [routerLink]="['/patrimoines']" [queryParams]="{ zone: 'HAUTE_CASAMANCE' }">Haute-Casamance</a>
-          </li>
-          <li>
-            <a routerLink="/reserver">Réserver une visite</a>
-          </li>
-          <li>
-            <a routerLink="/connexion">Espace Touriste &amp; Comptes</a>
-          </li>
-        </ul>
-      </div>
-
-      <div>
-        <h3 class="site-footer__heading">Cadre académique</h3>
-        <p class="site-footer__meta-strong">{{ config.universite.nom }}</p>
-        <p class="site-footer__meta">{{ config.universite.cours }}</p>
-      </div>
-    </div>
-
-    <div class="site-footer__bottom">
-      <div class="container site-footer__bottom-inner">
-        <span>{{ config.siteName }} — Architecture Microservices Spring Boot &amp; Angular</span>
+      <div class="site-footer__row2">
+        <span>© 2026 Casamance Patrimoine</span>
       </div>
     </div>
   </footer>

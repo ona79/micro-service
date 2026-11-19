@@ -12,6 +12,7 @@ import {
 } from '../../../../core/models/reservation.model';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import { UiFilterBarComponent } from '../../../../shared/components/ui-filter-bar/ui-filter-bar.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { CircuitApiService } from '../../../circuits/data-access/circuit-api.service';
 import { ReservationApiService } from '../../../reservations/data-access/reservation-api.service';
@@ -26,6 +27,7 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
     LucideRefreshCw,
     UiEmptyStateComponent,
     UiErrorBannerComponent,
+    UiFilterBarComponent,
     DateFrPipe,
   ],
   template: `
@@ -47,12 +49,16 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
       <app-ui-error-banner [message]="error()!" (retry)="loadCircuits()" />
     } @else {
       <section class="bo-panel">
-        <div class="bo-filters">
-          <div class="bo-field bo-field--grow">
-            <label for="manifeste-circuit-select" class="bo-label">Sélectionner un circuit</label>
+        <app-ui-filter-bar
+          [showSearch]="false"
+          [resultsLabel]="selectedCircuitId() !== null ? manifeste().length + ' participant(s)' : ''"
+        >
+          <ng-container filter-primary>
             <select
               id="manifeste-circuit-select"
-              class="bo-select"
+              aria-label="Sélectionner un circuit"
+              class="ui-filter-control"
+              style="min-width: 280px;"
               [ngModel]="selectedCircuitId()"
               (ngModelChange)="onSelectCircuit($event)"
             >
@@ -63,8 +69,8 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
                 </option>
               }
             </select>
-          </div>
-        </div>
+          </ng-container>
+        </app-ui-filter-bar>
 
         @if (selectedCircuitId() === null) {
           <app-ui-empty-state

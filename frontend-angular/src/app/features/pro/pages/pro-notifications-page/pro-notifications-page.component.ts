@@ -1,8 +1,8 @@
 import { Dialog } from '@angular/cdk/dialog';
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { LucideCheck, LucideCheckCheck, LucideEye, LucideRefreshCw } from '@lucide/angular';
+import { LucideCheck, LucideCheckCheck, LucideEye, LucideMoreHorizontal, LucideRefreshCw } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { toast } from 'ngx-sonner';
 import { PermissionService } from '../../../../core/auth/permissions';
@@ -17,6 +17,10 @@ import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confi
 import { UiDetailDrawerComponent } from '../../../../shared/components/ui-detail-drawer/ui-detail-drawer.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import {
+  FilterStatusPill,
+  UiFilterBarComponent,
+} from '../../../../shared/components/ui-filter-bar/ui-filter-bar.component';
 import { UiKpiCardComponent } from '../../../../shared/components/ui-kpi-card/ui-kpi-card.component';
 import { UiPaginationComponent } from '../../../../shared/components/ui-pagination/ui-pagination.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
@@ -36,15 +40,17 @@ import { NotificationStore } from '../../../notifications/data-access/notificati
     UiDetailDrawerComponent,
     UiEmptyStateComponent,
     UiErrorBannerComponent,
+    UiFilterBarComponent,
     LucideCheck,
     LucideCheckCheck,
     LucideRefreshCw,
     LucideEye,
+    LucideMoreHorizontal,
   ],
   template: `
     <header class="bo-header">
       <div>
-        <p class="bo-header__eyebrow">Alertes &amp; Supervision ms-notification</p>
+        <p class="bo-header__eyebrow">Notifications</p>
         <h1 class="bo-header__title">Centre des notifications</h1>
         <p class="bo-header__lead">
           Consultez vos alertes métier personnelles
@@ -90,28 +96,37 @@ import { NotificationStore } from '../../../notifications/data-access/notificati
 
     @if (activeTab() === 'perso') {
       <section class="bo-panel">
-        <div class="bo-panel__head">
-          <div class="bo-filters" style="margin-bottom: 0;">
-            <label class="bo-btn" style="cursor: pointer;">
-              <input type="checkbox" [(ngModel)]="nonLuesOnly" (ngModelChange)="loadPerso(0)" />
-              <span>Non lues uniquement</span>
-            </label>
-            <select class="bo-select" [(ngModel)]="persoType" (ngModelChange)="loadPerso(0)" style="width: auto;">
-              <option value="">Tous les événements</option>
+        <app-ui-filter-bar
+          [showSearch]="false"
+          [statusPills]="[
+            { id: 'all', label: 'Toutes', count: persoTotal() },
+            { id: 'unread', label: 'Non lues', count: notificationStore.unreadCount(), tone: 'danger' }
+          ]"
+          [activeStatus]="nonLuesOnly ? 'unread' : 'all'"
+          (statusChange)="nonLuesOnly = $event === 'unread'; loadPerso(0)"
+          [resultsLabel]="persoTotal() + ' notification(s)'"
+          [hasActiveFilters]="Boolean(nonLuesOnly || persoType)"
+          (reset)="nonLuesOnly = false; persoType = ''; loadPerso(0)"
+        >
+          <ng-container filter-primary>
+            <select aria-label="Type d'événement" class="ui-filter-control" [(ngModel)]="persoType" (ngModelChange)="loadPerso(0)">
+              <option value="">Événement : Tous</option>
               <option value="RESERVATION_CONFIRMEE">Réservation confirmée</option>
               <option value="PAIEMENT_ACCEPTE">Paiement accepté</option>
               <option value="GUIDE_PROFILE_VALIDE">Profil guide validé</option>
               <option value="GUIDE_AFFECTE_CIRCUIT">Affectation circuit</option>
               <option value="AVIS_MODERE">Décision modération</option>
             </select>
-          </div>
-          @if (notificationStore.unreadCount() > 0) {
-            <button type="button" class="bo-btn bo-btn--primary" (click)="markAllRead()">
-              <svg lucideCheckCheck [size]="14" aria-hidden="true"></svg>
-              <span>Tout marquer comme lu</span>
-            </button>
-          }
-        </div>
+          </ng-container>
+          <ng-container filter-sort>
+            @if (notificationStore.unreadCount() > 0) {
+              <button type="button" class="bo-btn bo-btn--sm bo-btn--primary" (click)="markAllRead()">
+                <svg lucideCheckCheck [size]="14" aria-hidden="true"></svg>
+                <span>Tout lire</span>
+              </button>
+            }
+          </ng-container>
+        </app-ui-filter-bar>
 
         @if (loading()) {
           <p class="bo-cell-sub">Chargement...</p>
@@ -187,31 +202,26 @@ import { NotificationStore } from '../../../notifications/data-access/notificati
       }
 
       <section class="bo-panel">
-        <div class="bo-panel__head">
-          <div class="bo-filters" style="margin-bottom: 0;">
-            <select class="bo-select" [(ngModel)]="adminStatut" (ngModelChange)="loadAdmin(0)" style="width: auto;">
-              <option value="">Tous les statuts</option>
-              <option value="ENVOYEE">ENVOYEE</option>
-              <option value="EN_ATTENTE">EN_ATTENTE</option>
-              <option value="ECHEC_TEMPORAIRE">ECHEC_TEMPORAIRE</option>
-              <option value="ECHEC">ECHEC</option>
-            </select>
-            <input
-              type="text"
-              class="bo-input"
-              [(ngModel)]="adminType"
-              placeholder="Filtrer typeEvenement (ex: PAIEMENT_ACCEPTE)"
-              (keyup.enter)="loadAdmin(0)"
-              style="width: 240px;"
-            />
-            <button type="button" class="bo-btn" (click)="loadAdmin(0)">Filtrer</button>
-          </div>
-          @if (permissions.has('NOTIFICATION:RELANCER')) {
-            <button type="button" class="bo-btn bo-btn--terracotta" (click)="forcerRepriseEchecs()" [disabled]="busy()">
-              Relancer tous les échecs
-            </button>
-          }
-        </div>
+        <app-ui-filter-bar
+          [statusPills]="adminStatusPills()"
+          [activeStatus]="adminStatut || 'ALL'"
+          (statusChange)="adminStatut = $event === 'ALL' ? '' : $any($event); loadAdmin(0)"
+          [searchValue]="adminType"
+          searchPlaceholder="Type événement (ex: PAIEMENT_ACCEPTE)"
+          searchAriaLabel="Filtrer par type d'événement"
+          [resultsLabel]="adminTotal() + ' envoi(s)'"
+          [hasActiveFilters]="Boolean(adminStatut || adminType.trim())"
+          (searchChange)="adminType = $event; loadAdmin(0)"
+          (reset)="adminStatut = ''; adminType = ''; loadAdmin(0)"
+        >
+          <ng-container filter-sort>
+            @if (permissions.has('NOTIFICATION:RELANCER')) {
+              <button type="button" class="bo-btn bo-btn--sm bo-btn--terracotta" (click)="forcerRepriseEchecs()" [disabled]="busy()">
+                Relancer échecs
+              </button>
+            }
+          </ng-container>
+        </app-ui-filter-bar>
 
         @if (loading()) {
           <p class="bo-cell-sub">Chargement de la file globale...</p>
@@ -262,15 +272,32 @@ import { NotificationStore } from '../../../notifications/data-access/notificati
                     </td>
                     <td>
                       <div class="bo-actions-cell">
-                        <button type="button" class="bo-btn bo-btn--sm" (click)="selectedItem.set(n)">
-                          <svg lucideEye [size]="13" aria-hidden="true"></svg>
-                          <span>Détail</span>
-                        </button>
                         @if (n.statut !== 'ENVOYEE' && permissions.has('NOTIFICATION:RELANCER')) {
                           <button type="button" class="bo-btn bo-btn--sm bo-btn--primary" (click)="relancer(n)" [disabled]="busy()">
                             Relancer
                           </button>
+                        } @else {
+                          <button type="button" class="bo-btn bo-btn--sm" (click)="selectedItem.set(n)">
+                            Détail
+                          </button>
                         }
+                        <div class="bo-row-menu">
+                          <button
+                            type="button"
+                            class="bo-btn bo-btn--sm bo-btn--icon"
+                            aria-label="Plus d'actions"
+                            (click)="toggleRowMenu(n.id)"
+                          >
+                            <svg lucideMoreHorizontal [size]="15" aria-hidden="true"></svg>
+                          </button>
+                          @if (openMenuId() === n.id) {
+                            <div class="bo-row-menu__dropdown" role="menu">
+                              <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null); selectedItem.set(n)">
+                                Détail
+                              </button>
+                            </div>
+                          }
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -291,8 +318,8 @@ import { NotificationStore } from '../../../notifications/data-access/notificati
 
     <app-ui-detail-drawer
       [open]="selectedItem() !== null"
-      [title]="'Notification #' + (selectedItem()?.id ?? '')"
-      eyebrow="Détail livraison ms-notification"
+      [title]="'Notification n° ' + (selectedItem()?.id ?? '')"
+      eyebrow="Détail notification"
       (close)="selectedItem.set(null)"
     >
       @if (selectedItem(); as d) {
@@ -322,6 +349,28 @@ export class ProNotificationsPageComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly selectedItem = signal<NotificationItem | null>(null);
+  protected readonly openMenuId = signal<number | null>(null);
+  private adminTypeTimer?: ReturnType<typeof setTimeout>;
+
+  protected onAdminTypeInput(): void {
+    clearTimeout(this.adminTypeTimer);
+    this.adminTypeTimer = setTimeout(() => void this.loadAdmin(0), 250);
+  }
+
+  protected toggleRowMenu(id: number): void {
+    this.openMenuId.update((curr) => (curr === id ? null : id));
+  }
+
+  protected readonly adminStatusPills = computed<FilterStatusPill[]>(() => {
+    const s = this.adminStats();
+    return [
+      { id: 'ALL', label: 'Tous', count: s?.total },
+      { id: 'ENVOYEE', label: 'Envoyées', count: s?.envoyees },
+      { id: 'EN_ATTENTE', label: 'En attente' },
+      { id: 'ECHEC_TEMPORAIRE', label: 'Échecs temp.', count: s?.echecsTemporaires },
+      { id: 'ECHEC', label: 'Échecs déf.', count: s?.echecsDefinitifs, tone: 'danger' },
+    ];
+  });
 
   protected nonLuesOnly = false;
   protected persoType = '';

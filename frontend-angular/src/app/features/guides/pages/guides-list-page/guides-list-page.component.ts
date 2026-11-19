@@ -1,5 +1,5 @@
 import { DecimalPipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
@@ -19,6 +19,10 @@ import { SeoService } from '../../../../core/services/seo.service';
 import { UiCardComponent } from '../../../../shared/components/ui-card/ui-card.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import {
+  ActiveFilterChip,
+  UiFilterBarComponent,
+} from '../../../../shared/components/ui-filter-bar/ui-filter-bar.component';
 import { UiLoadingStateComponent } from '../../../../shared/components/ui-loading-state/ui-loading-state.component';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
 import { AvisApiService } from '../../../avis/data-access/avis-api.service';
@@ -36,6 +40,7 @@ import { GuideApiService } from '../../data-access/guide-api.service';
     UiEmptyStateComponent,
     UiErrorBannerComponent,
     UiLoadingStateComponent,
+    UiFilterBarComponent,
     UiCardComponent,
     LucideCompass,
     LucideSearch,
@@ -46,65 +51,62 @@ import { GuideApiService } from '../../data-access/guide-api.service';
     LucideArrowRight,
   ],
   template: `
-    <div class="page-section">
+    <div class="page-section" style="padding-top: 14px;">
       <div class="container">
-        <header class="editorial-header">
-          <p class="editorial-header__eyebrow">Accompagnateurs certifiés de Casamance</p>
-          <h1 class="editorial-header__title">Guides touristiques agréés</h1>
-          <p class="editorial-header__lead">
-            Découvrez nos guides locaux vérifiés : spécialistes de l'écotourisme en bolongs, du patrimoine
-            architectural Diola, de l'histoire mémorielle et des traditions vivantes du Kasa.
-          </p>
+        <header class="page-head-compact">
+          <div class="page-head-compact__left">
+            <h1 class="page-head-compact__title">Guides touristiques</h1>
+            <span
+              class="page-info-tip"
+              title="Guides locaux certifiés : écotourisme en bolongs, patrimoine Diola et histoire mémorielle."
+              aria-label="Informations"
+            >
+              i
+            </span>
+          </div>
         </header>
 
-        <form class="filters-bar" (ngSubmit)="loadGuides()">
-          <label class="filter-field">
-            <span class="filter-label">Recherche</span>
-            <input
-              type="search"
-              class="filter-input"
-              [(ngModel)]="q"
-              name="q"
-              placeholder="Nom, spécialité, Carabane..."
-            />
-          </label>
-          <label class="filter-field">
-            <span class="filter-label">Zone d'intervention</span>
-            <input
-              type="text"
-              class="filter-input"
-              [(ngModel)]="zone"
-              name="zone"
-              placeholder="Basse-Casamance, Oussouye..."
-            />
-          </label>
-          <label class="filter-field">
-            <span class="filter-label">Langue parlée</span>
+        <app-ui-filter-bar
+          [searchValue]="q()"
+          searchPlaceholder="Rechercher un guide, une spécialité..."
+          searchAriaLabel="Rechercher un guide"
+          [resultsLabel]="guides().length + (guides().length > 1 ? ' guides' : ' guide')"
+          [hasActiveFilters]="hasActiveFilters()"
+          [activeChips]="activeFilterChips()"
+          (searchChange)="q.set($event); onFilterImmediate()"
+          (removeChip)="removeFilterChip($event)"
+          (reset)="resetFilters()"
+        >
+          <ng-container filter-primary>
             <input
               type="text"
-              class="filter-input"
-              [(ngModel)]="langue"
-              name="langue"
-              placeholder="Français, Diola, Wolof..."
+              class="ui-filter-control"
+              style="width: 150px;"
+              [ngModel]="zone()"
+              (ngModelChange)="onZoneInput($event)"
+              aria-label="Zone d'intervention"
+              placeholder="Zone (Oussouye...)"
             />
-          </label>
-          <label class="filter-field" style="display:flex;align-items:center;gap:0.5rem;padding-bottom:0.45rem;">
             <input
-              type="checkbox"
-              [(ngModel)]="disponibleOnly"
-              (ngModelChange)="loadGuides()"
-              name="disponibleOnly"
+              type="text"
+              class="ui-filter-control"
+              style="width: 140px;"
+              [ngModel]="langue()"
+              (ngModelChange)="onLangueInput($event)"
+              aria-label="Langue parlée"
+              placeholder="Langue (Diola...)"
             />
-            <span class="filter-label" style="margin:0;">Disponibles uniquement</span>
-          </label>
-          <div class="filter-actions">
-            <button type="submit" class="btn-filter">
-              <svg lucideSearch [size]="16" aria-hidden="true"></svg>
-              <span>Filtrer</span>
+            <button
+              type="button"
+              class="ui-filter-toggle"
+              [class.ui-filter-toggle--active]="disponibleOnly()"
+              [attr.aria-pressed]="disponibleOnly()"
+              (click)="disponibleOnly.set(!disponibleOnly()); onFilterImmediate()"
+            >
+              Disponibles
             </button>
-            <button type="button" class="btn-reset" (click)="resetFilters()">Réinitialiser</button>
-          </div>
-        </form>
+          </ng-container>
+        </app-ui-filter-bar>
 
         @if (error()) {
           <app-ui-error-banner [message]="error()!" (retry)="loadGuides()" />
@@ -116,8 +118,8 @@ import { GuideApiService } from '../../data-access/guide-api.service';
             message="Ajustez vos critères de zone ou de langue pour afficher nos guides agréés."
           />
         } @else {
-          <div class="guides-grid">
-            @for (guide of guides(); track guide.id) {
+          <div class="catalog-grid">
+            @for (guide of pagedGuides(); track guide.id) {
               <app-ui-card [interactive]="true" class="guide-card">
                 <div class="guide-card__top">
                   <div class="guide-avatar" aria-hidden="true">
@@ -127,7 +129,7 @@ import { GuideApiService } from '../../data-access/guide-api.service';
                     <div class="guide-badges">
                       <span class="ui-badge ui-badge--success">
                         <svg lucideAward [size]="12" aria-hidden="true"></svg>
-                        Guide agréé
+                        Agréé
                       </span>
                       @if (guide.disponible) {
                         <span class="ui-badge ui-badge--ochre">Disponible</span>
@@ -136,51 +138,46 @@ import { GuideApiService } from '../../data-access/guide-api.service';
                       }
                     </div>
                     <h2 class="guide-card__name">{{ guide.prenom }} {{ guide.nom }}</h2>
-                    @if (resumesMap()[guide.utilisateurId]; as r) {
-                      @if (r.totalAvis > 0) {
-                        <p class="guide-rating tabular-nums">
-                          <svg lucideStar [size]="14" class="star-icon" aria-hidden="true"></svg>
-                          <strong>{{ r.noteMoyenne | number: '1.1-2' }} / 5</strong>
-                          <span>({{ r.totalAvis }} avis vérifié(s))</span>
-                        </p>
-                      }
-                    }
                   </div>
                 </div>
 
-                <p class="guide-card__pitch">{{ guide.presentationCourte }}</p>
+                <p class="guide-card__pitch" [title]="guide.presentationCourte">{{ guide.presentationCourte }}</p>
 
-                <dl class="guide-meta">
-                  <div>
-                    <dt><svg lucideMapPin [size]="14" aria-hidden="true"></svg> Zones</dt>
-                    <dd>{{ guide.zonesIntervention }}</dd>
-                  </div>
-                  <div>
-                    <dt><svg lucideGlobe [size]="14" aria-hidden="true"></svg> Langues</dt>
-                    <dd>{{ guide.languesParlees }}</dd>
-                  </div>
-                  <div>
-                    <dt><svg lucideCompass [size]="14" aria-hidden="true"></svg> Expérience</dt>
-                    <dd class="tabular-nums">{{ guide.anneesExperience }} an(s)</dd>
-                  </div>
-                </dl>
+                <div class="guide-meta-compact">
+                  <p class="guide-meta-line" [title]="guide.zonesIntervention">
+                    <svg lucideMapPin [size]="13" aria-hidden="true"></svg>
+                    <span>{{ guide.zonesIntervention }}</span>
+                  </p>
+                  <p class="guide-meta-line" [title]="guide.languesParlees">
+                    <svg lucideGlobe [size]="13" aria-hidden="true"></svg>
+                    <span>{{ guide.languesParlees }}</span>
+                  </p>
+                </div>
 
                 <div class="guide-card__footer">
                   <span class="guide-price tabular-nums">
                     {{
                       guide.tarifJournalierIndicatif != null
-                        ? (guide.tarifJournalierIndicatif | fcfaPrice) + ' / jour'
-                        : 'Tarif selon itinéraire'
+                        ? (guide.tarifJournalierIndicatif | fcfaPrice) + '/j'
+                        : 'Sur devis'
                     }}
                   </span>
                   <a [routerLink]="['/guides', guide.id]" class="btn-detail">
-                    <span>Voir le profil</span>
-                    <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
+                    <span>Voir profil</span>
+                    <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
                   </a>
                 </div>
               </app-ui-card>
             }
           </div>
+
+          @if (guides().length > visibleLimit()) {
+            <div style="display:flex;justify-content:center;margin-top:20px;">
+              <button type="button" class="ui-filter-toggle" (click)="visibleLimit.set(visibleLimit() + 24)">
+                Charger plus ({{ guides().length - visibleLimit() }} restants)
+              </button>
+            </div>
+          }
         }
       </div>
     </div>
@@ -188,27 +185,32 @@ import { GuideApiService } from '../../data-access/guide-api.service';
   styles: `
     .filters-bar {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-      gap: 0.85rem;
-      padding: 1rem 1.25rem;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+      gap: var(--space-3);
+      padding: var(--card-padding);
       background: var(--surface-elevated);
       border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg);
-      margin-bottom: 1.75rem;
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-5);
       align-items: end;
+      max-width: 100%;
     }
     .filter-field {
       display: grid;
-      gap: 0.35rem;
+      gap: var(--space-1);
+      min-width: 0;
     }
     .filter-label {
-      font-size: var(--text-xs);
+      font-size: 12px;
       font-weight: 700;
       color: var(--ink-secondary);
     }
     .filter-input {
-      padding: 0.58rem 0.75rem;
-      border: 1px solid var(--border-strong);
+      width: 100%;
+      min-width: 0;
+      height: var(--control-height);
+      padding: 0 var(--space-3);
+      border: 1px solid var(--border-default);
       border-radius: var(--radius-sm);
       font-family: inherit;
       font-size: var(--text-sm);
@@ -245,112 +247,109 @@ import { GuideApiService } from '../../data-access/guide-api.service';
     }
     .guides-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 1.25rem;
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+      gap: var(--space-4);
     }
     .guide-card {
       background: var(--surface-elevated);
       border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-lg);
-      padding: 1.35rem;
+      border-radius: 12px;
+      padding: 14px;
       display: flex;
       flex-direction: column;
-      gap: 0.95rem;
+      gap: 10px;
       box-shadow: var(--shadow-xs);
     }
     .guide-card__top {
       display: flex;
-      gap: 0.9rem;
+      gap: 10px;
       align-items: center;
     }
     .guide-avatar {
-      width: 54px;
-      height: 54px;
+      width: 44px;
+      height: 44px;
       border-radius: 50%;
       background: var(--surface-forest);
       color: var(--ink-on-dark);
       display: grid;
       place-items: center;
-      font-family: var(--font-display);
+      font-family: var(--font-sans);
       font-weight: 700;
-      font-size: 1.15rem;
+      font-size: 15px;
       flex-shrink: 0;
     }
     .guide-badges {
       display: flex;
-      gap: 0.4rem;
+      gap: 6px;
       flex-wrap: wrap;
-      margin-bottom: 0.25rem;
+      margin-bottom: 3px;
     }
     .guide-card__name {
       margin: 0;
-      font-family: var(--font-display);
-      font-size: var(--text-lg);
+      font-family: var(--font-sans);
+      font-size: 16px;
+      font-weight: 600;
       color: var(--ink-primary);
-    }
-    .guide-rating {
-      margin: 0.2rem 0 0;
-      display: inline-flex;
-      align-items: center;
-      gap: 0.3rem;
-      font-size: var(--text-xs);
-      color: var(--ink-secondary);
-    }
-    .star-icon {
-      color: var(--accent-ochre);
-      fill: var(--accent-ochre);
     }
     .guide-card__pitch {
       margin: 0;
       color: var(--ink-secondary);
-      font-size: var(--text-sm);
-      line-height: 1.55;
+      font-size: 13px;
+      line-height: 1.45;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
     }
-    .guide-meta {
-      margin: 0;
-      padding: 0.75rem;
-      background: var(--surface-canvas);
-      border-radius: var(--radius-md);
-      display: grid;
-      gap: 0.45rem;
-      font-size: var(--text-xs);
-    }
-    .guide-meta div {
+    .guide-meta-compact {
       display: flex;
-      justify-content: space-between;
-      gap: 0.75rem;
+      flex-direction: column;
+      gap: 5px;
+      padding: 8px 10px;
+      background: var(--surface-canvas);
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--ink-primary);
     }
-    .guide-meta dt {
-      display: inline-flex;
+    .guide-meta-line {
+      margin: 0;
+      display: flex;
       align-items: center;
-      gap: 0.3rem;
-      font-weight: 700;
+      gap: 6px;
+      min-width: 0;
+    }
+    .guide-meta-line svg {
+      flex-shrink: 0;
       color: var(--ink-muted);
     }
-    .guide-meta dd {
-      margin: 0;
-      color: var(--ink-primary);
-      text-align: right;
+    .guide-meta-line span {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .guide-card__footer {
       margin-top: auto;
-      padding-top: 0.75rem;
+      padding-top: 8px;
       border-top: 1px solid var(--border-subtle);
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 0.75rem;
+      gap: 8px;
+      white-space: nowrap;
     }
     .guide-price {
-      font-weight: 800;
+      font-weight: 700;
       color: var(--brand-primary);
-      font-size: var(--text-sm);
+      font-size: 13px;
+      white-space: nowrap;
     }
     .btn-detail {
       display: inline-flex;
       align-items: center;
-      gap: 0.35rem;
-      padding: 0.5rem 0.9rem;
+      gap: 5px;
+      height: 32px;
+      padding: 0 12px;
+      white-space: nowrap;
       background: var(--accent-terracotta);
       color: var(--ink-on-dark);
       border-radius: var(--radius-sm);
@@ -370,10 +369,54 @@ export class GuidesListPageComponent implements OnInit {
   protected readonly loading = signal(true);
   protected readonly error = signal<string | null>(null);
 
-  protected q = '';
-  protected zone = '';
-  protected langue = '';
-  protected disponibleOnly = false;
+  protected readonly q = signal('');
+  protected readonly zone = signal('');
+  protected readonly langue = signal('');
+  protected readonly disponibleOnly = signal(false);
+  protected readonly visibleLimit = signal(24);
+  private filterTimer?: ReturnType<typeof setTimeout>;
+
+  protected readonly pagedGuides = computed(() =>
+    this.guides().slice(0, this.visibleLimit())
+  );
+
+  protected readonly hasActiveFilters = computed(() =>
+    Boolean(this.q().trim() || this.zone().trim() || this.langue().trim() || this.disponibleOnly())
+  );
+
+  protected readonly activeFilterChips = computed<ActiveFilterChip[]>(() => {
+    const chips: ActiveFilterChip[] = [];
+    if (this.q().trim()) chips.push({ key: 'q', label: `Recherche : ${this.q().trim()}` });
+    if (this.zone().trim()) chips.push({ key: 'zone', label: `Zone : ${this.zone().trim()}` });
+    if (this.langue().trim()) chips.push({ key: 'langue', label: `Langue : ${this.langue().trim()}` });
+    if (this.disponibleOnly()) chips.push({ key: 'disp', label: 'Disponibles uniquement' });
+    return chips;
+  });
+
+  protected onZoneInput(val: string): void {
+    this.zone.set(val);
+    clearTimeout(this.filterTimer);
+    this.filterTimer = setTimeout(() => void this.onFilterImmediate(), 300);
+  }
+
+  protected onLangueInput(val: string): void {
+    this.langue.set(val);
+    clearTimeout(this.filterTimer);
+    this.filterTimer = setTimeout(() => void this.onFilterImmediate(), 300);
+  }
+
+  protected onFilterImmediate(): void {
+    this.visibleLimit.set(24);
+    void this.loadGuides();
+  }
+
+  protected removeFilterChip(key: string): void {
+    if (key === 'q') this.q.set('');
+    else if (key === 'zone') this.zone.set('');
+    else if (key === 'langue') this.langue.set('');
+    else if (key === 'disp') this.disponibleOnly.set(false);
+    this.onFilterImmediate();
+  }
 
   ngOnInit(): void {
     this.seo.update({
@@ -386,10 +429,11 @@ export class GuidesListPageComponent implements OnInit {
   }
 
   protected resetFilters(): void {
-    this.q = '';
-    this.zone = '';
-    this.langue = '';
-    this.disponibleOnly = false;
+    this.q.set('');
+    this.zone.set('');
+    this.langue.set('');
+    this.disponibleOnly.set(false);
+    this.visibleLimit.set(24);
     void this.loadGuides();
   }
 
@@ -399,16 +443,16 @@ export class GuidesListPageComponent implements OnInit {
     try {
       const list = await firstValueFrom(
         this.guideApi.getPublicGuides({
-          q: this.q.trim() || undefined,
-          zone: this.zone.trim() || undefined,
-          langue: this.langue.trim() || undefined,
+          q: this.q().trim() || undefined,
+          zone: this.zone().trim() || undefined,
+          langue: this.langue().trim() || undefined,
         })
       );
       const safeList = (list ?? []).filter(
         (g) =>
           g.statutValidation === 'VALIDE' &&
           g.visibilitePublique &&
-          (!this.disponibleOnly || g.disponible)
+          (!this.disponibleOnly() || g.disponible)
       );
       this.guides.set(safeList);
 

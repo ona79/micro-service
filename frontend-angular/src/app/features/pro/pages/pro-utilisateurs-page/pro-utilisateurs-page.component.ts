@@ -1,7 +1,8 @@
 import { Dialog } from '@angular/cdk/dialog';
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
+  LucideMoreHorizontal,
   LucidePencil,
   LucidePlus,
   LucideRefreshCw,
@@ -19,7 +20,13 @@ import { RoleUtilisateur, Utilisateur } from '../../../../core/models/utilisateu
 import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confirm-dialog/ui-confirm-dialog.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import {
+  FilterStatusPill,
+  UiFilterBarComponent,
+} from '../../../../shared/components/ui-filter-bar/ui-filter-bar.component';
 import { UiKpiCardComponent } from '../../../../shared/components/ui-kpi-card/ui-kpi-card.component';
+import { UiModalComponent } from '../../../../shared/components/ui-modal/ui-modal.component';
+import { UiPageHeaderComponent } from '../../../../shared/components/ui-page-header/ui-page-header.component';
 import { UiPaginationComponent } from '../../../../shared/components/ui-pagination/ui-pagination.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 
@@ -31,27 +38,26 @@ import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
     FormsModule,
     ReactiveFormsModule,
     DateFrPipe,
+    UiPageHeaderComponent,
+    UiModalComponent,
     UiKpiCardComponent,
     UiPaginationComponent,
     UiEmptyStateComponent,
     UiErrorBannerComponent,
+    UiFilterBarComponent,
     LucidePlus,
     LucidePencil,
     LucideTrash2,
     LucideRefreshCw,
     LucideShieldAlert,
+    LucideMoreHorizontal,
   ],
   template: `
-    <header class="bo-header">
-      <div>
-        <p class="bo-header__eyebrow">Sécurité &amp; Gouvernance ms-utilisateur · Administrateur</p>
-        <h1 class="bo-header__title">Utilisateurs, Rôles RBAC &amp; Audit sécurité</h1>
-        <p class="bo-header__lead">
-          Créez des comptes staff, modifiez les rôles (avec révocation immédiate des sessions), et
-          inspectez le journal immuable d’audit sécurité.
-        </p>
-      </div>
-      <div class="bo-header__actions">
+    <app-ui-page-header
+      title="Utilisateurs"
+      subtitle="Créez des comptes, modifiez les rôles et consultez le journal d'audit."
+    >
+      <div header-actions>
         <button type="button" class="bo-btn" (click)="refresh()">
           <svg lucideRefreshCw [size]="14" aria-hidden="true"></svg>
           <span>Actualiser</span>
@@ -63,24 +69,24 @@ import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
           </button>
         }
       </div>
-    </header>
-
-    @if (stats(); as s) {
-      <div class="bo-kpi-grid">
-        <app-ui-kpi-card label="Total comptes" [value]="s.total" subtitle="Actifs : {{ s.actifs }} · Inactifs : {{ s.inactifs }}" />
-        <app-ui-kpi-card label="Staff &amp; Guides" [value]="(s.parRole['ADMINISTRATEUR'] ?? 0) + (s.parRole['GESTIONNAIRE_SITE'] ?? 0) + (s.parRole['CONSERVATEUR'] ?? 0) + (s.parRole['GUIDE'] ?? 0)" tone="ochre" />
-        <app-ui-kpi-card label="Événements d'audit" [value]="s.auditLogsTotal" tone="forest" />
-        <app-ui-kpi-card label="Alertes / Échecs (24h)" [value]="s.alertesSecurite24h + ' / ' + s.echecsConnexion24h" [tone]="s.alertesSecurite24h > 0 ? 'danger' : 'neutral'" />
-      </div>
-    }
+    </app-ui-page-header>
 
     <div class="bo-tabs" role="tablist">
       <button type="button" role="tab" class="bo-tab" [class.bo-tab--active]="activeTab() === 'users'" (click)="switchTab('users')">
-        Comptes &amp; Rôles RBAC
+        <span>Comptes</span>
+        @if (stats(); as s) {
+          <span class="ui-badge ui-badge--neutral tabular-nums">{{ s.total }}</span>
+        }
       </button>
       @if (permissions.has('AUDIT:LIRE')) {
         <button type="button" role="tab" class="bo-tab" [class.bo-tab--active]="activeTab() === 'audit'" (click)="switchTab('audit')">
-          Journal d'audit sécurité
+          <span>Journal d'audit</span>
+          @if (stats(); as s) {
+            <span class="ui-badge ui-badge--neutral tabular-nums">{{ s.auditLogsTotal }}</span>
+            @if (s.alertesSecurite24h > 0) {
+              <span class="ui-badge ui-badge--danger tabular-nums">{{ s.alertesSecurite24h }}</span>
+            }
+          }
         </button>
       }
     </div>
@@ -89,15 +95,12 @@ import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
       <app-ui-error-banner [message]="actionError()!" [showRetry]="false" />
     }
 
-    @if (formOpen()) {
-      <section class="bo-panel" aria-label="Formulaire compte utilisateur">
-        <div class="bo-panel__head">
-          <h2 class="bo-panel__title">
-            {{ editingUser() ? 'Modifier le compte #' + editingUser()!.id + ' (' + editingUser()!.email + ')' : 'Créer un compte staff ou guide' }}
-          </h2>
-          <button type="button" class="bo-btn" (click)="closeForm()">Fermer</button>
-        </div>
-
+    <app-ui-modal
+      [open]="formOpen()"
+      [title]="editingUser() ? 'Modifier le compte ' + editingUser()!.email : 'Créer un compte staff ou guide'"
+      [showFooter]="false"
+      (closed)="closeForm()"
+    >
         <form [formGroup]="userForm" (ngSubmit)="saveUser()" class="bo-form-grid" novalidate>
           <div class="bo-field">
             <label for="u-prenom" class="bo-label">Prénom *</label>
@@ -116,7 +119,7 @@ import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
             <input id="u-tel" type="text" class="bo-input" formControlName="telephone" />
           </div>
           <div class="bo-field">
-            <label for="u-role" class="bo-label">Rôle RBAC *</label>
+            <label for="u-role" class="bo-label">Rôle *</label>
             <select id="u-role" class="bo-select" formControlName="role">
               <option value="TOURISTE">TOURISTE</option>
               <option value="GUIDE">GUIDE</option>
@@ -148,37 +151,33 @@ import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
             <button type="button" class="bo-btn" (click)="closeForm()">Annuler</button>
           </div>
         </form>
-      </section>
-    }
+    </app-ui-modal>
 
     @if (activeTab() === 'users') {
       <section class="bo-panel">
-        <div class="bo-filters">
-          <div class="bo-field bo-field--grow">
-            <label for="usr-q" class="bo-label">Recherche</label>
-            <input id="usr-q" type="search" class="bo-input" [(ngModel)]="userQ" placeholder="Nom, prénom, email..." (keyup.enter)="loadUsers(0)" />
-          </div>
-          <div class="bo-field">
-            <label for="usr-role" class="bo-label">Rôle</label>
-            <select id="usr-role" class="bo-select" [(ngModel)]="userRoleFilter" (ngModelChange)="loadUsers(0)">
-              <option value="">Tous les rôles</option>
+        <app-ui-filter-bar
+          [statusPills]="userStatePills()"
+          [activeStatus]="userActifFilter || 'ALL'"
+          (statusChange)="userActifFilter = $event === 'ALL' ? '' : $any($event); loadUsers(0)"
+          [searchValue]="userQ"
+          searchPlaceholder="Nom, prénom, email..."
+          searchAriaLabel="Rechercher un utilisateur"
+          [resultsLabel]="userTotal() + ' compte(s)'"
+          [hasActiveFilters]="Boolean(userQ.trim() || userRoleFilter || userActifFilter)"
+          (searchChange)="userQ = $event; loadUsers(0)"
+          (reset)="userQ = ''; userRoleFilter = ''; userActifFilter = ''; loadUsers(0)"
+        >
+          <ng-container filter-primary>
+            <select id="usr-role" aria-label="Rôle" class="ui-filter-control" [(ngModel)]="userRoleFilter" (ngModelChange)="loadUsers(0)">
+              <option value="">Rôle : Tous</option>
               <option value="ADMINISTRATEUR">ADMINISTRATEUR</option>
               <option value="GESTIONNAIRE_SITE">GESTIONNAIRE_SITE</option>
               <option value="CONSERVATEUR">CONSERVATEUR</option>
               <option value="GUIDE">GUIDE</option>
               <option value="TOURISTE">TOURISTE</option>
             </select>
-          </div>
-          <div class="bo-field">
-            <label for="usr-actif" class="bo-label">Activation</label>
-            <select id="usr-actif" class="bo-select" [(ngModel)]="userActifFilter" (ngModelChange)="loadUsers(0)">
-              <option value="">Tous</option>
-              <option value="true">Actifs</option>
-              <option value="false">Désactivés</option>
-            </select>
-          </div>
-          <button type="button" class="bo-btn bo-btn--primary" (click)="loadUsers(0)">Filtrer</button>
-        </div>
+          </ng-container>
+        </app-ui-filter-bar>
 
         @if (error()) {
           <app-ui-error-banner [message]="error()!" (retry)="loadUsers(userPage())" />
@@ -192,8 +191,9 @@ import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
               <thead>
                 <tr>
                   <th>Utilisateur</th>
-                  <th>Rôle RBAC</th>
-                  <th>État &amp; Inscription</th>
+                  <th>Email</th>
+                  <th>Rôle</th>
+                  <th>État</th>
                   <th>Actions sécurité</th>
                 </tr>
               </thead>
@@ -201,37 +201,47 @@ import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
                 @for (u of users(); track u.id) {
                   <tr>
                     <td>
-                      <span class="bo-cell-title">{{ u.prenom }} {{ u.nom }}</span>
-                      <span class="bo-cell-sub">{{ u.email }} · {{ u.telephone || 'N/A' }}</span>
+                      <span class="bo-cell-one bo-cell-title" [title]="u.prenom + ' ' + u.nom">{{ u.prenom }} {{ u.nom }}</span>
+                    </td>
+                    <td>
+                      <span class="bo-cell-one" [title]="u.email">{{ u.email }}</span>
                     </td>
                     <td>
                       <span class="ui-badge ui-badge--terracotta">{{ formatRole(u.role) }}</span>
                     </td>
                     <td>
-                      <span class="ui-badge" [class.ui-badge--success]="u.actif" [class.ui-badge--danger]="!u.actif">
+                      <span class="ui-badge" [class.ui-badge--success]="u.actif" [class.ui-badge--danger]="!u.actif" [title]="u.dateInscription ? (u.dateInscription | dateFr: 'd MMM yyyy') : ''">
                         {{ u.actif ? 'Actif' : 'Désactivé' }}
                       </span>
-                      @if (u.dateInscription) {
-                        <span class="bo-cell-sub">{{ u.dateInscription | dateFr: 'd MMM yyyy' }}</span>
-                      }
                     </td>
                     <td>
                       <div class="bo-actions-cell">
                         @if (permissions.has('UTILISATEUR:GERER_ROLES')) {
                           <button type="button" class="bo-btn bo-btn--sm" (click)="openEditForm(u)">
-                            <svg lucidePencil [size]="12" aria-hidden="true"></svg>
-                            <span>Modifier / Rôle</span>
+                            Modifier
                           </button>
-                          <button type="button" class="bo-btn bo-btn--sm bo-btn--terracotta" (click)="revokerSessions(u)">
-                            <svg lucideShieldAlert [size]="12" aria-hidden="true"></svg>
-                            <span>Révoquer sessions</span>
-                          </button>
-                        }
-                        @if (permissions.has('UTILISATEUR:SUPPRIMER') && u.id !== authStore.user()?.id) {
-                          <button type="button" class="bo-btn bo-btn--sm bo-btn--danger" (click)="supprimerUser(u)">
-                            <svg lucideTrash2 [size]="12" aria-hidden="true"></svg>
-                            <span>Supprimer</span>
-                          </button>
+                          <div class="bo-row-menu">
+                            <button
+                              type="button"
+                              class="bo-btn bo-btn--sm bo-btn--icon"
+                              aria-label="Plus d'actions"
+                              (click)="toggleRowMenu(u.id)"
+                            >
+                              <svg lucideMoreHorizontal [size]="15" aria-hidden="true"></svg>
+                            </button>
+                            @if (openMenuId() === u.id) {
+                              <div class="bo-row-menu__dropdown" role="menu">
+                                <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null); revokerSessions(u)">
+                                  Révoquer sessions
+                                </button>
+                                @if (permissions.has('UTILISATEUR:SUPPRIMER') && u.id !== authStore.user()?.id) {
+                                  <button type="button" class="bo-row-menu__item bo-row-menu__item--danger" role="menuitem" (click)="openMenuId.set(null); supprimerUser(u)">
+                                    Supprimer
+                                  </button>
+                                }
+                              </div>
+                            }
+                          </div>
                         }
                       </div>
                     </td>
@@ -252,15 +262,18 @@ import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
       </section>
     } @else {
       <section class="bo-panel">
-        <div class="bo-filters">
-          <div class="bo-field bo-field--grow">
-            <label for="aud-q" class="bo-label">Recherche logs</label>
-            <input id="aud-q" type="search" class="bo-input" [(ngModel)]="auditQ" placeholder="Email, IP, détails..." (keyup.enter)="loadAudit(0)" />
-          </div>
-          <div class="bo-field">
-            <label for="aud-type" class="bo-label">Type événement</label>
-            <select id="aud-type" class="bo-select" [(ngModel)]="auditEventType" (ngModelChange)="loadAudit(0)">
-              <option value="">Tous</option>
+        <app-ui-filter-bar
+          [searchValue]="auditQ"
+          searchPlaceholder="Email, IP, détails..."
+          searchAriaLabel="Rechercher dans les logs"
+          [resultsLabel]="auditTotal() + ' entrée(s)'"
+          [hasActiveFilters]="Boolean(auditQ.trim() || auditEventType)"
+          (searchChange)="auditQ = $event; loadAudit(0)"
+          (reset)="auditQ = ''; auditEventType = ''; loadAudit(0)"
+        >
+          <ng-container filter-primary>
+            <select id="aud-type" aria-label="Type d'événement" class="ui-filter-control" [(ngModel)]="auditEventType" (ngModelChange)="loadAudit(0)">
+              <option value="">Événement : Tous</option>
               <option value="LOGIN_SUCCESS">LOGIN_SUCCESS</option>
               <option value="LOGIN_FAILURE">LOGIN_FAILURE</option>
               <option value="LOGOUT">LOGOUT</option>
@@ -270,9 +283,8 @@ import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
               <option value="ADMIN_ACTION">ADMIN_ACTION</option>
               <option value="ACCESS_DENIED">ACCESS_DENIED</option>
             </select>
-          </div>
-          <button type="button" class="bo-btn bo-btn--primary" (click)="loadAudit(0)">Filtrer</button>
-        </div>
+          </ng-container>
+        </app-ui-filter-bar>
 
         @if (auditLoading()) {
           <p class="bo-cell-sub">Chargement du journal d'audit...</p>
@@ -355,6 +367,32 @@ export class ProUtilisateursPageComponent implements OnInit {
 
   protected readonly formOpen = signal(false);
   protected readonly editingUser = signal<Utilisateur | null>(null);
+  protected readonly openMenuId = signal<number | null>(null);
+  private userSearchTimer?: ReturnType<typeof setTimeout>;
+  private auditSearchTimer?: ReturnType<typeof setTimeout>;
+
+  protected onUserSearchInput(): void {
+    clearTimeout(this.userSearchTimer);
+    this.userSearchTimer = setTimeout(() => void this.loadUsers(0), 250);
+  }
+
+  protected onAuditSearchInput(): void {
+    clearTimeout(this.auditSearchTimer);
+    this.auditSearchTimer = setTimeout(() => void this.loadAudit(0), 250);
+  }
+
+  protected toggleRowMenu(id: number): void {
+    this.openMenuId.update((curr) => (curr === id ? null : id));
+  }
+
+  protected readonly userStatePills = computed<FilterStatusPill[]>(() => {
+    const s = this.stats();
+    return [
+      { id: 'ALL', label: 'Tous', count: s?.total },
+      { id: 'true', label: 'Actifs', count: s?.actifs },
+      { id: 'false', label: 'Désactivés', count: s?.inactifs },
+    ];
+  });
 
   protected userQ = '';
   protected userRoleFilter: RoleUtilisateur | '' = '';

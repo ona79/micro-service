@@ -1,3 +1,39 @@
+.type-chips-scroll {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  height: 32px;
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: none;
+}
+
+.type-chips-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.type-chip-sm {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background-color: var(--surface-elevated);
+  color: var(--ink-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.type-chip-sm--active {
+  background-color: var(--brand-primary);
+  border-color: var(--brand-primary);
+  color: #ffffff;
+}
+
 .agenda-controls {
   background-color: var(--surface-elevated);
   border: 1px solid var(--border-subtle);
@@ -45,15 +81,15 @@
   align-items: end;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 768px) {
   .agenda-controls__inputs {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .agenda-controls__inputs {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -61,6 +97,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  min-width: 0;
 }
 
 .agenda-field__label {
@@ -299,13 +336,15 @@
   color: var(--ink-on-dark);
 }
 
-@media (max-width: 960px) {
+@media (max-width: 768px) {
   .agenda-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+    max-width: 100%;
   }
 
   .agenda-date-stamp {
     flex-direction: row;
+    align-items: baseline;
     gap: var(--space-2);
     border-right: none;
     border-bottom: 1px solid var(--border-subtle);
@@ -313,13 +352,17 @@
     justify-content: flex-start;
   }
 
+  .agenda-date-stamp__month {
+    margin-top: 0;
+  }
+
   .agenda-row__media {
     height: 190px;
   }
 }
 
-@media (max-width: 680px) {
+@media (max-width: 640px) {
   .agenda-controls__inputs {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }

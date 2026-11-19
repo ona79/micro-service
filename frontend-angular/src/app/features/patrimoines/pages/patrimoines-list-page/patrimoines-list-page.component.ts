@@ -29,6 +29,10 @@ import {
 import { SeoService } from '../../../../core/services/seo.service';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import {
+  ActiveFilterChip,
+  UiFilterBarComponent,
+} from '../../../../shared/components/ui-filter-bar/ui-filter-bar.component';
 import { UiCardComponent } from '../../../../shared/components/ui-card/ui-card.component';
 import { UiLoadingStateComponent } from '../../../../shared/components/ui-loading-state/ui-loading-state.component';
 import { UiPaginationComponent } from '../../../../shared/components/ui-pagination/ui-pagination.component';
@@ -70,6 +74,7 @@ type ViewMode = 'grid' | 'map';
     UiHeritageMapComponent,
     UiErrorBannerComponent,
     UiEmptyStateComponent,
+    UiFilterBarComponent,
   ],
   templateUrl: './patrimoines-list-page.component.html',
   styleUrl: './patrimoines-list-page.component.css',
@@ -87,7 +92,31 @@ export class PatrimoinesListPageComponent implements OnInit {
   protected readonly sortBy = signal<SortOption>('nom_asc');
   protected readonly viewMode = signal<ViewMode>('grid');
   protected readonly currentPage = signal<number>(1);
-  protected readonly pageSize = 9;
+  protected readonly pageSize = 24;
+
+  protected readonly activeFilterChips = computed<ActiveFilterChip[]>(() => {
+    const chips: ActiveFilterChip[] = [];
+    if (this.searchTerm().trim()) {
+      chips.push({ key: 'q', label: `Recherche : ${this.searchTerm().trim()}` });
+    }
+    if (this.selectedZone()) {
+      chips.push({ key: 'zone', label: `Zone : ${this.selectedZone()}` });
+    }
+    if (this.selectedCategorie()) {
+      chips.push({ key: 'cat', label: `Catégorie : ${this.selectedCategorie()}` });
+    }
+    if (this.gpsLocation()) {
+      chips.push({ key: 'gps', label: `Près de moi (${this.selectedRayonKm()} km)` });
+    }
+    return chips;
+  });
+
+  protected removeFilterChip(key: string): void {
+    if (key === 'q') this.onSearchChange('');
+    else if (key === 'zone') this.onZoneChange('');
+    else if (key === 'cat') this.onCategorieChange('');
+    else if (key === 'gps') this.desactiverGeolocalisation();
+  }
 
   protected readonly items = signal<Patrimoine[]>([]);
   protected readonly totalElements = signal<number>(0);

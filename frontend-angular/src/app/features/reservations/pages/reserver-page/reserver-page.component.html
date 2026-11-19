@@ -36,7 +36,7 @@
             </div>
             <div class="booking-success__body">
               <p>
-                <strong>{{ created.referenceReservation || ('Réservation #' + created.id) }}</strong>
+                <strong>{{ created.referenceReservation || ('Réservation n° ' + created.id) }}</strong>
                 enregistrée pour {{ created.nomClient }} ({{ created.nombrePlaces }} place(s), total
                 serveur :
                 <span class="tabular-nums">{{ created.montantTotal | fcfaPrice }}</span
@@ -120,7 +120,7 @@
                 }
               </select>
               @if (circuitStore.items().length === 0 && !circuitStore.loading()) {
-                <span class="form-help">Aucun circuit enregistré dans ms-circuit.</span>
+                <span class="form-help">Aucun circuit disponible pour le moment.</span>
               }
               @if (submittedAttempt() && !hasTargetSelection()) {
                 <span class="form-error">Veuillez sélectionner un circuit.</span>
@@ -372,7 +372,7 @@
             <input
               type="search"
               aria-label="Filtrer les réservations"
-              placeholder="Filtrer par référence, visiteur, #id..."
+              placeholder="Filtrer par référence, visiteur, numéro..."
               class="ledger-search"
               [ngModel]="ledgerSearch()"
               (ngModelChange)="ledgerSearch.set($event); currentPage.set(0)"
@@ -455,7 +455,7 @@
                 <div class="res-item__top">
                   <div class="res-item__badges">
                     <span class="ui-badge tabular-nums">
-                      {{ res.referenceReservation || ('#' + res.id) }}
+                      {{ res.referenceReservation || ('n° ' + res.id) }}
                     </span>
                     <span
                       class="ui-badge"
@@ -518,54 +518,74 @@
 
                 <div class="res-item__actions res-item__actions--spread">
                   <div class="res-item__left-actions">
-                    <a
-                      [routerLink]="['/reservations', res.id]"
-                      class="refresh-btn"
-                    >
-                      Détails complets
-                    </a>
                     @if (res.statut === 'EN_ATTENTE_PAIEMENT') {
                       <a
                         [routerLink]="['/paiements', res.id]"
-                        class="ui-btn ui-btn--primary ui-btn--sm"
+                        class="bo-btn bo-btn--sm bo-btn--primary"
                       >
-                        Régler (Wave / OM simulé)
+                        Régler
                       </a>
-                    }
-                    @if (res.statut === 'BROUILLON') {
+                    } @else if (res.statut === 'BROUILLON') {
                       <button
                         type="button"
-                        class="ui-btn ui-btn--secondary ui-btn--sm"
+                        class="bo-btn bo-btn--sm bo-btn--primary"
                         (click)="submitDraft(res)"
                       >
                         Soumettre
                       </button>
-                    }
-                    @if (res.historique?.length || res.participants?.length) {
-                      <button
-                        type="button"
-                        class="refresh-btn"
-                        (click)="toggleHistory(res.id)"
+                    } @else {
+                      <a
+                        [routerLink]="['/reservations', res.id]"
+                        class="bo-btn bo-btn--sm"
                       >
-                        {{ expandedHistoryId() === res.id ? 'Masquer détails' : 'Historique' }}
-                      </button>
+                        Détail
+                      </a>
                     }
                   </div>
 
-                  @if (canCancelReservation(res)) {
+                  <div class="bo-row-menu">
                     <button
                       type="button"
-                      class="cancel-btn"
-                      [disabled]="reservationStore.cancelingId() === res.id"
-                      (click)="requestCancellation(res)"
+                      class="bo-btn bo-btn--sm bo-btn--icon"
+                      aria-label="Plus d'actions"
+                      (click)="toggleRowMenu(res.id)"
                     >
-                      {{
-                        reservationStore.cancelingId() === res.id
-                          ? 'Annulation...'
-                          : 'Annuler la réservation'
-                      }}
+                      ···
                     </button>
-                  }
+                    @if (openMenuId() === res.id) {
+                      <div class="bo-row-menu__dropdown" role="menu">
+                        <a
+                          [routerLink]="['/reservations', res.id]"
+                          class="bo-row-menu__item"
+                          role="menuitem"
+                          (click)="openMenuId.set(null)"
+                        >
+                          Détails complets
+                        </a>
+                        @if (res.historique?.length || res.participants?.length) {
+                          <button
+                            type="button"
+                            class="bo-row-menu__item"
+                            role="menuitem"
+                            (click)="openMenuId.set(null); toggleHistory(res.id)"
+                          >
+                            {{ expandedHistoryId() === res.id ? 'Masquer historique' : 'Historique' }}
+                          </button>
+                        }
+                        @if (canCancelReservation(res)) {
+                          <button
+                            type="button"
+                            class="bo-row-menu__item bo-row-menu__item--danger"
+                            role="menuitem"
+                            [disabled]="reservationStore.cancelingId() === res.id"
+                            (click)="openMenuId.set(null); requestCancellation(res)"
+                          >
+                            Annuler
+                          </button>
+                        }
+                      </div>
+                    }
+                  </div>
                 </div>
 
                 @if (expandedHistoryId() === res.id) {

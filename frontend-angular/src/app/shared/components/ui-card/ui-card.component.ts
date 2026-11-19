@@ -44,6 +44,42 @@ export type UiCardVariant = 'elevated' | 'bordered' | 'flat' | 'interactive';
   styles: `
     :host {
       display: block;
+      max-width: 100%;
+    }
+
+    .ui-card {
+      background-color: var(--surface-elevated, #ffffff);
+      border: 1px solid var(--border-subtle, #e5dfd3);
+      border-radius: var(--radius-md, 12px);
+      overflow: hidden;
+      max-width: 100%;
+      transition:
+        box-shadow var(--transition-fast, 150ms ease),
+        border-color var(--transition-fast, 150ms ease),
+        transform var(--transition-fast, 150ms ease);
+    }
+
+    .ui-card--elevated {
+      box-shadow: var(--shadow-sm);
+    }
+
+    .ui-card--bordered {
+      box-shadow: var(--shadow-xs);
+    }
+
+    .ui-card--flat {
+      background-color: var(--surface-subtle, #f5f2eb);
+      box-shadow: none;
+    }
+
+    .ui-card--interactive {
+      cursor: pointer;
+    }
+
+    .ui-card--interactive:hover {
+      border-color: var(--brand-border, #b6d1c3);
+      box-shadow: var(--shadow-md);
+      transform: translateY(-1px);
     }
 
     .ui-card__media-slot:empty,
@@ -54,22 +90,23 @@ export type UiCardVariant = 'elevated' | 'bordered' | 'flat' | 'interactive';
 
     .ui-card__media-slot img {
       width: 100%;
+      max-width: 100%;
       object-fit: cover;
       display: block;
     }
 
     .ui-card__header-slot {
-      padding: var(--space-4, 16px) var(--space-5, 20px) 0;
+      padding: var(--card-padding, 16px) var(--card-padding, 16px) 0;
     }
 
     .ui-card__body-slot {
-      padding: var(--space-5, 20px);
+      padding: var(--card-padding, 16px);
     }
 
     .ui-card__footer-slot {
-      padding: var(--space-3, 12px) var(--space-5, 20px);
-      border-top: 1px solid var(--color-border-subtle, #e2dac9);
-      background-color: var(--color-surface-lin-light, #faf7f0);
+      padding: var(--space-3, 12px) var(--card-padding, 16px);
+      border-top: 1px solid var(--border-subtle, #e5dfd3);
+      background-color: var(--surface-subtle, #f5f2eb);
     }
   `,
 })

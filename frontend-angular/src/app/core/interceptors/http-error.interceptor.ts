@@ -19,7 +19,7 @@ export function normalizeHttpError(error: unknown): ApiError {
 
   if (error.status === 0) {
     return new ApiError(
-      "Impossible de joindre l'API Gateway. Vérifiez que les microservices sont démarrés.",
+      "Service temporairement indisponible. Veuillez réessayer.",
       0,
       'network'
     );

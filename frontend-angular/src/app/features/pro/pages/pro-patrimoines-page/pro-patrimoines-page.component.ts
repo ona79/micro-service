@@ -5,6 +5,7 @@ import {
   LucideArchive,
   LucideCheckCircle2,
   LucideEye,
+  LucideMoreHorizontal,
   LucidePencil,
   LucidePlus,
   LucideRefreshCw,
@@ -24,12 +25,18 @@ import {
 import { PatrimoineStats } from '../../../../core/models/statistics.model';
 import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confirm-dialog/ui-confirm-dialog.component';
 import { UiDetailDrawerComponent } from '../../../../shared/components/ui-detail-drawer/ui-detail-drawer.component';
+import { UiDrawerComponent } from '../../../../shared/components/ui-drawer/ui-drawer.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
 import { UiHeritageMapComponent } from '../../../../shared/components/ui-heritage-map/ui-heritage-map.component';
-import { UiKpiCardComponent } from '../../../../shared/components/ui-kpi-card/ui-kpi-card.component';
+import { UiPageHeaderComponent } from '../../../../shared/components/ui-page-header/ui-page-header.component';
 import { UiPaginationComponent } from '../../../../shared/components/ui-pagination/ui-pagination.component';
 import { UiPatrimoineImageComponent } from '../../../../shared/components/ui-patrimoine-image/ui-patrimoine-image.component';
+import {
+  FilterStatusPill,
+  UiFilterBarComponent,
+} from '../../../../shared/components/ui-filter-bar/ui-filter-bar.component';
+import { UiTabItem } from '../../../../shared/components/ui-tabs/ui-tabs.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
 import { hasValidCoordinates, isLieuDeMemoire } from '../../../../shared/utils/patrimoine.utils';
@@ -44,7 +51,9 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
     ReactiveFormsModule,
     DateFrPipe,
     FcfaPricePipe,
-    UiKpiCardComponent,
+    UiPageHeaderComponent,
+    UiFilterBarComponent,
+    UiDrawerComponent,
     UiPaginationComponent,
     UiDetailDrawerComponent,
     UiEmptyStateComponent,
@@ -58,22 +67,15 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
     LucideCheckCircle2,
     LucideArchive,
     LucideEye,
+    LucideMoreHorizontal,
     LucideRefreshCw,
   ],
   template: `
-    <header class="bo-header">
-      <div>
-        <p class="bo-header__eyebrow">Référentiel ms-patrimoine</p>
-        <h1 class="bo-header__title">Patrimoine culturel, mémoriel &amp; naturel</h1>
-        <p class="bo-header__lead">
-          @if (canEdit()) {
-            Créez, géolocalisez, soumettez, publiez ou archivez les fiches patrimoniales de Casamance.
-          } @else {
-            Consultation en lecture seule des fiches patrimoniales publiées (supervision gestionnaire).
-          }
-        </p>
-      </div>
-      <div class="bo-header__actions">
+    <app-ui-page-header
+      title="Patrimoines"
+      [subtitle]="canEdit() ? 'Créez, géolocalisez, soumettez, publiez ou archivez les fiches patrimoniales.' : 'Consultation en lecture seule des fiches patrimoniales publiées.'"
+    >
+      <div header-actions>
         <button type="button" class="bo-btn" (click)="loadPage(page())" [disabled]="loading()">
           <svg lucideRefreshCw [size]="14" aria-hidden="true"></svg>
           <span>Actualiser</span>
@@ -85,7 +87,7 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
           </button>
         }
       </div>
-    </header>
+    </app-ui-page-header>
 
     @if (!canEdit()) {
       <p class="bo-notice" style="margin-bottom: var(--space-4);">
@@ -94,29 +96,17 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
       </p>
     }
 
-    @if (stats(); as s) {
-      <div class="bo-kpi-grid">
-        <app-ui-kpi-card label="Total" [value]="s.total" subtitle="Périmètre : {{ s.scope }}" />
-        <app-ui-kpi-card label="Publiés" [value]="s.publies" tone="success" />
-        @if (canEdit()) {
-          <app-ui-kpi-card label="Brouillons / Soumis" [value]="s.brouillons + s.soumis" tone="ochre" />
-          <app-ui-kpi-card label="Archivés" [value]="s.archives" tone="neutral" />
-        }
-      </div>
-    }
-
     @if (actionError()) {
       <app-ui-error-banner [message]="actionError()!" [showRetry]="false" />
     }
 
-    @if (formOpen() && canEdit()) {
-      <section class="bo-panel" aria-label="Formulaire fiche patrimoine">
-        <div class="bo-panel__head">
-          <h2 class="bo-panel__title">
-            {{ editingId() ? 'Modifier la fiche patrimoine #' + editingId() : 'Nouvelle fiche patrimoniale' }}
-          </h2>
-          <button type="button" class="bo-btn" (click)="closeForm()">Fermer</button>
-        </div>
+    <app-ui-drawer
+      [open]="formOpen() && canEdit()"
+      width="lg"
+      [title]="editingId() ? 'Modifier la fiche patrimoine n° ' + editingId() : 'Nouvelle fiche patrimoniale'"
+      [showFooter]="false"
+      (closed)="closeForm()"
+    >
 
         <form [formGroup]="form" (ngSubmit)="savePatrimoine()" class="bo-form-grid" novalidate>
           <div class="bo-field">
@@ -199,7 +189,7 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
 
           <div class="bo-field">
             <label for="pat-img" class="bo-label">URL / Chemin image principale</label>
-            <input id="pat-img" type="text" class="bo-input" formControlName="imageUrl" placeholder="/images/patrimoines/PAT-CRB-002.jpg" />
+            <input id="pat-img" type="text" class="bo-input" formControlName="imageUrl" placeholder="/images/patrimoines/PAT-CRB-002.webp" />
           </div>
 
           <div class="bo-field">
@@ -225,56 +215,38 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
             <button type="button" class="bo-btn" (click)="closeForm()">Annuler</button>
           </div>
         </form>
-      </section>
-    }
+    </app-ui-drawer>
 
     <section class="bo-panel">
-      <div class="bo-filters">
-        <div class="bo-field bo-field--grow">
-          <label for="pat-search" class="bo-label">Recherche</label>
-          <input
-            id="pat-search"
-            type="search"
-            class="bo-input"
-            [(ngModel)]="q"
-            placeholder="Nom, code, localité..."
-            (keyup.enter)="loadPage(0)"
-          />
-        </div>
-        <div class="bo-field">
-          <label for="pat-fcat" class="bo-label">Catégorie</label>
-          <select id="pat-fcat" class="bo-select" [(ngModel)]="categorieFilter" (ngModelChange)="loadPage(0)">
-            <option value="">Toutes</option>
+      <app-ui-filter-bar
+        [statusPills]="statusTabs()"
+        [activeStatus]="statutFilter || 'ALL'"
+        (statusChange)="onStatusTabChange($event)"
+        [searchValue]="q"
+        searchPlaceholder="Rechercher nom, code, localité..."
+        searchAriaLabel="Rechercher un patrimoine"
+        [resultsLabel]="totalElements() + ' fiche(s)'"
+        [hasActiveFilters]="Boolean(q.trim() || categorieFilter || zoneFilter || statutFilter)"
+        (searchChange)="q = $event; loadPage(0)"
+        (reset)="q = ''; categorieFilter = ''; zoneFilter = ''; statutFilter = ''; loadPage(0)"
+      >
+        <ng-container filter-primary>
+          <select id="pat-fcat" aria-label="Catégorie" class="ui-filter-control" [(ngModel)]="categorieFilter" (ngModelChange)="loadPage(0)">
+            <option value="">Catégorie : Toutes</option>
             <option value="CULTUREL">CULTUREL</option>
             <option value="HISTORIQUE">HISTORIQUE</option>
             <option value="ARCHITECTURAL">ARCHITECTURAL</option>
             <option value="NATUREL">NATUREL</option>
             <option value="IMMATERIEL">IMMATERIEL</option>
           </select>
-        </div>
-        <div class="bo-field">
-          <label for="pat-fzone" class="bo-label">Zone</label>
-          <select id="pat-fzone" class="bo-select" [(ngModel)]="zoneFilter" (ngModelChange)="loadPage(0)">
-            <option value="">Toutes</option>
+          <select id="pat-fzone" aria-label="Zone géographique" class="ui-filter-control" [(ngModel)]="zoneFilter" (ngModelChange)="loadPage(0)">
+            <option value="">Zone : Toutes</option>
             <option value="BASSE_CASAMANCE">BASSE_CASAMANCE</option>
             <option value="MOYENNE_CASAMANCE">MOYENNE_CASAMANCE</option>
             <option value="HAUTE_CASAMANCE">HAUTE_CASAMANCE</option>
           </select>
-        </div>
-        @if (canEdit()) {
-          <div class="bo-field">
-            <label for="pat-fstatut" class="bo-label">Statut</label>
-            <select id="pat-fstatut" class="bo-select" [(ngModel)]="statutFilter" (ngModelChange)="loadPage(0)">
-              <option value="">Tous (incl. brouillons)</option>
-              <option value="BROUILLON">BROUILLON</option>
-              <option value="SOUMIS">SOUMIS</option>
-              <option value="PUBLIE">PUBLIE</option>
-              <option value="ARCHIVE">ARCHIVE</option>
-            </select>
-          </div>
-        }
-        <button type="button" class="bo-btn bo-btn--primary" (click)="loadPage(0)">Filtrer</button>
-      </div>
+        </ng-container>
+      </app-ui-filter-bar>
 
       @if (error()) {
         <app-ui-error-banner [message]="error()!" (retry)="loadPage(page())" />
@@ -301,16 +273,17 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
               @for (p of items(); track p.id) {
                 <tr>
                   <td>
-                    <span class="bo-cell-title">{{ p.nomPatrimoine }}</span>
-                    <span class="bo-cell-sub">{{ p.codePatrimoine }} · {{ p.localite || p.adressePatrimoine || 'Casamance' }}</span>
+                    <span class="bo-cell-one bo-cell-title" [title]="p.nomPatrimoine + ' (' + p.codePatrimoine + ')'">
+                      {{ p.nomPatrimoine }}
+                    </span>
                   </td>
                   <td>
-                    <span class="ui-badge ui-badge--neutral">{{ p.categoriePatrimoine || 'CULTUREL' }}</span>
-                    <span class="bo-cell-sub">{{ p.zoneGeographique || 'BASSE_CASAMANCE' }}</span>
+                    <span class="ui-badge ui-badge--neutral" [title]="(p.zoneGeographique || 'BASSE_CASAMANCE') + ' · ' + (p.localite || '')">
+                      {{ p.categoriePatrimoine || 'CULTUREL' }}
+                    </span>
                   </td>
-                  <td class="tabular-nums">
-                    {{ (p.tarifEntree ?? 0) | fcfaPrice }}
-                    <span class="bo-cell-sub">Cap. {{ p.capacitePatrimoine }} pers.</span>
+                  <td class="tabular-nums" [title]="((p.tarifEntree ?? 0) | fcfaPrice) + ' · Cap. ' + p.capacitePatrimoine + ' pers.'">
+                    {{ (p.tarifEntree ?? 0) | fcfaPrice }} · {{ p.capacitePatrimoine }} pl.
                   </td>
                   <td>
                     <span
@@ -324,40 +297,61 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
                   </td>
                   <td>
                     <div class="bo-actions-cell">
-                      <button type="button" class="bo-btn bo-btn--sm" (click)="selectedItem.set(p)">
-                        <svg lucideEye [size]="13" aria-hidden="true"></svg>
-                        <span>Détail</span>
-                      </button>
-                      @if (permissions.has('PATRIMOINE:MODIFIER') && p.statutPublication !== 'ARCHIVE') {
-                        <button type="button" class="bo-btn bo-btn--sm" (click)="openEditForm(p)">
-                          <svg lucidePencil [size]="13" aria-hidden="true"></svg>
-                          <span>Éditer</span>
-                        </button>
-                        @if (p.statutPublication === 'BROUILLON') {
-                          <button type="button" class="bo-btn bo-btn--sm" (click)="soumettre(p)">
-                            <svg lucideSend [size]="13" aria-hidden="true"></svg>
-                            <span>Soumettre</span>
-                          </button>
-                        }
-                      }
                       @if (permissions.has('PATRIMOINE:PUBLIER') && (p.statutPublication === 'BROUILLON' || p.statutPublication === 'SOUMIS' || p.statutPublication === 'ARCHIVE')) {
                         <button type="button" class="bo-btn bo-btn--sm bo-btn--primary" (click)="publier(p)">
-                          <svg lucideCheckCircle2 [size]="13" aria-hidden="true"></svg>
-                          <span>Publier</span>
+                          Publier
+                        </button>
+                      } @else if (permissions.has('PATRIMOINE:MODIFIER') && p.statutPublication === 'BROUILLON') {
+                        <button type="button" class="bo-btn bo-btn--sm bo-btn--primary" (click)="soumettre(p)">
+                          Soumettre
+                        </button>
+                      } @else if (permissions.has('PATRIMOINE:MODIFIER') && p.statutPublication !== 'ARCHIVE') {
+                        <button type="button" class="bo-btn bo-btn--sm" (click)="openEditForm(p)">
+                          Éditer
+                        </button>
+                      } @else {
+                        <button type="button" class="bo-btn bo-btn--sm" (click)="selectedItem.set(p)">
+                          Détail
                         </button>
                       }
-                      @if (permissions.has('PATRIMOINE:ARCHIVER') && p.statutPublication !== 'ARCHIVE') {
-                        <button type="button" class="bo-btn bo-btn--sm" (click)="openArchivePrompt(p)">
-                          <svg lucideArchive [size]="13" aria-hidden="true"></svg>
-                          <span>Archiver</span>
+
+                      <div class="bo-row-menu">
+                        <button
+                          type="button"
+                          class="bo-btn bo-btn--sm bo-btn--icon"
+                          aria-label="Plus d'actions"
+                          (click)="toggleRowMenu(p.id)"
+                        >
+                          <svg lucideMoreHorizontal [size]="15" aria-hidden="true"></svg>
                         </button>
-                      }
-                      @if (permissions.has('PATRIMOINE:SUPPRIMER') && (p.statutPublication === 'BROUILLON' || p.statutPublication === 'ARCHIVE')) {
-                        <button type="button" class="bo-btn bo-btn--sm bo-btn--danger" (click)="supprimer(p)">
-                          <svg lucideTrash2 [size]="13" aria-hidden="true"></svg>
-                          <span>Supprimer</span>
-                        </button>
-                      }
+                        @if (openMenuId() === p.id) {
+                          <div class="bo-row-menu__dropdown" role="menu">
+                            <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null); selectedItem.set(p)">
+                              Détail
+                            </button>
+                            @if (permissions.has('PATRIMOINE:MODIFIER') && p.statutPublication !== 'ARCHIVE') {
+                              <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null); openEditForm(p)">
+                                Éditer
+                              </button>
+                              @if (p.statutPublication === 'BROUILLON') {
+                                <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null); soumettre(p)">
+                                  Soumettre
+                                </button>
+                              }
+                            }
+                            @if (permissions.has('PATRIMOINE:ARCHIVER') && p.statutPublication !== 'ARCHIVE') {
+                              <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null); openArchivePrompt(p)">
+                                Archiver
+                              </button>
+                            }
+                            @if (permissions.has('PATRIMOINE:SUPPRIMER') && (p.statutPublication === 'BROUILLON' || p.statutPublication === 'ARCHIVE')) {
+                              <button type="button" class="bo-row-menu__item bo-row-menu__item--danger" role="menuitem" (click)="openMenuId.set(null); supprimer(p)">
+                                Supprimer
+                              </button>
+                            }
+                          </div>
+                        }
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -457,6 +451,17 @@ export class ProPatrimoinesPageComponent implements OnInit {
   protected readonly editingId = signal<number | null>(null);
   protected readonly selectedItem = signal<Patrimoine | null>(null);
   protected readonly archivingTarget = signal<Patrimoine | null>(null);
+  protected readonly openMenuId = signal<number | null>(null);
+  private searchTimer?: ReturnType<typeof setTimeout>;
+
+  protected onSearchInput(): void {
+    clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => void this.loadPage(0), 250);
+  }
+
+  protected toggleRowMenu(id: number): void {
+    this.openMenuId.update((curr) => (curr === id ? null : id));
+  }
 
   protected q = '';
   protected categorieFilter: CategoriePatrimoine | '' = '';
@@ -482,6 +487,28 @@ export class ProPatrimoinesPageComponent implements OnInit {
     informationsPratiques: [''],
     statutPublication: ['BROUILLON' as StatutPublication],
   });
+
+  protected readonly statusTabs = computed<UiTabItem[]>(() => {
+    const s = this.stats();
+    if (!s) return [{ id: 'ALL', label: 'Tous' }];
+    const items: UiTabItem[] = [
+      { id: 'ALL', label: 'Tous', count: s.total },
+      { id: 'PUBLIE', label: 'Publiés', count: s.publies },
+    ];
+    if (this.canEdit()) {
+      items.push(
+        { id: 'BROUILLON', label: 'Brouillons', count: s.brouillons },
+        { id: 'SOUMIS', label: 'Soumis', count: s.soumis },
+        { id: 'ARCHIVE', label: 'Archivés', count: s.archives }
+      );
+    }
+    return items;
+  });
+
+  protected onStatusTabChange(id: string): void {
+    this.statutFilter = id === 'ALL' ? '' : (id as StatutPublication);
+    void this.loadPage(0);
+  }
 
   ngOnInit(): void {
     void Promise.all([this.loadStats(), this.loadPage(0)]);

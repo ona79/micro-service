@@ -227,7 +227,9 @@ export class ProLayoutComponent {
 
   protected readonly sidebarCollapsed = signal(false);
   protected readonly mobileDrawerOpen = signal(false);
+  protected readonly avatarMenuOpen = signal(false);
   protected readonly currentPath = signal(this.router.url);
+  protected readonly collapsedSections = signal<Record<string, boolean>>({});
 
   protected readonly visibleSections = computed(() => {
     const userRole = this.authStore.user()?.role;
@@ -289,8 +291,20 @@ export class ProLayoutComponent {
     this.sidebarCollapsed.update((v) => !v);
   }
 
+  protected toggleSection(section: string): void {
+    this.collapsedSections.update((prev) => ({ ...prev, [section]: !prev[section] }));
+  }
+
+  protected isSectionCollapsed(section: string): boolean {
+    return !!this.collapsedSections()[section];
+  }
+
   protected toggleMobileDrawer(): void {
     this.mobileDrawerOpen.update((v) => !v);
+  }
+
+  protected toggleAvatarMenu(): void {
+    this.avatarMenuOpen.update((v) => !v);
   }
 
   protected closeMobileDrawer(): void {

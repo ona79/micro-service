@@ -2,7 +2,11 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
+  LucideArrowLeft,
   LucideArrowRight,
+  LucideCompass,
+  LucideEye,
+  LucideEyeOff,
   LucideKeyRound,
   LucideLock,
   LucideMail,
@@ -10,6 +14,7 @@ import {
 import { toast } from 'ngx-sonner';
 import { AuthStore } from '../../../../core/auth/auth.store';
 import { getDefaultPostLoginRoute } from '../../../../core/auth/permissions';
+import { environment } from '../../../../../environments/environment';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
 
 @Component({
@@ -19,47 +24,58 @@ import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-b
   imports: [
     ReactiveFormsModule,
     RouterLink,
-    LucideMail,
-    LucideLock,
-    LucideKeyRound,
+    LucideArrowLeft,
     LucideArrowRight,
+    LucideCompass,
+    LucideEye,
+    LucideEyeOff,
+    LucideKeyRound,
+    LucideLock,
+    LucideMail,
     UiErrorBannerComponent,
   ],
   template: `
-    <section class="auth-section">
-      <div class="container auth-grid">
-        <aside class="auth-visual">
-          <img
-            src="/images/auth-cover.jpg"
-            alt="Sanctuaire naturel et patrimoine du Sénégal"
-            class="auth-visual__img"
-          />
-          <div class="auth-visual__overlay">
-            <span class="ui-badge ui-badge--terracotta">Portail Authentifié · UASZ</span>
-            <h2 class="auth-visual__title">
-              Accédez à vos réservations, paiements et carnets de visite
-            </h2>
-            <p class="auth-visual__caption">
-              Session sécurisée par cookie HttpOnly signé (HMAC-SHA256) et contrôle d’accès
-              par rôle sur l’API Gateway.
-            </p>
-          </div>
-        </aside>
+    <div class="auth-split">
+      <aside class="auth-left" aria-label="Présentation Casamance Patrimoine">
+        <img
+          src="/images/auth-cover.webp"
+          width="800"
+          height="600"
+          alt=""
+          class="auth-left__img"
+        />
+        <div class="auth-left__veil" aria-hidden="true"></div>
+        <div class="auth-left__content">
+          <h2 class="auth-left__title">
+            Accès à <span class="auth-left__accent">Casamance Patrimoine</span>
+          </h2>
+          <p class="auth-left__desc">
+            Retrouvez vos réservations, vos billets et vos circuits culturels en Casamance.
+          </p>
+        </div>
+      </aside>
 
-        <div class="auth-panel">
-          <header class="auth-header">
-            <p class="auth-header__eyebrow">Espace Membre &amp; Administration</p>
-            <h1 class="auth-header__title">Connexion à votre compte</h1>
-            <p class="auth-header__subtitle">
-              Connectez-vous pour gérer vos réservations, régler vos visites ou administrer
-              le catalogue patrimonial.
-            </p>
-          </header>
+      <main class="auth-right">
+        <div class="auth-topbar">
+          <a routerLink="/" class="auth-back-btn">
+            <svg lucideArrowLeft [size]="15" aria-hidden="true"></svg>
+            <span>Retour au site</span>
+          </a>
+        </div>
+
+        <div class="auth-form-wrap">
+          <div class="auth-brand">
+            <span class="auth-brand__mark" aria-hidden="true">
+              <svg lucideCompass [size]="18"></svg>
+            </span>
+            <span class="auth-brand__name">Casamance Patrimoine</span>
+          </div>
+
+          <h1 class="auth-title">Connexion</h1>
 
           @if (expiredNotice()) {
             <div class="session-expired-notice" role="status">
-              Votre session a expiré ou nécessite une authentification préalable. Veuillez
-              vous connecter pour continuer.
+              Votre session a expiré. Veuillez vous reconnecter.
             </div>
           }
 
@@ -73,7 +89,7 @@ import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-b
 
           <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="auth-form" novalidate>
             <div class="form-field">
-              <label for="login-email" class="form-label">Adresse email</label>
+              <label for="login-email" class="sr-only">Adresse email</label>
               <div class="input-icon-wrap">
                 <svg lucideMail [size]="16" class="input-icon" aria-hidden="true"></svg>
                 <input
@@ -81,8 +97,9 @@ import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-b
                   type="email"
                   formControlName="email"
                   autocomplete="email"
-                  placeholder="exemple@zig.univ.sn"
-                  class="form-input form-input--with-icon"
+                  aria-label="Adresse email"
+                  placeholder="Adresse email"
+                  class="form-input"
                 />
               </div>
               @if (isFieldInvalid('email')) {
@@ -93,17 +110,30 @@ import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-b
             </div>
 
             <div class="form-field">
-              <label for="login-password" class="form-label">Mot de passe</label>
+              <label for="login-password" class="sr-only">Mot de passe</label>
               <div class="input-icon-wrap">
                 <svg lucideLock [size]="16" class="input-icon" aria-hidden="true"></svg>
                 <input
                   id="login-password"
-                  type="password"
+                  [type]="showPassword() ? 'text' : 'password'"
                   formControlName="motDePasse"
                   autocomplete="current-password"
-                  placeholder="Votre mot de passe"
-                  class="form-input form-input--with-icon"
+                  aria-label="Mot de passe"
+                  placeholder="Mot de passe"
+                  class="form-input form-input--has-toggle"
                 />
+                <button
+                  type="button"
+                  class="password-toggle"
+                  (click)="showPassword.set(!showPassword())"
+                  [attr.aria-label]="showPassword() ? 'Masquer le mot de passe' : 'Afficher le mot de passe'"
+                >
+                  @if (showPassword()) {
+                    <svg lucideEyeOff [size]="16" aria-hidden="true"></svg>
+                  } @else {
+                    <svg lucideEye [size]="16" aria-hidden="true"></svg>
+                  }
+                </button>
               </div>
               @if (isFieldInvalid('motDePasse')) {
                 <p class="field-error" role="alert">
@@ -118,7 +148,7 @@ import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-b
               [disabled]="authStore.loading()"
             >
               @if (authStore.loading()) {
-                <span>Vérification des identifiants...</span>
+                <span>Connexion en cours...</span>
               } @else {
                 <span>Se connecter</span>
                 <svg lucideArrowRight [size]="16" aria-hidden="true"></svg>
@@ -126,156 +156,204 @@ import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-b
             </button>
           </form>
 
-          <div class="quick-accounts" aria-label="Comptes de démonstration par rôle">
-            <p class="quick-accounts__title">
+          <details class="quick-accounts">
+            <summary class="quick-accounts__summary">
               <svg lucideKeyRound [size]="14" aria-hidden="true"></svg>
-              <span>Accès rapide de démonstration (Comptes réels en base H2)</span>
-            </p>
+              <span>Comptes de démonstration</span>
+            </summary>
             <div class="quick-accounts__grid">
               <button
                 type="button"
                 class="quick-pill"
                 (click)="fillDemo('moussa.diop@zig.univ.sn', 'Passer123!')"
               >
-                <strong>Touriste</strong>
+                <strong>Visiteur</strong>
                 <span>moussa.diop&#64;zig.univ.sn</span>
               </button>
               <button
                 type="button"
                 class="quick-pill"
-                (click)="fillDemo('awa.sagna@zig.univ.sn', 'Gestion2026!')"
+                (click)="fillDemo('awa.sagna@zig.univ.sn', 'Passer123!')"
               >
-                <strong>Gestionnaire de site</strong>
+                <strong>Guide</strong>
                 <span>awa.sagna&#64;zig.univ.sn</span>
               </button>
               <button
                 type="button"
                 class="quick-pill"
-                (click)="fillDemo('lamine.faty@univ-zig.sn', 'Admin2026!')"
+                (click)="fillDemo('lamine.faty@univ-zig.sn', 'Passer123!')"
               >
                 <strong>Administrateur</strong>
                 <span>lamine.faty&#64;univ-zig.sn</span>
               </button>
             </div>
-          </div>
+          </details>
 
           <footer class="auth-footer">
-            <span>Vous n’avez pas encore de compte ?</span>
-            <a routerLink="/inscription" class="auth-footer__link">Créer un compte visiteur</a>
+            <span>Pas encore de compte ?</span>
+            <a routerLink="/inscription" class="auth-footer__link">Créer un compte</a>
           </footer>
         </div>
-      </div>
-    </section>
+      </main>
+    </div>
   `,
   styles: `
-    .auth-section {
-      padding: var(--space-10) 0 var(--space-16);
-    }
-
-    .auth-grid {
+    .auth-split {
       display: grid;
-      grid-template-columns: 1.05fr 1fr;
-      background-color: var(--surface-elevated);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-xl);
+      grid-template-columns: 45% 55%;
+      height: 100dvh;
+      min-height: 100dvh;
+      background-color: #ffffff;
       overflow: hidden;
-      box-shadow: var(--shadow-lg);
     }
 
-    .auth-visual {
+    .auth-left {
       position: relative;
-      min-height: 540px;
-      background-color: var(--surface-ink);
       display: flex;
-      align-items: flex-end;
+      align-items: center;
+      padding: 40px 44px;
+      background-color: #1f4d3b;
+      border-top-right-radius: 36px;
+      border-bottom-right-radius: 36px;
+      overflow: hidden;
     }
 
-    .auth-visual__img {
+    .auth-left__img {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
-      opacity: 0.82;
     }
 
-    .auth-visual__overlay {
+    .auth-left__veil {
+      position: absolute;
+      inset: 0;
+      background-color: rgba(31, 77, 59, 0.85);
+    }
+
+    .auth-left__content {
       position: relative;
       z-index: 1;
-      padding: var(--space-8);
-      background: linear-gradient(to top, rgba(20, 17, 15, 0.92) 15%, rgba(20, 17, 15, 0.15) 100%);
-      color: var(--ink-on-dark);
-      width: 100%;
+      max-width: 440px;
     }
 
-    .auth-visual__title {
-      font-size: var(--text-2xl);
+    .auth-left__title {
+      font-family: var(--font-sans);
+      font-size: clamp(1.75rem, 2.8vw, 2.5rem);
+      font-weight: 700;
+      line-height: 1.15;
       color: #ffffff;
-      margin: var(--space-3) 0 var(--space-2);
-      line-height: 1.22;
+      margin: 0 0 14px;
     }
 
-    .auth-visual__caption {
-      font-size: var(--text-sm);
-      color: rgba(250, 246, 240, 0.85);
-      line-height: 1.55;
+    .auth-left__accent {
+      color: #d9a441;
     }
 
-    .auth-panel {
-      padding: var(--space-8) var(--space-10);
+    .auth-left__desc {
+      font-size: 0.95rem;
+      line-height: 1.5;
+      color: rgba(255, 255, 255, 0.88);
+      margin: 0;
+    }
+
+    .auth-right {
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      gap: var(--space-5);
+      background-color: #ffffff;
+      padding: 20px 28px;
+      overflow-y: auto;
     }
 
-    .auth-header__eyebrow {
-      font-size: var(--text-xs);
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--accent-terracotta);
-      margin-bottom: var(--space-1);
+    .auth-topbar {
+      display: flex;
+      justify-content: flex-end;
+      flex-shrink: 0;
     }
 
-    .auth-header__title {
-      font-size: var(--text-2xl);
+    .auth-back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      height: 36px;
+      padding: 0 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border-strong);
+      background-color: #ffffff;
       color: var(--ink-primary);
-      margin-bottom: var(--space-2);
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background-color 140ms ease, border-color 140ms ease;
     }
 
-    .auth-header__subtitle {
-      font-size: var(--text-sm);
-      color: var(--ink-secondary);
-      line-height: 1.55;
+    .auth-back-btn:hover {
+      background-color: var(--surface-canvas);
+      border-color: var(--brand-primary);
+    }
+
+    .auth-form-wrap {
+      width: 100%;
+      max-width: 400px;
+      margin: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 16px 0;
+    }
+
+    .auth-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .auth-brand__mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background-color: #245b45;
+      color: #ffffff;
+    }
+
+    .auth-brand__name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--ink-primary);
+    }
+
+    .auth-title {
+      font-family: var(--font-sans);
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--ink-primary);
+      margin: 0;
     }
 
     .session-expired-notice {
-      padding: var(--space-3) var(--space-4);
-      border-radius: var(--radius-md);
+      padding: 10px 12px;
+      border-radius: 8px;
       background-color: var(--warning-soft);
+      border: 1px solid rgba(154, 91, 19, 0.3);
       color: var(--warning);
-      border: 1px solid rgba(154, 91, 19, 0.25);
-      font-size: var(--text-sm);
+      font-size: 13px;
       font-weight: 600;
     }
 
     .auth-form {
       display: flex;
       flex-direction: column;
-      gap: var(--space-4);
+      gap: 14px;
     }
 
     .form-field {
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
-    }
-
-    .form-label {
-      font-size: var(--text-sm);
-      font-weight: 600;
-      color: var(--ink-primary);
+      gap: 4px;
     }
 
     .input-icon-wrap {
@@ -286,58 +364,80 @@ import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-b
 
     .input-icon {
       position: absolute;
-      left: 0.85rem;
+      left: 14px;
       color: var(--ink-muted);
       pointer-events: none;
     }
 
     .form-input {
       width: 100%;
-      padding: 0.68rem 0.9rem;
-      border-radius: var(--radius-md);
+      height: 44px;
+      padding: 0 14px 0 40px;
+      border-radius: 10px;
       border: 1px solid var(--border-strong);
-      background-color: var(--surface-canvas);
+      background-color: #f9fafb;
       font-family: var(--font-sans);
-      font-size: var(--text-sm);
+      font-size: 14px;
       color: var(--ink-primary);
     }
 
-    .form-input--with-icon {
-      padding-left: 2.4rem;
+    .form-input--has-toggle {
+      padding-right: 42px;
     }
 
     .form-input:focus {
-      outline: 2px solid var(--brand-primary);
+      outline: 2px solid #245b45;
       outline-offset: 1px;
-      background-color: var(--surface-elevated);
+      background-color: #ffffff;
+    }
+
+    .password-toggle {
+      position: absolute;
+      right: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border: none;
+      background: transparent;
+      color: var(--ink-muted);
+      cursor: pointer;
+      border-radius: 8px;
+    }
+
+    .password-toggle:hover {
+      color: var(--ink-primary);
+      background-color: rgba(0, 0, 0, 0.04);
     }
 
     .field-error {
-      font-size: var(--text-xs);
+      font-size: 12px;
       color: var(--danger);
       font-weight: 600;
+      margin: 0;
     }
 
     .auth-submit-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: var(--space-2);
-      padding: 0.78rem 1.4rem;
-      border-radius: var(--radius-pill);
+      gap: 8px;
+      width: 100%;
+      height: 44px;
+      border-radius: 10px;
       border: none;
-      background-color: var(--brand-primary);
-      color: var(--ink-on-dark);
+      background-color: #245b45;
+      color: #ffffff;
       font-family: var(--font-sans);
-      font-size: var(--text-sm);
-      font-weight: 700;
+      font-size: 14px;
+      font-weight: 600;
       cursor: pointer;
-      transition: background-color var(--transition-fast);
-      margin-top: var(--space-1);
+      transition: background-color 140ms ease;
     }
 
     .auth-submit-btn:hover:not(:disabled) {
-      background-color: var(--brand-primary-hover);
+      background-color: #1c4736;
     }
 
     .auth-submit-btn:disabled {
@@ -346,57 +446,58 @@ import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-b
     }
 
     .quick-accounts {
-      padding: var(--space-4);
-      border-radius: var(--radius-md);
-      background-color: var(--surface-sand);
-      border: 1px solid var(--border-subtle);
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 10px;
     }
 
-    .quick-accounts__title {
-      display: flex;
+    .quick-accounts__summary {
+      display: inline-flex;
       align-items: center;
-      gap: var(--space-2);
-      font-size: var(--text-xs);
-      font-weight: 700;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
       color: var(--ink-secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-bottom: var(--space-3);
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .quick-accounts__summary::-webkit-details-marker {
+      display: none;
     }
 
     .quick-accounts__grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: var(--space-2);
+      gap: 8px;
+      margin-top: 10px;
     }
 
     .quick-pill {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 0.15rem;
-      padding: 0.5rem 0.65rem;
-      border-radius: var(--radius-sm);
+      gap: 2px;
+      padding: 6px 8px;
+      border-radius: 8px;
       border: 1px solid var(--border-strong);
-      background-color: var(--surface-elevated);
+      background-color: #f9fafb;
       cursor: pointer;
       text-align: left;
       font-family: var(--font-sans);
-      transition: border-color var(--transition-fast), background-color var(--transition-fast);
     }
 
     .quick-pill:hover {
-      border-color: var(--brand-primary);
+      border-color: #245b45;
       background-color: var(--brand-soft);
     }
 
     .quick-pill strong {
-      font-size: var(--text-xs);
+      font-size: 11px;
       color: var(--ink-primary);
     }
 
     .quick-pill span {
-      font-size: 0.7rem;
+      font-size: 10px;
       color: var(--ink-muted);
       word-break: break-all;
     }
@@ -405,29 +506,48 @@ import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-b
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: var(--space-2);
-      font-size: var(--text-sm);
+      gap: 6px;
+      font-size: 13px;
       color: var(--ink-secondary);
-      padding-top: var(--space-3);
-      border-top: 1px solid var(--border-subtle);
+      padding-top: 8px;
     }
 
     .auth-footer__link {
       font-weight: 700;
-      color: var(--brand-primary);
+      color: #245b45;
     }
 
-    @media (max-width: 920px) {
-      .auth-grid {
+    @media (max-width: 767px) {
+      .auth-split {
         grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        height: auto;
+        min-height: 100dvh;
+        overflow: visible;
       }
 
-      .auth-visual {
-        min-height: 240px;
+      .auth-left {
+        height: 120px;
+        padding: 16px 20px;
+        border-radius: 0;
       }
 
-      .auth-panel {
-        padding: var(--space-6);
+      .auth-left__title {
+        font-size: 1.25rem;
+        margin: 0;
+      }
+
+      .auth-left__desc {
+        display: none;
+      }
+
+      .auth-right {
+        padding: 16px 20px 24px;
+        overflow-y: visible;
+      }
+
+      .auth-form-wrap {
+        margin: 12px auto 0;
       }
 
       .quick-accounts__grid {
@@ -441,8 +561,10 @@ export class LoginPageComponent {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   protected readonly authStore = inject(AuthStore);
+  protected readonly demoEnabled = environment.demo;
 
   protected readonly submitted = signal(false);
+  protected readonly showPassword = signal(false);
   protected readonly serverError = signal<string | null>(null);
 
   protected readonly expiredNotice = computed(

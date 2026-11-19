@@ -1,164 +1,129 @@
-<div class="page-section">
+<div class="page-section" style="padding-top: 14px;">
   <div class="container">
-    <header class="editorial-header">
-      <p class="editorial-header__eyebrow">Catalogue patrimonial · Casamance</p>
-      <h1 class="editorial-header__title">Sites &amp; Monuments Patrimoniaux</h1>
-      <p class="editorial-header__subtitle">
-        Parcourez les sites culturels, historiques, naturels et mémoriels publiés de Basse, Moyenne
-        et Haute-Casamance.
-      </p>
+    <header class="page-head-compact">
+      <div class="page-head-compact__left">
+        <h1 class="page-head-compact__title">Sites patrimoniaux</h1>
+        <span
+          class="page-info-tip"
+          title="Sites culturels, historiques, naturels et mémoriels publiés en Casamance."
+          aria-label="Informations"
+        >
+          i
+        </span>
+      </div>
+      <div
+        ngToolbar
+        class="view-switcher"
+        role="toolbar"
+        aria-label="Mode d'affichage des sites"
+      >
+        <button
+          type="button"
+          ngToolbarWidget
+          class="view-switcher__btn"
+          [class.view-switcher__btn--active]="viewMode() === 'grid'"
+          [attr.aria-pressed]="viewMode() === 'grid'"
+          (click)="setViewMode('grid')"
+        >
+          <svg lucideGrid [size]="15" aria-hidden="true"></svg>
+          <span>Catalogue</span>
+        </button>
+        <button
+          type="button"
+          ngToolbarWidget
+          class="view-switcher__btn"
+          [class.view-switcher__btn--active]="viewMode() === 'map'"
+          [attr.aria-pressed]="viewMode() === 'map'"
+          (click)="setViewMode('map')"
+        >
+          <svg lucideMap [size]="15" aria-hidden="true"></svg>
+          <span>Carte ({{ mapPoints().length }})</span>
+        </button>
+      </div>
     </header>
 
-    <section class="controls-bar" aria-label="Filtres de recherche des patrimoines">
-      <form class="controls-bar__fields" (ngSubmit)="onSearchSubmit()">
-        <div class="control-field">
-          <label for="pat-search" class="control-field__label">Rechercher</label>
-          <div class="search-input-wrap">
-            <svg lucideSearch [size]="16" class="search-input-wrap__icon" aria-hidden="true"></svg>
-            <input
-              id="pat-search"
-              name="search"
-              type="search"
-              [ngModel]="searchTerm()"
-              (ngModelChange)="onSearchChange($event)"
-              placeholder="Nom, localité, code ou description (Carabane, Sédhiou…)"
-              class="control-input control-input--with-icon"
-            />
-          </div>
-        </div>
-
-        <div class="control-field">
-          <label for="pat-zone" class="control-field__label">Zone</label>
-          <select
-            id="pat-zone"
-            name="zone"
-            [ngModel]="selectedZone()"
-            (ngModelChange)="onZoneChange($event)"
-            class="control-input"
-          >
-            @for (z of zones; track z.value) {
-              <option [value]="z.value">{{ z.label }}</option>
-            }
-          </select>
-        </div>
-
-        <div class="control-field">
-          <label for="pat-cat" class="control-field__label">Catégorie</label>
-          <select
-            id="pat-cat"
-            name="categorie"
-            [ngModel]="selectedCategorie()"
-            (ngModelChange)="onCategorieChange($event)"
-            class="control-input"
-          >
-            @for (cat of categories; track cat.value) {
-              <option [value]="cat.value">{{ cat.label }}</option>
-            }
-          </select>
-        </div>
-
-        <div class="control-field">
-          <label for="pat-sort" class="control-field__label">Trier par</label>
-          <select
-            id="pat-sort"
-            name="sort"
-            [ngModel]="sortBy()"
-            (ngModelChange)="onSortChange($event)"
-            class="control-input"
-          >
-            <option value="nom_asc">Nom (A → Z)</option>
-            <option value="capacite_desc">Capacité d'accueil</option>
-            <option value="tarif_asc">Tarif croissant</option>
-            <option value="date_desc">Ajoutés récemment</option>
-          </select>
-        </div>
-      </form>
-
-      <div class="controls-bar__footer">
-        <p class="controls-bar__count tabular-nums">
-          <strong>{{ totalElements() }}</strong>
-          {{ totalElements() > 1 ? 'sites publiés trouvés' : 'site publié trouvé' }}
-        </p>
-
-        <div class="controls-bar__actions">
-          @if (!gpsLocation()) {
-            <button
-              type="button"
-              class="btn-gps"
-              (click)="activerGeolocalisation()"
-              [disabled]="gpsLoading()"
-              title="Trier par proximité depuis votre position"
-            >
-              <svg lucideMapPin [size]="15" aria-hidden="true"></svg>
-              <span>{{ gpsLoading() ? 'Localisation…' : 'Autour de moi (GPS)' }}</span>
-            </button>
-          } @else {
-            <button
-              type="button"
-              class="btn-gps btn-gps--active"
-              (click)="desactiverGeolocalisation()"
-              title="Désactiver le filtre de proximité"
-            >
-              <svg lucideMapPin [size]="15" aria-hidden="true"></svg>
-              <span>Proximité active (✕)</span>
-            </button>
-            <div class="gps-rayon-wrap">
-              <label for="gps-rayon-select" class="sr-only">Rayon de recherche GPS</label>
-              <select
-                id="gps-rayon-select"
-                class="control-input control-input--sm"
-                [ngModel]="selectedRayonKm()"
-                (ngModelChange)="onRayonChange($event)"
-              >
-                @for (r of rayonsKm; track r.value) {
-                  <option [value]="r.value">{{ r.label }}</option>
-                }
-              </select>
-            </div>
+    <app-ui-filter-bar
+      [searchValue]="searchTerm()"
+      searchPlaceholder="Rechercher un site, une localité..."
+      searchAriaLabel="Rechercher un patrimoine"
+      [resultsLabel]="totalElements() + (totalElements() > 1 ? ' sites' : ' site')"
+      [hasActiveFilters]="hasActiveFilters() || Boolean(gpsLocation())"
+      [activeChips]="activeFilterChips()"
+      (searchChange)="onSearchChange($event)"
+      (removeChip)="removeFilterChip($event)"
+      (reset)="resetFilters()"
+    >
+      <ng-container filter-primary>
+        <select
+          id="pat-zone"
+          name="zone"
+          aria-label="Zone géographique"
+          [ngModel]="selectedZone()"
+          (ngModelChange)="onZoneChange($event)"
+          class="ui-filter-control"
+        >
+          @for (z of zones; track z.value) {
+            <option [value]="z.value">{{ z.label }}</option>
           }
+        </select>
 
-          @if (hasActiveFilters() || gpsLocation()) {
-            <button type="button" class="btn-reset" (click)="resetFilters()">
-              Réinitialiser les filtres
-            </button>
+        <select
+          id="pat-cat"
+          name="categorie"
+          aria-label="Catégorie"
+          [ngModel]="selectedCategorie()"
+          (ngModelChange)="onCategorieChange($event)"
+          class="ui-filter-control"
+        >
+          @for (cat of categories; track cat.value) {
+            <option [value]="cat.value">{{ cat.label }}</option>
           }
+        </select>
 
-          <div
-            ngToolbar
-            class="view-switcher"
-            role="toolbar"
-            aria-label="Mode d'affichage des sites"
+        @if (!gpsLocation()) {
+          <button
+            type="button"
+            class="ui-filter-toggle"
+            (click)="activerGeolocalisation()"
+            [disabled]="gpsLoading()"
+            title="Trier par proximité depuis votre position"
           >
-            <button
-              type="button"
-              ngToolbarWidget
-              class="view-switcher__btn"
-              [class.view-switcher__btn--active]="viewMode() === 'grid'"
-              [attr.aria-pressed]="viewMode() === 'grid'"
-              (click)="setViewMode('grid')"
-            >
-              <svg lucideGrid [size]="15" aria-hidden="true"></svg>
-              <span>Catalogue</span>
-            </button>
-            <button
-              type="button"
-              ngToolbarWidget
-              class="view-switcher__btn"
-              [class.view-switcher__btn--active]="viewMode() === 'map'"
-              [attr.aria-pressed]="viewMode() === 'map'"
-              (click)="setViewMode('map')"
-            >
-              <svg lucideMap [size]="15" aria-hidden="true"></svg>
-              <span>Carte ({{ mapPoints().length }})</span>
-            </button>
-          </div>
-        </div>
-      </div>
+            <svg lucideMapPin [size]="14" aria-hidden="true"></svg>
+            <span>{{ gpsLoading() ? 'GPS…' : 'Près de moi' }}</span>
+          </button>
+        } @else {
+          <button
+            type="button"
+            class="ui-filter-toggle ui-filter-toggle--active"
+            (click)="desactiverGeolocalisation()"
+            title="Désactiver le filtre de proximité"
+          >
+            <svg lucideMapPin [size]="14" aria-hidden="true"></svg>
+            <span>{{ selectedRayonKm() }} km ✕</span>
+          </button>
+        }
+      </ng-container>
 
-      @if (gpsError()) {
-        <p class="gps-error-banner" role="alert">{{ gpsError() }}</p>
-      }
-    </section>
+      <ng-container filter-sort>
+        <select
+          id="pat-sort"
+          name="sort"
+          aria-label="Trier par"
+          [ngModel]="sortBy()"
+          (ngModelChange)="onSortChange($event)"
+          class="ui-filter-control"
+        >
+          <option value="nom_asc">Nom (A → Z)</option>
+          <option value="capacite_desc">Capacité</option>
+          <option value="tarif_asc">Tarif croissant</option>
+          <option value="date_desc">Récents</option>
+        </select>
+      </ng-container>
+    </app-ui-filter-bar>
+
+    @if (gpsError()) {
+      <p class="gps-error-banner" role="alert">{{ gpsError() }}</p>
+    }
 
     @if (loading() && publishedItems().length === 0) {
       <app-ui-loading-state label="Chargement des sites patrimoniaux de Casamance..." />

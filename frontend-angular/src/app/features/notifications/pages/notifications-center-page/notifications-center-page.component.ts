@@ -15,6 +15,7 @@ import {
 } from '../../../../core/models/notification.model';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import { UiFilterBarComponent } from '../../../../shared/components/ui-filter-bar/ui-filter-bar.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { NotificationApiService } from '../../data-access/notification-api.service';
 import { NotificationStore } from '../../data-access/notification.store';
@@ -29,22 +30,20 @@ import { NotificationStore } from '../../data-access/notification.store';
     DateFrPipe,
     UiEmptyStateComponent,
     UiErrorBannerComponent,
+    UiFilterBarComponent,
     LucideCheck,
     LucideCheckCheck,
     LucideRefreshCw,
   ],
   template: `
-    <div class="page-section">
+    <div class="page-section" style="padding-top: 14px;">
       <div class="container">
-        <header class="notif-header">
-          <div>
-            <p class="editorial-header__eyebrow">Centre d'alertes &amp; suivi transactionnel</p>
-            <h1 class="editorial-header__title">
-              Mes notifications
-              @if (unreadCount() > 0) {
-                <span class="ui-badge ui-badge--terracotta tabular-nums">{{ unreadCount() }} non lue(s)</span>
-              }
-            </h1>
+        <header class="page-head-compact">
+          <div class="page-head-compact__left">
+            <h1 class="page-head-compact__title">Mes notifications</h1>
+            @if (unreadCount() > 0) {
+              <span class="ui-badge ui-badge--terracotta tabular-nums">{{ unreadCount() }} non lue(s)</span>
+            }
           </div>
 
           <div class="header-actions">
@@ -61,43 +60,37 @@ import { NotificationStore } from '../../data-access/notification.store';
           </div>
         </header>
 
-        <div class="toolbar">
-          <div class="filter-tabs" role="tablist" aria-label="Filtrer par lecture">
-            <button
-              type="button"
-              role="tab"
-              [class.tab-active]="!nonLuesOnly()"
-              (click)="setNonLuesFilter(false)"
+        <app-ui-filter-bar
+          [showSearch]="false"
+          [statusPills]="[
+            { id: 'all', label: 'Toutes', count: totalElements() },
+            { id: 'unread', label: 'Non lues', count: unreadCount(), tone: 'danger' }
+          ]"
+          [activeStatus]="nonLuesOnly() ? 'unread' : 'all'"
+          (statusChange)="setNonLuesFilter($event === 'unread')"
+          [resultsLabel]="totalElements() + ' notification(s)'"
+          [hasActiveFilters]="Boolean(typeFilter)"
+          (reset)="typeFilter = ''; loadNotifications(0)"
+        >
+          <ng-container filter-primary>
+            <select
+              class="ui-filter-control"
+              [(ngModel)]="typeFilter"
+              (ngModelChange)="loadNotifications(0)"
+              aria-label="Filtrer par type d'événement"
             >
-              Toutes ({{ totalElements() }})
-            </button>
-            <button
-              type="button"
-              role="tab"
-              [class.tab-active]="nonLuesOnly()"
-              (click)="setNonLuesFilter(true)"
-            >
-              Non lues ({{ unreadCount() }})
-            </button>
-          </div>
-
-          <select
-            class="type-select"
-            [(ngModel)]="typeFilter"
-            (ngModelChange)="loadNotifications(0)"
-            aria-label="Filtrer par type d'événement"
-          >
-            <option value="">Tous les types d'événements</option>
-            <option value="RESERVATION_CONFIRMEE">Réservation confirmée</option>
-            <option value="RESERVATION_ANNULEE">Réservation annulée</option>
-            <option value="PAIEMENT_ACCEPTE">Paiement accepté</option>
-            <option value="PAIEMENT_REMBOURSE">Remboursement simulé</option>
-            <option value="GUIDE_PROFILE_VALIDE">Profil guide validé</option>
-            <option value="GUIDE_AFFECTE_CIRCUIT">Affectation circuit</option>
-            <option value="AVIS_MODERE">Modération d'avis</option>
-            <option value="SIGNALEMENT_TRAITE">Signalement traité</option>
-          </select>
-        </div>
+              <option value="">Tous les types d'événements</option>
+              <option value="RESERVATION_CONFIRMEE">Réservation confirmée</option>
+              <option value="RESERVATION_ANNULEE">Réservation annulée</option>
+              <option value="PAIEMENT_ACCEPTE">Paiement accepté</option>
+              <option value="PAIEMENT_REMBOURSE">Remboursement</option>
+              <option value="GUIDE_PROFILE_VALIDE">Profil guide validé</option>
+              <option value="GUIDE_AFFECTE_CIRCUIT">Affectation circuit</option>
+              <option value="AVIS_MODERE">Modération d'avis</option>
+              <option value="SIGNALEMENT_TRAITE">Signalement traité</option>
+            </select>
+          </ng-container>
+        </app-ui-filter-bar>
 
         @if (error()) {
           <app-ui-error-banner [message]="error()!" (retry)="loadNotifications(page())" />

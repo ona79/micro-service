@@ -1,5 +1,5 @@
 import { Dialog } from '@angular/cdk/dialog';
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import {
   AbstractControl,
   FormBuilder,
@@ -12,6 +12,7 @@ import {
   LucideArchive,
   LucideCheckCircle2,
   LucideEye,
+  LucideMoreHorizontal,
   LucidePencil,
   LucidePlus,
   LucideRefreshCw,
@@ -32,9 +33,15 @@ import { Patrimoine } from '../../../../core/models/patrimoine.model';
 import { EvenementStats } from '../../../../core/models/statistics.model';
 import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confirm-dialog/ui-confirm-dialog.component';
 import { UiDetailDrawerComponent } from '../../../../shared/components/ui-detail-drawer/ui-detail-drawer.component';
+import { UiDrawerComponent } from '../../../../shared/components/ui-drawer/ui-drawer.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import {
+  FilterStatusPill,
+  UiFilterBarComponent,
+} from '../../../../shared/components/ui-filter-bar/ui-filter-bar.component';
 import { UiKpiCardComponent } from '../../../../shared/components/ui-kpi-card/ui-kpi-card.component';
+import { UiPageHeaderComponent } from '../../../../shared/components/ui-page-header/ui-page-header.component';
 import { UiPaginationComponent } from '../../../../shared/components/ui-pagination/ui-pagination.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
@@ -59,11 +66,14 @@ function dateRangeValidator(group: AbstractControl): ValidationErrors | null {
     ReactiveFormsModule,
     DateFrPipe,
     FcfaPricePipe,
+    UiPageHeaderComponent,
+    UiDrawerComponent,
     UiKpiCardComponent,
     UiPaginationComponent,
     UiDetailDrawerComponent,
     UiEmptyStateComponent,
     UiErrorBannerComponent,
+    UiFilterBarComponent,
     LucidePlus,
     LucidePencil,
     LucideTrash2,
@@ -72,18 +82,15 @@ function dateRangeValidator(group: AbstractControl): ValidationErrors | null {
     LucideXCircle,
     LucideArchive,
     LucideEye,
+    LucideMoreHorizontal,
     LucideRefreshCw,
   ],
   template: `
-    <header class="bo-header">
-      <div>
-        <p class="bo-header__eyebrow">Agenda culturel ms-evenement (Africa/Dakar)</p>
-        <h1 class="bo-header__title">Gestion des événements &amp; festivals</h1>
-        <p class="bo-header__lead">
-          Planifiez, liez à un site patrimonial, ouvrez aux réservations et publiez l’agenda officiel.
-        </p>
-      </div>
-      <div class="bo-header__actions">
+    <app-ui-page-header
+      title="Événements"
+      subtitle="Planifiez, liez à un site patrimonial et publiez l'agenda."
+    >
+      <div header-actions>
         <button type="button" class="bo-btn" (click)="loadPage(page())" [disabled]="loading()">
           <svg lucideRefreshCw [size]="14" aria-hidden="true"></svg>
           <span>Actualiser</span>
@@ -95,7 +102,7 @@ function dateRangeValidator(group: AbstractControl): ValidationErrors | null {
           </button>
         }
       </div>
-    </header>
+    </app-ui-page-header>
 
     @if (stats(); as s) {
       <div class="bo-kpi-grid">
@@ -110,15 +117,13 @@ function dateRangeValidator(group: AbstractControl): ValidationErrors | null {
       <app-ui-error-banner [message]="actionError()!" [showRetry]="false" />
     }
 
-    @if (formOpen()) {
-      <section class="bo-panel" aria-label="Formulaire événement">
-        <div class="bo-panel__head">
-          <h2 class="bo-panel__title">
-            {{ editingId() ? 'Modifier événement #' + editingId() : 'Créer un événement culturel' }}
-          </h2>
-          <button type="button" class="bo-btn" (click)="closeForm()">Fermer</button>
-        </div>
-
+    <app-ui-drawer
+      [open]="formOpen()"
+      width="lg"
+      [title]="editingId() ? 'Modifier événement n° ' + editingId() : 'Créer un événement culturel'"
+      [showFooter]="false"
+      (closed)="closeForm()"
+    >
         <form [formGroup]="form" (ngSubmit)="save()" class="bo-form-grid" novalidate>
           <div class="bo-field">
             <label for="evt-nom" class="bo-label">Intitulé *</label>
@@ -144,12 +149,12 @@ function dateRangeValidator(group: AbstractControl): ValidationErrors | null {
           </div>
 
           <div class="bo-field">
-            <label for="evt-deb" class="bo-label">Date début (Africa/Dakar) *</label>
+            <label for="evt-deb" class="bo-label">Date de début *</label>
             <input id="evt-deb" type="datetime-local" class="bo-input" formControlName="dateDebut" />
           </div>
 
           <div class="bo-field">
-            <label for="evt-fin" class="bo-label">Date fin (Africa/Dakar) *</label>
+            <label for="evt-fin" class="bo-label">Date de fin *</label>
             <input id="evt-fin" type="datetime-local" class="bo-input" formControlName="dateFin" />
             @if (form.hasError('invalidDateRange')) {
               <p class="bo-error">La date de fin doit être postérieure ou égale à la date de début.</p>
@@ -220,29 +225,21 @@ function dateRangeValidator(group: AbstractControl): ValidationErrors | null {
             <button type="button" class="bo-btn" (click)="closeForm()">Annuler</button>
           </div>
         </form>
-      </section>
-    }
+    </app-ui-drawer>
 
     <section class="bo-panel">
-      <div class="bo-filters">
-        <div class="bo-field bo-field--grow">
-          <label for="evt-search" class="bo-label">Recherche</label>
-          <input id="evt-search" type="search" class="bo-input" [(ngModel)]="q" placeholder="Nom, lieu, organisateur..." (keyup.enter)="loadPage(0)" />
-        </div>
-        <div class="bo-field">
-          <label for="evt-fstatut" class="bo-label">Statut</label>
-          <select id="evt-fstatut" class="bo-select" [(ngModel)]="statutFilter" (ngModelChange)="loadPage(0)">
-            <option value="">Tous</option>
-            <option value="BROUILLON">BROUILLON</option>
-            <option value="SOUMIS">SOUMIS</option>
-            <option value="PUBLIE">PUBLIE</option>
-            <option value="ANNULE">ANNULE</option>
-            <option value="TERMINE">TERMINE</option>
-            <option value="ARCHIVE">ARCHIVE</option>
-          </select>
-        </div>
-        <button type="button" class="bo-btn bo-btn--primary" (click)="loadPage(0)">Filtrer</button>
-      </div>
+      <app-ui-filter-bar
+        [statusPills]="statusPills()"
+        [activeStatus]="statutFilter || 'ALL'"
+        (statusChange)="statutFilter = $event === 'ALL' ? '' : $any($event); loadPage(0)"
+        [searchValue]="q"
+        searchPlaceholder="Rechercher nom, lieu, organisateur..."
+        searchAriaLabel="Rechercher un événement"
+        [resultsLabel]="totalElements() + ' événement(s)'"
+        [hasActiveFilters]="Boolean(q.trim() || statutFilter)"
+        (searchChange)="q = $event; loadPage(0)"
+        (reset)="q = ''; statutFilter = ''; loadPage(0)"
+      />
 
       @if (error()) {
         <app-ui-error-banner [message]="error()!" (retry)="loadPage(page())" />
@@ -266,16 +263,13 @@ function dateRangeValidator(group: AbstractControl): ValidationErrors | null {
               @for (e of items(); track e.id) {
                 <tr>
                   <td>
-                    <span class="bo-cell-title">{{ e.nomEvenement }}</span>
-                    <span class="bo-cell-sub">{{ e.dateDebut | dateFr: 'd MMM yyyy HH:mm' }} → {{ e.dateFin | dateFr: 'd MMM yyyy HH:mm' }}</span>
+                    <span class="bo-cell-one bo-cell-title" [title]="e.nomEvenement">{{ e.nomEvenement }}</span>
                   </td>
                   <td>
-                    <span class="ui-badge ui-badge--neutral">{{ e.typeEvenement }}</span>
-                    <span class="bo-cell-sub">{{ e.lieu || e.localite || e.zoneGeographique }}</span>
+                    <span class="ui-badge ui-badge--neutral" [title]="e.lieu || e.localite || e.zoneGeographique">{{ e.typeEvenement }}</span>
                   </td>
-                  <td class="tabular-nums">
+                  <td class="tabular-nums" [title]="(e.dateDebut | dateFr: 'd MMM yyyy') + ' → ' + (e.dateFin | dateFr: 'd MMM yyyy')">
                     {{ e.prix | fcfaPrice }} · {{ e.capaciteMax }} pl.
-                    <span class="bo-cell-sub">{{ e.ouvertReservation ? 'Résa ouverte' : 'Sans réservation' }}</span>
                   </td>
                   <td>
                     <span
@@ -290,47 +284,69 @@ function dateRangeValidator(group: AbstractControl): ValidationErrors | null {
                   </td>
                   <td>
                     <div class="bo-actions-cell">
-                      <button type="button" class="bo-btn bo-btn--sm" (click)="selectedItem.set(e)">
-                        <svg lucideEye [size]="13" aria-hidden="true"></svg>
-                        <span>Détail</span>
-                      </button>
-                      @if (e.statutEvenement !== 'ARCHIVE') {
-                        <button type="button" class="bo-btn bo-btn--sm" (click)="openEditForm(e)">
-                          <svg lucidePencil [size]="13" aria-hidden="true"></svg>
-                          <span>Éditer</span>
-                        </button>
-                      }
-                      @if (e.statutEvenement === 'BROUILLON') {
-                        <button type="button" class="bo-btn bo-btn--sm" (click)="soumettre(e)">
-                          <svg lucideSend [size]="13" aria-hidden="true"></svg>
-                          <span>Soumettre</span>
-                        </button>
-                      }
                       @if (permissions.has('EVENEMENT:PUBLIER') && (e.statutEvenement === 'BROUILLON' || e.statutEvenement === 'SOUMIS' || e.statutEvenement === 'ARCHIVE')) {
                         <button type="button" class="bo-btn bo-btn--sm bo-btn--primary" (click)="publier(e)">
-                          <svg lucideCheckCircle2 [size]="13" aria-hidden="true"></svg>
-                          <span>Publier</span>
+                          Publier
+                        </button>
+                      } @else if (e.statutEvenement === 'BROUILLON') {
+                        <button type="button" class="bo-btn bo-btn--sm bo-btn--primary" (click)="soumettre(e)">
+                          Soumettre
+                        </button>
+                      } @else if (e.statutEvenement !== 'ARCHIVE') {
+                        <button type="button" class="bo-btn bo-btn--sm" (click)="openEditForm(e)">
+                          Éditer
+                        </button>
+                      } @else {
+                        <button type="button" class="bo-btn bo-btn--sm" (click)="selectedItem.set(e)">
+                          Détail
                         </button>
                       }
-                      @if (e.statutEvenement === 'PUBLIE' && permissions.has('EVENEMENT:ANNULER')) {
-                        <button type="button" class="bo-btn bo-btn--sm bo-btn--danger" (click)="annuler(e)">
-                          <svg lucideXCircle [size]="13" aria-hidden="true"></svg>
-                          <span>Annuler</span>
+
+                      <div class="bo-row-menu">
+                        <button
+                          type="button"
+                          class="bo-btn bo-btn--sm bo-btn--icon"
+                          aria-label="Plus d'actions"
+                          (click)="toggleRowMenu(e.id)"
+                        >
+                          <svg lucideMoreHorizontal [size]="15" aria-hidden="true"></svg>
                         </button>
-                        <button type="button" class="bo-btn bo-btn--sm" (click)="terminer(e)">Terminer</button>
-                      }
-                      @if (permissions.has('EVENEMENT:ARCHIVER') && e.statutEvenement !== 'ARCHIVE') {
-                        <button type="button" class="bo-btn bo-btn--sm" (click)="archiver(e)">
-                          <svg lucideArchive [size]="13" aria-hidden="true"></svg>
-                          <span>Archiver</span>
-                        </button>
-                      }
-                      @if (permissions.has('EVENEMENT:SUPPRIMER') && (e.statutEvenement === 'BROUILLON' || e.statutEvenement === 'ARCHIVE' || e.statutEvenement === 'ANNULE')) {
-                        <button type="button" class="bo-btn bo-btn--sm bo-btn--danger" (click)="supprimer(e)">
-                          <svg lucideTrash2 [size]="13" aria-hidden="true"></svg>
-                          <span>Supprimer</span>
-                        </button>
-                      }
+                        @if (openMenuId() === e.id) {
+                          <div class="bo-row-menu__dropdown" role="menu">
+                            <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null); selectedItem.set(e)">
+                              Détail
+                            </button>
+                            @if (e.statutEvenement !== 'ARCHIVE') {
+                              <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null); openEditForm(e)">
+                                Éditer
+                              </button>
+                            }
+                            @if (e.statutEvenement === 'BROUILLON') {
+                              <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null); soumettre(e)">
+                                Soumettre
+                              </button>
+                            }
+                            @if (e.statutEvenement === 'PUBLIE' && permissions.has('EVENEMENT:ANNULER')) {
+                              <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null); terminer(e)">
+                                Terminer
+                              </button>
+                              <button type="button" class="bo-row-menu__item bo-row-menu__item--danger" role="menuitem" (click)="openMenuId.set(null); annuler(e)">
+                                Annuler
+                              </button>
+                            }
+                            @if (permissions.has('EVENEMENT:ARCHIVER') && e.statutEvenement !== 'ARCHIVE') {
+                              <button type="button" class="bo-row-menu__item" role="menuitem" (click)="openMenuId.set(null); archiver(e)">
+                                Archiver
+                              </button>
+                            }
+                            @if (permissions.has('EVENEMENT:SUPPRIMER') && (e.statutEvenement === 'BROUILLON' || e.statutEvenement === 'ARCHIVE' || e.statutEvenement === 'ANNULE')) {
+                              <button type="button" class="bo-row-menu__item bo-row-menu__item--danger" role="menuitem" (click)="openMenuId.set(null); supprimer(e)">
+                                Supprimer
+                              </button>
+                            }
+                          </div>
+                        }
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -394,6 +410,30 @@ export class ProEvenementsPageComponent implements OnInit {
   protected readonly formOpen = signal(false);
   protected readonly editingId = signal<number | null>(null);
   protected readonly selectedItem = signal<Evenement | null>(null);
+  protected readonly openMenuId = signal<number | null>(null);
+  private searchTimer?: ReturnType<typeof setTimeout>;
+
+  protected onSearchInput(): void {
+    clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => void this.loadPage(0), 250);
+  }
+
+  protected toggleRowMenu(id: number): void {
+    this.openMenuId.update((curr) => (curr === id ? null : id));
+  }
+
+  protected readonly statusPills = computed<FilterStatusPill[]>(() => {
+    const s = this.stats();
+    return [
+      { id: 'ALL', label: 'Tous', count: s?.total },
+      { id: 'PUBLIE', label: 'Publiés', count: s?.publies },
+      { id: 'BROUILLON', label: 'Brouillons', count: s?.brouillons },
+      { id: 'SOUMIS', label: 'Soumis', count: s?.soumis },
+      { id: 'TERMINE', label: 'Terminés' },
+      { id: 'ANNULE', label: 'Annulés', count: s?.annules },
+      { id: 'ARCHIVE', label: 'Archivés', count: s?.archives },
+    ];
+  });
 
   protected q = '';
   protected statutFilter: StatutEvenement | '' = '';

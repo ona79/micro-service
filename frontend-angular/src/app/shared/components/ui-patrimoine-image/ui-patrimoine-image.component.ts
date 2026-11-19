@@ -2,28 +2,28 @@ import { ChangeDetectionStrategy, Component, computed, input, signal } from '@an
 
 const LOCAL_PATRIMOINE_ASSETS: Record<string, string> = {
   'PAT-ZIG-001': '/images/patrimoines/PAT-ZIG-001.svg',
-  'PAT-CRB-002': '/images/patrimoines/PAT-CRB-002.jpg',
-  'PAT-ZIG-003': '/images/patrimoines/PAT-ZIG-003.jpg',
-  'PAT-OSS-004': '/images/patrimoines/PAT-OSS-004.jpg',
-  'PAT-CAS-005': '/images/patrimoines/PAT-CAS-005.jpg',
+  'PAT-CRB-002': '/images/patrimoines/PAT-CRB-002.webp',
+  'PAT-ZIG-003': '/images/patrimoines/PAT-ZIG-003.webp',
+  'PAT-OSS-004': '/images/patrimoines/PAT-OSS-004.webp',
+  'PAT-CAS-005': '/images/patrimoines/PAT-CAS-005.webp',
   'PAT-SED-006': '/images/patrimoines/PAT-SED-006.svg',
-  'PAT-OSS-007': '/images/patrimoines/PAT-OSS-007.jpg',
-  'PAT-KOL-008': '/images/patrimoines/PAT-KOL-008.jpg',
-  'PAT-DKR-001': '/images/patrimoines/PAT-DKR-001.jpg',
-  'PAT-DKR-002': '/images/patrimoines/PAT-DKR-002.jpg',
-  'PAT-SLN-004': '/images/patrimoines/PAT-SLN-004.jpg',
-  'PAT-DKR-006': '/images/patrimoines/PAT-DKR-006.jpg',
+  'PAT-OSS-007': '/images/patrimoines/PAT-OSS-007.webp',
+  'PAT-KOL-008': '/images/patrimoines/PAT-KOL-008.webp',
+  'PAT-DKR-001': '/images/patrimoines/PAT-DKR-001.webp',
+  'PAT-DKR-002': '/images/patrimoines/PAT-DKR-002.webp',
+  'PAT-SLN-004': '/images/patrimoines/PAT-SLN-004.webp',
+  'PAT-DKR-006': '/images/patrimoines/PAT-DKR-006.webp',
 };
 
 const LEGACY_ASSET_FILENAME_MAP: Record<string, string> = {
   'memorial-joola.jpg': '/images/patrimoines/PAT-ZIG-001.svg',
-  'carabane.jpg': '/images/patrimoines/PAT-CRB-002.jpg',
-  'cathedrale-zig.jpg': '/images/patrimoines/PAT-ZIG-003.jpg',
-  'bois-oussouye.jpg': '/images/patrimoines/PAT-OSS-004.jpg',
-  'enampore.jpg': '/images/patrimoines/PAT-CAS-005.jpg',
+  'carabane.jpg': '/images/patrimoines/PAT-CRB-002.webp',
+  'cathedrale-zig.jpg': '/images/patrimoines/PAT-ZIG-003.webp',
+  'bois-oussouye.jpg': '/images/patrimoines/PAT-OSS-004.webp',
+  'enampore.jpg': '/images/patrimoines/PAT-CAS-005.webp',
   'fort-sedhiou.jpg': '/images/patrimoines/PAT-SED-006.svg',
-  'mangrove-oussouye.jpg': '/images/patrimoines/PAT-OSS-007.jpg',
-  'reserve-kolda.jpg': '/images/patrimoines/PAT-KOL-008.jpg',
+  'mangrove-oussouye.jpg': '/images/patrimoines/PAT-OSS-007.webp',
+  'reserve-kolda.jpg': '/images/patrimoines/PAT-KOL-008.webp',
 };
 
 @Component({
@@ -34,7 +34,11 @@ const LEGACY_ASSET_FILENAME_MAP: Record<string, string> = {
     <div class="heritage-media-wrap">
       <img
         [src]="resolvedSrc()"
+        [attr.srcset]="resolvedSrcset()"
+        sizes="(max-width: 640px) 100vw, 480px"
         [alt]="nomPatrimoine()"
+        width="640"
+        height="420"
         class="heritage-img"
         loading="lazy"
         decoding="async"
@@ -134,7 +138,15 @@ export class UiPatrimoineImageComponent {
     if (code.includes('SLN') || name.includes('saint-louis') || name.includes('faidherbe')) {
       return LOCAL_PATRIMOINE_ASSETS['PAT-SLN-004'];
     }
-    return '/images/hero.jpg';
+    return '/images/hero.webp';
+  });
+
+  protected readonly resolvedSrcset = computed(() => {
+    const src = this.resolvedSrc();
+    if (src.startsWith('/images/') && src.endsWith('.webp') && !src.endsWith('-640.webp')) {
+      return `${src.slice(0, -5)}-640.webp 640w, ${src} 1200w`;
+    }
+    return null;
   });
 
   protected readonly resolvedSrc = computed(() => {

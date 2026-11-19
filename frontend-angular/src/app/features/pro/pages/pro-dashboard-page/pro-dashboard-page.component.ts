@@ -21,6 +21,7 @@ import {
 import { ChartDatum, UiBarChartComponent } from '../../../../shared/components/ui-bar-chart/ui-bar-chart.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
 import { UiKpiCardComponent } from '../../../../shared/components/ui-kpi-card/ui-kpi-card.component';
+import { UiPageHeaderComponent } from '../../../../shared/components/ui-page-header/ui-page-header.component';
 import { UiSkeletonGridComponent } from '../../../../shared/components/ui-skeleton-grid/ui-skeleton-grid.component';
 import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
 import { AvisApiService } from '../../../avis/data-access/avis-api.service';
@@ -41,30 +42,25 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
     RouterLink,
     LucideRefreshCw,
     UiKpiCardComponent,
+    UiPageHeaderComponent,
     UiBarChartComponent,
     UiErrorBannerComponent,
     UiSkeletonGridComponent,
     FcfaPricePipe,
   ],
   template: `
-    <header class="bo-header">
-      <div>
-        <p class="bo-header__eyebrow">Poste de pilotage · {{ authStore.roleLabel() }}</p>
-        <h1 class="bo-header__title">
-          Bonjour {{ authStore.user()?.prenom }}, voici votre synthèse opérationnelle
-        </h1>
-        <p class="bo-header__lead">
-          Indicateurs calculés côté serveur en temps réel selon vos permissions RBAC actives.
-        </p>
-      </div>
-      <div class="bo-header__actions">
+    <app-ui-page-header
+      title="Tableau de bord"
+      subtitle="Synthèse de l'activité selon vos permissions."
+    >
+      <div header-actions>
         <button type="button" class="bo-btn" (click)="load()" [disabled]="loading()">
           <svg lucideRefreshCw [size]="15" aria-hidden="true"></svg>
           <span>Actualiser</span>
         </button>
         <a routerLink="/pro/statistiques" class="bo-btn bo-btn--primary">Analyses détaillées</a>
       </div>
-    </header>
+    </app-ui-page-header>
 
     @if (error()) {
       <app-ui-error-banner [message]="error()!" (retry)="load()" />
@@ -220,26 +216,8 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
               label="Revenus simulés acceptés"
               [value]="(paiementStats()?.montantTotalAccepteSimule ?? 0) | fcfaPrice"
               tone="forest"
-              subtitle="Acceptées : {{ paiementStats()?.acceptees ?? 0 }} · Outbox : {{ paiementStats()?.outboxEnAttente ?? 0 }}"
+              subtitle="Acceptées : {{ paiementStats()?.acceptees ?? 0 }}"
               link="/pro/paiements"
-            />
-          }
-          @if (permissions.has('NOTIFICATION:LIRE_TOUT')) {
-            <app-ui-kpi-card
-              label="Notifications en échec"
-              [value]="(notifStats()?.echecsTemporaires ?? 0) + (notifStats()?.echecsDefinitifs ?? 0)"
-              [tone]="((notifStats()?.echecsTemporaires ?? 0) + (notifStats()?.echecsDefinitifs ?? 0)) > 0 ? 'danger' : 'success'"
-              subtitle="Total journalisées : {{ notifStats()?.total ?? 0 }}"
-              link="/pro/notifications"
-            />
-          }
-          @if (permissions.has('UTILISATEUR:LIRE_TOUT')) {
-            <app-ui-kpi-card
-              label="Alertes sécurité (24h)"
-              [value]="userStats()?.alertesSecurite24h ?? 0"
-              [tone]="(userStats()?.alertesSecurite24h ?? 0) > 0 ? 'danger' : 'neutral'"
-              subtitle="Comptes actifs : {{ userStats()?.actifs ?? 0 }} / {{ userStats()?.total ?? 0 }}"
-              link="/pro/utilisateurs"
             />
           }
         </div>
@@ -247,7 +225,7 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
         <div class="bo-charts-grid">
           <app-ui-bar-chart
             title="État des réservations"
-            subtitle="Vue agrégée depuis ms-reservation"
+            subtitle="Réservations enregistrées"
             [data]="reservationChart()"
           />
           @if (permissions.has('PAIEMENT:LIRE_TOUT') && paiementStats()) {

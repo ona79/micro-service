@@ -50,7 +50,12 @@
 
     <figure class="hero-photo-frame">
       <img
-        src="/images/hero.jpg"
+        src="/images/hero.webp"
+        srcset="/images/hero-640.webp 640w, /images/hero.webp 1200w"
+        sizes="(max-width: 768px) 100vw, 50vw"
+        width="1200"
+        height="800"
+        fetchpriority="high"
         alt="Pirogue naviguant au lever du soleil sur les bolongs bordés de palétuviers en Casamance"
         class="hero-photo-frame__img"
         fetchpriority="high"
@@ -328,7 +333,7 @@
   <div class="container">
     <div class="section-header">
       <div>
-        <p class="eyebrow">Rendez-vous culturels · Heure Africa/Dakar</p>
+        <p class="eyebrow">Rendez-vous culturels</p>
         <h2 id="events-home-title" class="section-title">Agenda des événements en Casamance</h2>
       </div>
       <a routerLink="/evenements" class="section-link">
@@ -502,7 +507,12 @@
     </div>
     <div class="preservation-banner__media">
       <img
-        src="/images/evenements-banner.jpg"
+        src="/images/evenements-banner.webp"
+        srcset="/images/evenements-banner-640.webp 640w, /images/evenements-banner.webp 1200w"
+        sizes="(max-width: 768px) 100vw, 480px"
+        width="1200"
+        height="675"
+        loading="lazy"
         alt="Kora traditionnelle mandingue symbole du patrimoine musical casamançais"
         loading="lazy"
       />

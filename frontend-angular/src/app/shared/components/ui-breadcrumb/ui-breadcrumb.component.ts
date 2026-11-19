@@ -76,6 +76,16 @@ export interface BreadcrumbItem {
       color: var(--ink-secondary);
       font-weight: 500;
     }
+
+    @media (max-width: 640px) {
+      .breadcrumb {
+        margin-bottom: var(--space-3, 12px);
+      }
+
+      .breadcrumb__item:not(:last-child) {
+        display: none;
+      }
+    }
   `,
 })
 export class UiBreadcrumbComponent {

@@ -1,8 +1,8 @@
 import { Dialog } from '@angular/cdk/dialog';
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { LucideEye, LucideRefreshCw, LucideXCircle } from '@lucide/angular';
+import { LucideEye, LucideMoreHorizontal, LucideRefreshCw, LucideXCircle } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { toast } from 'ngx-sonner';
 import { PermissionService } from '../../../../core/auth/permissions';
@@ -20,6 +20,10 @@ import { UiConfirmDialogComponent } from '../../../../shared/components/ui-confi
 import { UiDetailDrawerComponent } from '../../../../shared/components/ui-detail-drawer/ui-detail-drawer.component';
 import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
 import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
+import {
+  FilterStatusPill,
+  UiFilterBarComponent,
+} from '../../../../shared/components/ui-filter-bar/ui-filter-bar.component';
 import { UiKpiCardComponent } from '../../../../shared/components/ui-kpi-card/ui-kpi-card.component';
 import { UiPaginationComponent } from '../../../../shared/components/ui-pagination/ui-pagination.component';
 import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
@@ -39,7 +43,9 @@ import { PaiementApiService } from '../../../paiements/data-access/paiement-api.
     UiDetailDrawerComponent,
     UiEmptyStateComponent,
     UiErrorBannerComponent,
+    UiFilterBarComponent,
     LucideEye,
+    LucideMoreHorizontal,
     LucideRefreshCw,
     LucideXCircle,
   ],
@@ -47,7 +53,7 @@ import { PaiementApiService } from '../../../paiements/data-access/paiement-api.
     <header class="bo-header">
       <div>
         <p class="bo-header__eyebrow">Supervision financière simulée · Administrateur uniquement</p>
-        <h1 class="bo-header__title">Paiements simulés (Wave / Orange Money) &amp; Outbox</h1>
+        <h1 class="bo-header__title">Paiements</h1>
         <p class="bo-header__lead">
           Supervisez les transactions pédagogiques simulées, exécutez des remboursements simulés et
           rejouez les événements outbox en échec.
@@ -60,7 +66,7 @@ import { PaiementApiService } from '../../../paiements/data-access/paiement-api.
         </button>
         @if (permissions.has('PAIEMENT:REMBOURSER')) {
           <button type="button" class="bo-btn bo-btn--terracotta" (click)="rejouerOutbox()" [disabled]="busy()">
-            Rejouer Outbox paiement
+            Synchroniser les paiements
           </button>
         }
       </div>
@@ -85,38 +91,27 @@ import { PaiementApiService } from '../../../paiements/data-access/paiement-api.
     }
 
     <section class="bo-panel">
-      <div class="bo-filters">
-        <div class="bo-field bo-field--grow">
-          <label for="pay-q" class="bo-label">Recherche</label>
-          <input id="pay-q" type="search" class="bo-input" [(ngModel)]="q" placeholder="Référence PAY-SIM..., corrélation..." (keyup.enter)="loadPage(0)" />
-        </div>
-        <div class="bo-field">
-          <label for="pay-statut" class="bo-label">Statut</label>
-          <select id="pay-statut" class="bo-select" [(ngModel)]="statutFilter" (ngModelChange)="loadPage(0)">
-            <option value="">Tous</option>
-            <option value="INITIE">INITIE</option>
-            <option value="EN_COURS">EN_COURS</option>
-            <option value="ACCEPTE">ACCEPTE</option>
-            <option value="REFUSE">REFUSE</option>
-            <option value="EXPIRE">EXPIRE</option>
-            <option value="ANNULE">ANNULE</option>
-            <option value="REMBOURSE">REMBOURSE</option>
-          </select>
-        </div>
-        <div class="bo-field">
-          <label for="pay-mode" class="bo-label">Opérateur simulé</label>
-          <select id="pay-mode" class="bo-select" [(ngModel)]="modeFilter" (ngModelChange)="loadPage(0)">
-            <option value="">Tous</option>
+      <app-ui-filter-bar
+        [statusPills]="statusPills()"
+        [activeStatus]="statutFilter || 'ALL'"
+        (statusChange)="statutFilter = $event === 'ALL' ? '' : $any($event); loadPage(0)"
+        [searchValue]="q"
+        searchPlaceholder="Référence PAY-SIM..., corrélation..."
+        searchAriaLabel="Rechercher un paiement"
+        [resultsLabel]="totalElements() + ' transaction(s)'"
+        [hasActiveFilters]="Boolean(q.trim() || statutFilter || modeFilter || reservationIdFilter)"
+        (searchChange)="q = $event; loadPage(0)"
+        (reset)="q = ''; statutFilter = ''; modeFilter = ''; reservationIdFilter = null; loadPage(0)"
+      >
+        <ng-container filter-primary>
+          <select id="pay-mode" aria-label="Opérateur simulé" class="ui-filter-control" [(ngModel)]="modeFilter" (ngModelChange)="loadPage(0)">
+            <option value="">Opérateur : Tous</option>
             <option value="WAVE">WAVE</option>
             <option value="ORANGE_MONEY">ORANGE_MONEY</option>
           </select>
-        </div>
-        <div class="bo-field">
-          <label for="pay-resa" class="bo-label">ID Réservation</label>
-          <input id="pay-resa" type="number" min="1" class="bo-input" [(ngModel)]="reservationIdFilter" style="width: 120px;" />
-        </div>
-        <button type="button" class="bo-btn bo-btn--primary" (click)="loadPage(0)">Filtrer</button>
-      </div>
+          <input id="pay-resa" type="number" min="1" aria-label="ID Réservation" placeholder="N° résa" class="ui-filter-control" [(ngModel)]="reservationIdFilter" (ngModelChange)="onSearchInput()" style="width: 100px;" />
+        </ng-container>
+      </app-ui-filter-bar>
 
       @if (error()) {
         <app-ui-error-banner [message]="error()!" (retry)="loadPage(page())" />
@@ -139,35 +134,41 @@ import { PaiementApiService } from '../../../paiements/data-access/paiement-api.
             <tbody>
               @for (p of items(); track p.id) {
                 <tr>
-                  <td>
-                    <span class="bo-cell-title tabular-nums">{{ p.referenceTransaction }}</span>
-                    <span class="bo-cell-sub">{{ (p.datePaiement || p.dateCreation || '') | dateFr: 'd MMM yyyy HH:mm' }}</span>
+                  <td class="tabular-nums" [title]="p.referenceTransaction + ' · ' + ((p.datePaiement || p.dateCreation || '') | dateFr: 'd MMM yyyy HH:mm')">
+                    <strong>{{ p.referenceTransaction }}</strong>
                   </td>
-                  <td>
-                    <span>{{ formatMode(p.modePaiement) }}</span>
-                    <span class="bo-cell-sub">{{ p.numeroTelephoneMasque || 'Téléphone masqué' }}</span>
+                  <td [title]="formatMode(p.modePaiement) + ' · ' + (p.numeroTelephoneMasque || 'Téléphone masqué')">
+                    {{ formatMode(p.modePaiement) }}
                   </td>
-                  <td class="tabular-nums">
-                    {{ p.montant | fcfaPrice }}
-                    <span class="bo-cell-sub">Réservation {{ p.reservationId }}</span>
+                  <td class="tabular-nums" [title]="'Réservation n° ' + p.reservationId">
+                    {{ p.montant | fcfaPrice }} · Résa {{ p.reservationId }}
                   </td>
                   <td>
                     <span [class]="statusBadge(p.statut)">{{ statusLabel(p.statut) }}</span>
-                    @if (p.synchroReservationStatut) {
-                      <span class="bo-cell-sub">Synchro : {{ p.synchroReservationStatut }}</span>
-                    }
                   </td>
                   <td>
                     <div class="bo-actions-cell">
                       <button type="button" class="bo-btn bo-btn--sm" (click)="openDetail(p)">
-                        <svg lucideEye [size]="13" aria-hidden="true"></svg>
-                        <span>Détail</span>
+                        Détail
                       </button>
                       @if (p.statut === 'ACCEPTE' && permissions.has('PAIEMENT:REMBOURSER')) {
-                        <button type="button" class="bo-btn bo-btn--sm bo-btn--danger" (click)="rembourser(p)" [disabled]="busy()">
-                          <svg lucideXCircle [size]="13" aria-hidden="true"></svg>
-                          <span>Rembourser</span>
-                        </button>
+                        <div class="bo-row-menu">
+                          <button
+                            type="button"
+                            class="bo-btn bo-btn--sm bo-btn--icon"
+                            aria-label="Plus d'actions"
+                            (click)="toggleRowMenu(p.id)"
+                          >
+                            <svg lucideMoreHorizontal [size]="15" aria-hidden="true"></svg>
+                          </button>
+                          @if (openMenuId() === p.id) {
+                            <div class="bo-row-menu__dropdown" role="menu">
+                              <button type="button" class="bo-row-menu__item bo-row-menu__item--danger" role="menuitem" [disabled]="busy()" (click)="openMenuId.set(null); rembourser(p)">
+                                Rembourser
+                              </button>
+                            </div>
+                          }
+                        </div>
                       }
                     </div>
                   </td>
@@ -189,8 +190,8 @@ import { PaiementApiService } from '../../../paiements/data-access/paiement-api.
 
     <app-ui-detail-drawer
       [open]="selectedItem() !== null"
-      [title]="selectedItem()?.referenceTransaction || 'Transaction #' + (selectedItem()?.id ?? '')"
-      eyebrow="Transaction simulée ms-paiement"
+      [title]="selectedItem()?.referenceTransaction || 'Transaction n° ' + (selectedItem()?.id ?? '')"
+      eyebrow="Détail transaction"
       (close)="selectedItem.set(null)"
     >
       @if (selectedItem(); as d) {
@@ -238,6 +239,30 @@ export class ProPaiementsPageComponent implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly actionError = signal<string | null>(null);
   protected readonly stats = signal<PaiementStats | null>(null);
+  protected readonly openMenuId = signal<number | null>(null);
+  private searchTimer?: ReturnType<typeof setTimeout>;
+
+  protected onSearchInput(): void {
+    clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => void this.loadPage(0), 250);
+  }
+
+  protected toggleRowMenu(id: number): void {
+    this.openMenuId.update((curr) => (curr === id ? null : id));
+  }
+
+  protected readonly statusPills = computed<FilterStatusPill[]>(() => {
+    const s = this.stats();
+    return [
+      { id: 'ALL', label: 'Tous', count: s?.total },
+      { id: 'ACCEPTE', label: 'Acceptés', count: s?.acceptes },
+      { id: 'EN_COURS', label: 'En cours', count: s?.enCours },
+      { id: 'INITIE', label: 'Initiés' },
+      { id: 'REFUSE', label: 'Refusés', count: s?.refuses },
+      { id: 'REMBOURSE', label: 'Remboursés', count: s?.rembourses },
+      { id: 'EXPIRE', label: 'Expirés' },
+    ];
+  });
   protected readonly items = signal<Paiement[]>([]);
   protected readonly selectedItem = signal<Paiement | null>(null);
 
@@ -345,9 +370,9 @@ export class ProPaiementsPageComponent implements OnInit {
       this.dialog
         .open<boolean>(UiConfirmDialogComponent, {
           data: {
-            title: 'Rejouer les événements Outbox de paiement ?',
-            message: 'Les événements non synchronisés vers ms-reservation et ms-notification seront rejoués.',
-            confirmLabel: 'Rejouer Outbox',
+            title: 'Synchroniser les paiements en attente ?',
+            message: 'Les paiements en attente seront synchronisés avec les réservations.',
+            confirmLabel: 'Synchroniser',
             cancelLabel: 'Annuler',
             variant: 'primary',
           },

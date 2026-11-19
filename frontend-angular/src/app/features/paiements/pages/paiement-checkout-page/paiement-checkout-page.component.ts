@@ -232,7 +232,7 @@ export class PaiementCheckoutPageComponent implements OnInit {
       this.reservation.set(synced);
       const list = await this.paiementStore.loadByReservation(res.id);
       this.tentatives.set(list);
-      toast.success('Statut synchronisé avec ms-paiement.');
+      toast.success('Statut du paiement mis à jour.');
     } catch (err) {
       toast.error(extractErrorMessage(err));
     } finally {
