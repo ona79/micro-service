@@ -9,7 +9,6 @@
         </span>
         <span class="brand__text">
           <span class="brand__name">{{ config.siteName }}</span>
-          <span class="brand__tagline">{{ config.siteSubtitle }}</span>
         </span>
       </a>
 
@@ -80,24 +79,39 @@
               <span class="notif-badge tabular-nums">{{ notificationStore.unreadCount() }}</span>
             }
           </a>
-          <a
-            routerLink="/mon-espace"
-            routerLinkActive="user-chip--active"
-            class="user-chip"
-            [attr.aria-label]="'Mon espace : ' + currentUser.prenom + ' ' + currentUser.nom"
-          >
-            <span class="user-chip__avatar" aria-hidden="true">{{ authStore.initials() }}</span>
-            <span class="user-chip__name">{{ currentUser.prenom }}</span>
-          </a>
-          <button
-            type="button"
-            class="btn-icon-logout"
-            aria-label="Se déconnecter"
-            title="Se déconnecter"
-            (click)="logout()"
-          >
-            <svg lucideLogOut [size]="16" aria-hidden="true"></svg>
-          </button>
+          <div class="avatar-menu">
+            <button
+              type="button"
+              class="user-chip"
+              [attr.aria-expanded]="avatarMenuOpen()"
+              [attr.aria-label]="'Menu compte : ' + currentUser.prenom + ' ' + currentUser.nom"
+              (click)="avatarMenuOpen.set(!avatarMenuOpen())"
+            >
+              <span class="user-chip__avatar" aria-hidden="true">{{ authStore.initials() }}</span>
+              <span class="user-chip__name">{{ currentUser.prenom }}</span>
+            </button>
+            @if (avatarMenuOpen()) {
+              <div class="avatar-menu__dropdown" role="menu">
+                <a routerLink="/mon-espace" class="avatar-menu__item" role="menuitem" (click)="avatarMenuOpen.set(false)">
+                  <svg lucideUser [size]="14" aria-hidden="true"></svg>
+                  <span>Mon espace</span>
+                </a>
+                <a routerLink="/reserver" class="avatar-menu__item" role="menuitem" (click)="avatarMenuOpen.set(false)">
+                  <svg lucideTicket [size]="14" aria-hidden="true"></svg>
+                  <span>Mes réservations</span>
+                </a>
+                <button
+                  type="button"
+                  class="avatar-menu__item avatar-menu__item--danger"
+                  role="menuitem"
+                  (click)="avatarMenuOpen.set(false); logout()"
+                >
+                  <svg lucideLogOut [size]="14" aria-hidden="true"></svg>
+                  <span>Déconnexion</span>
+                </button>
+              </div>
+            }
+          </div>
         } @else {
           <a routerLink="/connexion" routerLinkActive="auth-link--active" class="auth-link">
             <svg lucideUser [size]="15" aria-hidden="true"></svg>

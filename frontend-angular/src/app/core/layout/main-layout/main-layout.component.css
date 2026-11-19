@@ -14,7 +14,9 @@
 }
 
 .topbar__inner {
-  min-height: var(--header-height);
+  height: 60px;
+  min-height: 60px;
+  max-height: 60px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -368,6 +370,57 @@
 .app-main {
   flex: 1;
   outline: none;
+}
+
+.avatar-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.avatar-menu__dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 60;
+  min-width: 185px;
+  padding: 5px;
+  border-radius: 10px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-elevated);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.avatar-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.avatar-menu__item:hover {
+  background-color: var(--surface-canvas);
+}
+
+.avatar-menu__item--danger {
+  color: var(--danger);
+}
+
+.avatar-menu__item--danger:hover {
+  background-color: var(--status-error-bg);
 }
 
 .site-footer {

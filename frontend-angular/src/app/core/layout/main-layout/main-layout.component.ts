@@ -52,6 +52,7 @@ export class MainLayoutComponent {
   private readonly router = inject(Router);
 
   protected readonly menuOpen = signal(false);
+  protected readonly avatarMenuOpen = signal(false);
   protected searchQuery = '';
 
   protected readonly navItems: readonly NavItem[] = [
