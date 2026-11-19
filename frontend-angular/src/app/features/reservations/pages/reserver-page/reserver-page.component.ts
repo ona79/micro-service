@@ -15,6 +15,7 @@ import {
 import { toast } from 'ngx-sonner';
 import { firstValueFrom, map } from 'rxjs';
 import { AuthStore } from '../../../../core/auth/auth.store';
+import { environment } from '../../../../../environments/environment';
 import { extractErrorMessage } from '../../../../core/models/api-error.model';
 import { SeoService } from '../../../../core/services/seo.service';
 import {
@@ -309,6 +310,14 @@ export class ReserverPageComponent implements OnInit {
   }
 
   protected readonly openMenuId = signal<number | null>(null);
+  protected readonly isDemo = environment.demo;
+
+  protected readonly selectedTargetLabel = computed(() => {
+    if (this.selectedType() === 'CIRCUIT') {
+      return this.selectedCircuit()?.nomCircuit ?? 'Aucun circuit sélectionné';
+    }
+    return this.selectedEvenement()?.nomEvenement ?? 'Aucun événement sélectionné';
+  });
 
   protected toggleRowMenu(id: number): void {
     this.openMenuId.update((curr) => (curr === id ? null : id));
@@ -374,7 +383,7 @@ export class ReserverPageComponent implements OnInit {
         );
       } else if (created.statut === 'EN_ATTENTE_PAIEMENT') {
         toast.success(
-          `Réservation ${created.referenceReservation || 'n° ' + created.id} créée : passez au paiement simulé.`
+          `Réservation ${created.referenceReservation || 'n° ' + created.id} créée : passez au paiement${this.isDemo ? ' simulé' : ''}.`
         );
       } else {
         toast.success(`Réservation brouillon ${created.id} enregistrée.`);

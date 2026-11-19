@@ -14,7 +14,7 @@ import { LucideRotateCcw, LucideSearch, LucideSlidersHorizontal, LucideX } from 
 export interface FilterStatusPill {
   id: string;
   label: string;
-  count?: number;
+  count?: number | null;
   tone?: 'default' | 'danger' | 'warning' | 'success';
 }
 

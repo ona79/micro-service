@@ -105,17 +105,12 @@
         (action)="resetFilters()"
       />
     } @else {
-      <div class="agenda-list">
+      <div class="catalog-grid">
         @for (ev of publishedEvents(); track ev.id) {
           @let patLie = resolvePatrimoine(ev);
           @let sobre = isMemorialEvent(ev);
-          <article class="agenda-row" [class.agenda-row--memorial]="sobre">
-            <div class="agenda-date-stamp">
-              <span class="agenda-date-stamp__day tabular-nums">{{ ev.dateDebut | dateFr: 'dd' }}&nbsp;</span>
-              <span class="agenda-date-stamp__month">{{ ev.dateDebut | dateFr: 'MMM yyyy' }}</span>
-            </div>
-
-            <a [routerLink]="['/evenements', ev.id]" class="agenda-row__media">
+          <article class="evt-card" [class.evt-card--memorial]="sobre">
+            <a [routerLink]="['/evenements', ev.id]" class="evt-card__media">
               <app-ui-patrimoine-image
                 [codePatrimoine]="patLie?.codePatrimoine"
                 [nomPatrimoine]="patLie?.nomPatrimoine ?? ev.nomEvenement"
@@ -124,84 +119,46 @@
               />
             </a>
 
-            <div class="agenda-row__body">
-              <div class="agenda-row__top">
-                <div class="agenda-row__badges">
-                  <span
-                    class="ui-badge"
-                    [class.ui-badge--memorial]="sobre"
-                    [class.ui-badge--terracotta]="!sobre"
-                  >
-                    {{ ev.typeEvenement | evenementType }}
-                  </span>
-                  @if (patLie) {
-                    <span class="ui-badge">{{ patLie.nomPatrimoine }}</span>
-                  }
-                  @if (ev.statutEvenement === 'ANNULE') {
-                    <span class="ui-badge ui-badge--danger">ANNULÉ</span>
-                  } @else if (ev.statutEvenement === 'TERMINE') {
-                    <span class="ui-badge">TERMINÉ</span>
-                  } @else if (!isReservable(ev)) {
-                    <span class="ui-badge ui-badge--neutral">Accès sans réservation en ligne</span>
-                  }
-                  @if (getResume(ev.id); as res) {
-                    @if (res.totalAvis > 0) {
-                      <span class="ui-badge ui-badge--ochre tabular-nums">
-                        <svg lucideStar [size]="12" aria-hidden="true"></svg>
-                        {{ res.noteMoyenne }}/5 ({{ res.totalAvis }})
-                      </span>
-                    }
-                  }
-                </div>
-                <span class="agenda-row__price tabular-nums">{{ ev.prix | fcfaPrice }}</span>
+            <div class="evt-card__body">
+              <div class="evt-card__badges">
+                <span
+                  class="ui-badge"
+                  [class.ui-badge--memorial]="sobre"
+                  [class.ui-badge--terracotta]="!sobre"
+                >
+                  {{ ev.typeEvenement | evenementType }}
+                </span>
+                <span class="ui-badge ui-badge--neutral tabular-nums">
+                  {{ ev.dateDebut | dateFr: 'd MMM yyyy' }}
+                </span>
               </div>
 
-              <h2 class="agenda-row__title">
+              <h2 class="evt-card__title">
                 <a [routerLink]="['/evenements', ev.id]">{{ ev.nomEvenement }}</a>
               </h2>
 
-              <p class="agenda-row__desc">
-                {{
-                  ev.descriptionEvenement ||
-                    'Consultez la fiche de cet événement pour connaître les modalités de participation.'
-                }}
+              <p class="evt-card__meta" [title]="ev.lieu || patLie?.adressePatrimoine || 'Casamance'">
+                <svg lucideMapPin [size]="13" aria-hidden="true"></svg>
+                <span>{{ ev.lieu || patLie?.adressePatrimoine || 'Casamance' }} · {{ ev.capaciteMax }} pl.</span>
               </p>
 
-              <div class="agenda-row__footer">
-                <div class="agenda-row__meta">
-                  <span>
-                    <svg lucideCalendar [size]="14" aria-hidden="true"></svg>
-                    {{ ev.dateDebut | dateFr }}
-                  </span>
-                  <span>
-                    <svg lucideMapPin [size]="14" aria-hidden="true"></svg>
-                    {{ ev.lieu || patLie?.adressePatrimoine || 'Casamance' }}
-                  </span>
-                  <span class="tabular-nums">
-                    <svg lucideUsers [size]="14" aria-hidden="true"></svg>
-                    {{ ev.capaciteMax }} places
-                  </span>
-                </div>
-
-                <div class="agenda-row__actions">
+              <div class="evt-card__footer">
+                <span class="evt-card__price tabular-nums">{{ ev.prix | fcfaPrice }}</span>
+                @if (isReservable(ev)) {
                   <a
-                    [routerLink]="['/evenements', ev.id]"
-                    class="agenda-btn agenda-btn--secondary"
+                    routerLink="/reserver"
+                    [queryParams]="{ type: 'EVENEMENT', evenementId: ev.id }"
+                    class="evt-card__btn evt-card__btn--primary"
                   >
+                    <svg lucideTicket [size]="14" aria-hidden="true"></svg>
+                    <span>Réserver</span>
+                  </a>
+                } @else {
+                  <a [routerLink]="['/evenements', ev.id]" class="evt-card__btn">
                     <span>Détails</span>
                     <svg lucideArrowRight [size]="14" aria-hidden="true"></svg>
                   </a>
-                  @if (isReservable(ev)) {
-                    <a
-                      routerLink="/reserver"
-                      [queryParams]="{ type: 'EVENEMENT', evenementId: ev.id }"
-                      class="agenda-btn agenda-btn--primary"
-                    >
-                      <svg lucideTicket [size]="14" aria-hidden="true"></svg>
-                      <span>Réserver</span>
-                    </a>
-                  }
-                </div>
+                }
               </div>
             </div>
           </article>

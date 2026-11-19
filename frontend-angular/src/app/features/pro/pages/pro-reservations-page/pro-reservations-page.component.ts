@@ -94,7 +94,7 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
         [hasSecondaryFilters]="true"
         [secondaryActiveCount]="(dateMin ? 1 : 0) + (dateMax ? 1 : 0)"
         [resultsLabel]="totalElements() + ' réservation(s)'"
-        [hasActiveFilters]="Boolean(q.trim() || statutFilter || typeFilter || dateMin || dateMax)"
+        [hasActiveFilters]="!!(q.trim() || statutFilter || typeFilter || dateMin || dateMax)"
         (searchChange)="q = $event; loadPage(0)"
         (reset)="q = ''; statutFilter = ''; typeFilter = ''; dateMin = ''; dateMax = ''; loadPage(0)"
       >

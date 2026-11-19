@@ -1,26 +1,13 @@
-<div class="page-section">
+<div class="page-section" style="padding-top: 14px;">
   <div class="container">
-    <header class="editorial-header">
-      <p class="editorial-header__eyebrow">Comptoir de réservation · Parcours guidé</p>
-      <h1 class="editorial-header__title">Réserver une Visite ou un Événement</h1>
-      <p class="editorial-header__subtitle">
-        Sélectionnez un circuit ou un événement ouvert, vérifiez la disponibilité en temps réel
-        puis réglez en environnement simulé Wave ou Orange Money.
-      </p>
-      <ol
-        class="booking-steps"
-        aria-label="Étapes de réservation"
-        style="display:flex;flex-wrap:wrap;gap:0.65rem;list-style:none;padding:0;margin:1rem 0 0;"
-      >
-        <li class="ui-badge ui-badge--ochre">1. Prestation &amp; disponibilité</li>
-        <li class="ui-badge ui-badge--neutral">2. Coordonnées &amp; participants</li>
-        <li class="ui-badge ui-badge--neutral">3. Confirmation serveur</li>
-        <li class="ui-badge ui-badge--neutral">4. Paiement simulé</li>
-      </ol>
+    <header class="page-head-compact">
+      <div class="page-head-compact__left">
+        <h1 class="page-head-compact__title">Réserver</h1>
+      </div>
     </header>
 
     <div class="desk-layout">
-      <!-- Colonne gauche : Configurateur de réservation -->
+      <!-- Colonne gauche : Formulaire compact (max 720px) -->
       <section class="booking-card" aria-labelledby="booking-form-title">
         <h2 id="booking-form-title" class="booking-card__title">Nouvelle réservation</h2>
 
@@ -37,10 +24,8 @@
             <div class="booking-success__body">
               <p>
                 <strong>{{ created.referenceReservation || ('Réservation n° ' + created.id) }}</strong>
-                enregistrée pour {{ created.nomClient }} ({{ created.nombrePlaces }} place(s), total
-                serveur :
-                <span class="tabular-nums">{{ created.montantTotal | fcfaPrice }}</span
-                >).
+                enregistrée pour {{ created.nomClient }} ({{ created.nombrePlaces }} place(s),
+                <span class="tabular-nums">{{ created.montantTotal | fcfaPrice }}</span>).
               </p>
               <div class="booking-success__actions">
                 @if (created.statut === 'EN_ATTENTE_PAIEMENT') {
@@ -48,14 +33,14 @@
                     [routerLink]="['/paiements', created.id]"
                     class="ui-btn ui-btn--primary"
                   >
-                    <span>Régler maintenant (Wave / Orange Money simulé)</span>
+                    <span>Régler maintenant ({{ isDemo ? 'Wave / Orange Money simulé' : 'Wave / Orange Money' }})</span>
                     <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
                   </a>
                 } @else if (created.statut === 'CONFIRMEE') {
-                  <span class="ui-badge ui-badge--success">Réservation confirmée (Gratuit)</span>
+                  <span class="ui-badge ui-badge--success">Confirmée (Gratuit)</span>
                   <a [routerLink]="['/reservations', created.id]" class="ui-btn ui-btn--primary">
                     <svg lucideTicket [size]="15" aria-hidden="true"></svg>
-                    <span>Voir mes billets d'accès QR</span>
+                    <span>Voir mes billets QR</span>
                     <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
                   </a>
                 } @else {
@@ -71,7 +56,7 @@
 
         <form [formGroup]="form" (ngSubmit)="onSubmit()" novalidate>
           <div class="form-group">
-            <span class="form-label">Type de prestation *</span>
+            <span class="form-label">Circuit ou événement *</span>
             <div
               ngToolbar
               orientation="horizontal"
@@ -114,8 +99,7 @@
                 <option value="">-- Sélectionner un circuit --</option>
                 @for (cir of reservableCircuits(); track cir.id) {
                   <option [value]="cir.id">
-                    {{ cir.nomCircuit }} ({{ cir.prix | fcfaPrice }} — max
-                    {{ cir.placesMax }} places)
+                    {{ cir.nomCircuit }} — {{ cir.prix | fcfaPrice }} ({{ cir.placesMax }} pl.)
                   </option>
                 }
               </select>
@@ -160,8 +144,7 @@
                 <option value="">-- Sélectionner un événement --</option>
                 @for (ev of reservableEvenements(); track ev.id) {
                   <option [value]="ev.id" [disabled]="ev.ouvertReservation === false">
-                    {{ ev.nomEvenement }} ({{ ev.prix | fcfaPrice }} — max {{ ev.capaciteMax }}
-                    places{{ ev.ouvertReservation === false ? ' · Non ouvert' : '' }})
+                    {{ ev.nomEvenement }} — {{ ev.prix | fcfaPrice }} ({{ ev.capaciteMax }} pl.{{ ev.ouvertReservation === false ? ' · Fermé' : '' }})
                   </option>
                 }
               </select>
@@ -190,25 +173,24 @@
                 {{
                   reservationStore.disponibiliteLoading()
                     ? 'Vérification...'
-                    : 'Vérifier la disponibilité en direct'
+                    : 'Vérifier la disponibilité'
                 }}
               </span>
             </button>
 
             @if (reservationStore.disponibilite(); as dispo) {
-              <div class="dispo-result" [class.dispo-result--closed]="!dispo.reservable">
+              <span class="dispo-result" [class.dispo-result--closed]="!dispo.reservable">
                 @if (dispo.reservable) {
-                  <strong>{{ dispo.placesDisponibles }}</strong> place(s) restante(s) sur
-                  {{ dispo.capaciteTotale }} ({{ dispo.prixUnitaire | fcfaPrice }} / pers.)
+                  <strong>{{ dispo.placesDisponibles }}</strong> places disponibles
                 } @else {
-                  {{ dispo.motifIndisponibilite || 'Prestation indisponible' }}
+                  {{ dispo.motifIndisponibilite || 'Indisponible' }}
                 }
-              </div>
+              </span>
             }
           </div>
 
           <div class="form-group">
-            <label for="nomClient" class="form-label">Nom complet du titulaire *</label>
+            <label for="nomClient" class="form-label">Nom complet *</label>
             <input
               id="nomClient"
               type="text"
@@ -226,7 +208,7 @@
 
           <div class="form-row-2">
             <div class="form-group">
-              <label for="emailClient" class="form-label">Adresse e-mail *</label>
+              <label for="emailClient" class="form-label">E-mail *</label>
               <input
                 id="emailClient"
                 type="email"
@@ -236,7 +218,7 @@
                 [class.form-control--invalid]="isInvalid('emailClient')"
               />
               @if (isInvalid('emailClient')) {
-                <span class="form-error">Veuillez saisir une adresse e-mail valide.</span>
+                <span class="form-error">Adresse e-mail invalide.</span>
               }
             </div>
 
@@ -246,7 +228,7 @@
                 id="telephoneClient"
                 type="tel"
                 formControlName="telephoneClient"
-                placeholder="Ex: +221 77 000 00 00"
+                placeholder="+221 77 000 00 00"
                 class="form-control"
               />
             </div>
@@ -254,7 +236,7 @@
 
           <div class="form-row-2">
             <div class="form-group">
-              <label for="nombrePlaces" class="form-label">Nombre de places *</label>
+              <label for="nombrePlaces" class="form-label">Places *</label>
               <input
                 id="nombrePlaces"
                 type="number"
@@ -265,14 +247,12 @@
                 [class.form-control--invalid]="isInvalid('nombrePlaces')"
               />
               @if (isInvalid('nombrePlaces')) {
-                <span class="form-error">
-                  Indiquez un nombre entier de places supérieur ou égal à 1.
-                </span>
+                <span class="form-error">Minimum 1 place.</span>
               }
             </div>
 
             <div class="form-group">
-              <label for="commentaire" class="form-label">Note logistique (optionnel)</label>
+              <label for="commentaire" class="form-label">Note (optionnel)</label>
               <input
                 id="commentaire"
                 type="text"
@@ -299,15 +279,15 @@
                   [ngModel]="part.nomComplet"
                   [ngModelOptions]="{ standalone: true }"
                   (ngModelChange)="updateParticipant($index, 'nomComplet', $event)"
-                  placeholder="Nom complet"
+                  placeholder="Nom complet du participant"
                 />
                 <input
                   type="email"
                   class="form-control"
-                  [ngModel]="part.email || ''"
+                  [ngModel]="part.email"
                   [ngModelOptions]="{ standalone: true }"
                   (ngModelChange)="updateParticipant($index, 'email', $event)"
-                  placeholder="Email (optionnel)"
+                  placeholder="E-mail (optionnel)"
                 />
                 <button
                   type="button"
@@ -322,15 +302,8 @@
 
           <label class="draft-checkbox">
             <input type="checkbox" formControlName="soumettrePourPaiement" />
-            <span>Soumettre immédiatement pour paiement (décochez pour enregistrer en brouillon)</span>
+            <span>Soumettre immédiatement pour paiement</span>
           </label>
-
-          @if (estimatedTotal() !== null) {
-            <div class="estimate-box">
-              <span>Estimation indicative (tarif officiel calculé côté serveur)</span>
-              <strong class="tabular-nums">{{ estimatedTotal() | fcfaPrice }}</strong>
-            </div>
-          }
 
           <button
             type="submit"
@@ -341,7 +314,7 @@
             <span>
               {{
                 reservationStore.submitting()
-                  ? 'Enregistrement en cours...'
+                  ? 'Enregistrement...'
                   : 'Confirmer la réservation'
               }}
             </span>
@@ -349,296 +322,42 @@
         </form>
       </section>
 
-      <!-- Colonne droite : Registre des réservations -->
-      <section class="ledger-section" aria-labelledby="ledger-title">
-        <div class="ledger-header">
-          <h2 id="ledger-title" class="booking-card__title tabular-nums">
-            Registre des réservations ({{ reservationStore.items().length }})
-          </h2>
-          <button type="button" class="refresh-btn" (click)="refreshAll()">
-            <svg lucideRefreshCw [size]="14" aria-hidden="true"></svg>
-            <span>Actualiser</span>
-          </button>
-        </div>
-
-        <app-ui-error-banner
-          title="Erreur lors de l’annulation"
-          [message]="reservationStore.cancelError()"
-        />
-
-        <div class="ledger-toolbar">
-          <div class="ledger-search-wrap">
-            <svg lucideSearch [size]="15" class="ledger-search-wrap__icon" aria-hidden="true"></svg>
-            <input
-              type="search"
-              aria-label="Filtrer les réservations"
-              placeholder="Filtrer par référence, visiteur, numéro..."
-              class="ledger-search"
-              [ngModel]="ledgerSearch()"
-              (ngModelChange)="ledgerSearch.set($event); currentPage.set(0)"
-            />
+      <!-- Colonne droite : Récapitulatif en direct -->
+      <aside class="summary-card" aria-labelledby="summary-title">
+        <h2 id="summary-title" class="booking-card__title">Récapitulatif</h2>
+        <dl class="summary-list">
+          <div class="summary-row">
+            <dt>Circuit ou événement</dt>
+            <dd>{{ selectedTargetLabel() }}</dd>
           </div>
-
-          <div
-            ngToolbar
-            orientation="horizontal"
-            class="status-tabs"
-            aria-label="Filtrer par statut"
-          >
-            <button
-              type="button"
-              ngToolbarWidget
-              class="status-tab"
-              [class.status-tab--active]="statusFilter() === 'ALL'"
-              (click)="setStatusFilter('ALL')"
-            >
-              Toutes
-            </button>
-            <button
-              type="button"
-              ngToolbarWidget
-              class="status-tab"
-              [class.status-tab--active]="statusFilter() === 'EN_ATTENTE_PAIEMENT'"
-              (click)="setStatusFilter('EN_ATTENTE_PAIEMENT')"
-            >
-              À payer
-            </button>
-            <button
-              type="button"
-              ngToolbarWidget
-              class="status-tab"
-              [class.status-tab--active]="statusFilter() === 'CONFIRMEE'"
-              (click)="setStatusFilter('CONFIRMEE')"
-            >
-              Confirmées
-            </button>
-            <button
-              type="button"
-              ngToolbarWidget
-              class="status-tab"
-              [class.status-tab--active]="statusFilter() === 'ANNULEE'"
-              (click)="setStatusFilter('ANNULEE')"
-            >
-              Annulées
-            </button>
-            <button
-              type="button"
-              ngToolbarWidget
-              class="status-tab"
-              [class.status-tab--active]="statusFilter() === 'REMBOURSEE'"
-              (click)="setStatusFilter('REMBOURSEE')"
-            >
-              Remboursées
-            </button>
-          </div>
-        </div>
-
-        @if (reservationStore.loading() && reservationStore.items().length === 0) {
-          <app-ui-loading-state label="Chargement des réservations du compte en cours..." />
-        } @else if (reservationStore.listError() && reservationStore.items().length === 0) {
-          <app-ui-error-banner
-            title="Erreur de chargement des réservations"
-            [message]="reservationStore.listError()"
-            [showRetry]="true"
-            (retry)="refreshAll()"
-          />
-        } @else if (filteredReservations().length === 0) {
-          <app-ui-empty-state
-            title="Aucune réservation correspondante"
-            description="Utilisez le formulaire ci-contre pour enregistrer une réservation ou modifiez vos filtres d'affichage."
-          />
-        } @else {
-          <div class="ledger-list">
-            @for (res of pagedReservations(); track res.id) {
-              @let isAnnulee = res.statut === 'ANNULEE' || res.statut === 'EXPIREE';
-              <article class="res-item" [class.res-item--annulee]="isAnnulee">
-                <div class="res-item__top">
-                  <div class="res-item__badges">
-                    <span class="ui-badge tabular-nums">
-                      {{ res.referenceReservation || ('n° ' + res.id) }}
-                    </span>
-                    <span
-                      class="ui-badge"
-                      [class.ui-badge--ochre]="res.typeReservation === 'CIRCUIT'"
-                    >
-                      {{ res.typeReservation === 'CIRCUIT' ? 'Circuit' : 'Événement' }}
-                    </span>
-                    <span [class]="reservationStatusBadgeClass(res.statut)">
-                      {{ formatReservationStatusLabel(res.statut) }}
-                    </span>
-                  </div>
-                  <span class="res-item__date">{{ res.dateReservation | dateFr }}</span>
-                </div>
-
-                <h3 class="res-item__title">
-                  @if (res.typeReservation === 'CIRCUIT' && res.circuitId) {
-                    <a [routerLink]="['/circuits', res.circuitId]">
-                      {{ resolveCircuitName(res) }}
-                    </a>
-                  } @else if (res.evenementId) {
-                    <a [routerLink]="['/evenements', res.evenementId]">
-                      {{ resolveEvenementName(res) }}
-                    </a>
-                  } @else {
-                    Réservation {{ res.id }}
-                  }
-                </h3>
-
-                <dl class="res-item__meta">
-                  <div>
-                    <dt>Visiteur</dt>
-                    <dd>{{ res.nomClient }} ({{ res.emailClient }})</dd>
-                  </div>
-                  @if (res.datePrestation) {
-                    <div>
-                      <dt>Prestation</dt>
-                      <dd>
-                        {{ res.datePrestation | dateFr: 'date' }}
-                        @if (res.creneauPrestation) {
-                          · {{ res.creneauPrestation }}
-                        }
-                      </dd>
-                    </div>
-                  }
-                  <div>
-                    <dt>Places</dt>
-                    <dd class="tabular-nums">{{ res.nombrePlaces }}</dd>
-                  </div>
-                  <div>
-                    <dt>Montant serveur</dt>
-                    <dd class="tabular-nums">{{ res.montantTotal | fcfaPrice }}</dd>
-                  </div>
-                  @if (res.referencePaiement) {
-                    <div>
-                      <dt>Réf. paiement simulé</dt>
-                      <dd class="tabular-nums">{{ res.referencePaiement }}</dd>
-                    </div>
-                  }
-                </dl>
-
-                <div class="res-item__actions res-item__actions--spread">
-                  <div class="res-item__left-actions">
-                    @if (res.statut === 'EN_ATTENTE_PAIEMENT') {
-                      <a
-                        [routerLink]="['/paiements', res.id]"
-                        class="bo-btn bo-btn--sm bo-btn--primary"
-                      >
-                        Régler
-                      </a>
-                    } @else if (res.statut === 'BROUILLON') {
-                      <button
-                        type="button"
-                        class="bo-btn bo-btn--sm bo-btn--primary"
-                        (click)="submitDraft(res)"
-                      >
-                        Soumettre
-                      </button>
-                    } @else {
-                      <a
-                        [routerLink]="['/reservations', res.id]"
-                        class="bo-btn bo-btn--sm"
-                      >
-                        Détail
-                      </a>
-                    }
-                  </div>
-
-                  <div class="bo-row-menu">
-                    <button
-                      type="button"
-                      class="bo-btn bo-btn--sm bo-btn--icon"
-                      aria-label="Plus d'actions"
-                      (click)="toggleRowMenu(res.id)"
-                    >
-                      ···
-                    </button>
-                    @if (openMenuId() === res.id) {
-                      <div class="bo-row-menu__dropdown" role="menu">
-                        <a
-                          [routerLink]="['/reservations', res.id]"
-                          class="bo-row-menu__item"
-                          role="menuitem"
-                          (click)="openMenuId.set(null)"
-                        >
-                          Détails complets
-                        </a>
-                        @if (res.historique?.length || res.participants?.length) {
-                          <button
-                            type="button"
-                            class="bo-row-menu__item"
-                            role="menuitem"
-                            (click)="openMenuId.set(null); toggleHistory(res.id)"
-                          >
-                            {{ expandedHistoryId() === res.id ? 'Masquer historique' : 'Historique' }}
-                          </button>
-                        }
-                        @if (canCancelReservation(res)) {
-                          <button
-                            type="button"
-                            class="bo-row-menu__item bo-row-menu__item--danger"
-                            role="menuitem"
-                            [disabled]="reservationStore.cancelingId() === res.id"
-                            (click)="openMenuId.set(null); requestCancellation(res)"
-                          >
-                            Annuler
-                          </button>
-                        }
-                      </div>
-                    }
-                  </div>
-                </div>
-
-                @if (expandedHistoryId() === res.id) {
-                  <div class="res-history-drawer">
-                    @if (res.participants?.length) {
-                      <p class="drawer-heading">Participants :</p>
-                      <ul class="drawer-list">
-                        @for (p of res.participants!; track p.id || $index) {
-                          <li>{{ p.nomComplet }} @if (p.email) { ({{ p.email }}) }</li>
-                        }
-                      </ul>
-                    }
-                    @if (res.historique?.length) {
-                      <p class="drawer-heading">Transitions :</p>
-                      <ul class="drawer-list">
-                        @for (h of res.historique!; track h.id) {
-                          <li>
-                            <strong>{{ h.ancienStatut || 'NOUVEAU' }} -> {{ h.nouveauStatut }}</strong>
-                            ({{ h.dateTransition | dateFr: 'datetime' }})
-                            @if (h.motif) { — {{ h.motif }} }
-                          </li>
-                        }
-                      </ul>
-                    }
-                  </div>
-                }
-              </article>
-            }
-          </div>
-
-          @if (totalPages() > 1) {
-            <div class="ledger-pagination">
-              <button
-                type="button"
-                class="refresh-btn"
-                [disabled]="currentPage() === 0"
-                (click)="currentPage.set(currentPage() - 1)"
-              >
-                Précédent
-              </button>
-              <span class="tabular-nums">Page {{ currentPage() + 1 }} / {{ totalPages() }}</span>
-              <button
-                type="button"
-                class="refresh-btn"
-                [disabled]="currentPage() + 1 >= totalPages()"
-                (click)="currentPage.set(currentPage() + 1)"
-              >
-                Suivant
-              </button>
+          @if (selectedType() === 'CIRCUIT') {
+            <div class="summary-row">
+              <dt>Date</dt>
+              <dd>{{ form.controls.datePrestation.value || 'Non précisée' }}</dd>
+            </div>
+            <div class="summary-row">
+              <dt>Créneau</dt>
+              <dd>{{ form.controls.creneauPrestation.value || '—' }}</dd>
             </div>
           }
-        }
-      </section>
+          <div class="summary-row">
+            <dt>Places</dt>
+            <dd class="tabular-nums">{{ form.controls.nombrePlaces.value || 1 }}</dd>
+          </div>
+          <div class="summary-row summary-row--total">
+            <dt>Prix total</dt>
+            <dd class="tabular-nums">
+              {{ estimatedTotal() !== null ? (estimatedTotal() | fcfaPrice) : '—' }}
+            </dd>
+          </div>
+        </dl>
+
+        <div class="summary-footer">
+          <a routerLink="/mon-espace" class="refresh-btn" style="width:100%;justify-content:center;">
+            Voir mes réservations dans Mon espace
+          </a>
+        </div>
+      </aside>
     </div>
   </div>
 </div>

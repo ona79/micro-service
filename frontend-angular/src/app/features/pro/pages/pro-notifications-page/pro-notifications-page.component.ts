@@ -105,7 +105,7 @@ import { NotificationStore } from '../../../notifications/data-access/notificati
           [activeStatus]="nonLuesOnly ? 'unread' : 'all'"
           (statusChange)="nonLuesOnly = $event === 'unread'; loadPerso(0)"
           [resultsLabel]="persoTotal() + ' notification(s)'"
-          [hasActiveFilters]="Boolean(nonLuesOnly || persoType)"
+          [hasActiveFilters]="!!(nonLuesOnly || persoType)"
           (reset)="nonLuesOnly = false; persoType = ''; loadPerso(0)"
         >
           <ng-container filter-primary>
@@ -210,7 +210,7 @@ import { NotificationStore } from '../../../notifications/data-access/notificati
           searchPlaceholder="Type événement (ex: PAIEMENT_ACCEPTE)"
           searchAriaLabel="Filtrer par type d'événement"
           [resultsLabel]="adminTotal() + ' envoi(s)'"
-          [hasActiveFilters]="Boolean(adminStatut || adminType.trim())"
+          [hasActiveFilters]="!!(adminStatut || adminType.trim())"
           (searchChange)="adminType = $event; loadAdmin(0)"
           (reset)="adminStatut = ''; adminType = ''; loadAdmin(0)"
         >

@@ -180,7 +180,7 @@ import { AvisApiService } from '../../../avis/data-access/avis-api.service';
           [activeStatus]="avisStatutFilter || 'ALL'"
           (statusChange)="avisStatutFilter = $event === 'ALL' ? '' : $any($event); loadAvis()"
           [resultsLabel]="avis().length + ' avis'"
-          [hasActiveFilters]="Boolean(cibleFilter || avisStatutFilter)"
+          [hasActiveFilters]="!!(cibleFilter || avisStatutFilter)"
           (reset)="cibleFilter = ''; avisStatutFilter = ''; loadAvis()"
         >
           <ng-container filter-primary>
@@ -359,10 +359,10 @@ export class ProModerationPageComponent implements OnInit {
     const s = this.stats();
     return [
       { id: 'ALL', label: 'Tous', count: s?.totalAvis },
-      { id: 'APPROUVE', label: 'Approuvés', count: s?.avisApprouves },
-      { id: 'EN_ATTENTE', label: 'En attente' },
-      { id: 'MASQUE', label: 'Masqués', count: s?.avisMasques },
-      { id: 'REJETE', label: 'Rejetés', count: s?.avisRejetes },
+      { id: 'APPROUVE', label: 'Approuvés', count: s?.approuves },
+      { id: 'EN_ATTENTE', label: 'En attente', count: s?.enAttente },
+      { id: 'MASQUE', label: 'Masqués', count: s?.masques },
+      { id: 'REJETE', label: 'Rejetés', count: s?.rejetes },
     ];
   });
   protected readonly avis = signal<Avis[]>([]);

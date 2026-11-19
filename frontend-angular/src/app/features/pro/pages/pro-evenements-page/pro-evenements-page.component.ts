@@ -236,7 +236,7 @@ function dateRangeValidator(group: AbstractControl): ValidationErrors | null {
         searchPlaceholder="Rechercher nom, lieu, organisateur..."
         searchAriaLabel="Rechercher un événement"
         [resultsLabel]="totalElements() + ' événement(s)'"
-        [hasActiveFilters]="Boolean(q.trim() || statutFilter)"
+        [hasActiveFilters]="!!(q.trim() || statutFilter)"
         (searchChange)="q = $event; loadPage(0)"
         (reset)="q = ''; statutFilter = ''; loadPage(0)"
       />

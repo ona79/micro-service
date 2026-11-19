@@ -84,7 +84,7 @@ describe('EvenementsListPageComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Festival de Carabane');
     expect(fixture.nativeElement.textContent).toContain('Gratuit');
 
-    const chips = fixture.nativeElement.querySelectorAll('.type-chip') as NodeListOf<HTMLButtonElement>;
+    const chips = fixture.nativeElement.querySelectorAll('.type-chip-sm') as NodeListOf<HTMLButtonElement>;
     const festivalChip = Array.from(chips).find((b) => b.textContent?.includes('Festivals'));
     festivalChip?.click();
     fixture.detectChanges();

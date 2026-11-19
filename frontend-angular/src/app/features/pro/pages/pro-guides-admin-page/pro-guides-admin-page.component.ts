@@ -83,7 +83,7 @@ import { GuideApiService } from '../../../guides/data-access/guide-api.service';
         searchPlaceholder="Rechercher nom, email, zone, langue..."
         searchAriaLabel="Rechercher un guide"
         [resultsLabel]="filteredGuides().length + ' guide(s)'"
-        [hasActiveFilters]="Boolean(q.trim() || statutFilter)"
+        [hasActiveFilters]="!!(q.trim() || statutFilter)"
         (searchChange)="q = $event"
         (reset)="q = ''; statutFilter = ''; loadGuides()"
       />

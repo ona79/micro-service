@@ -226,7 +226,7 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
         searchPlaceholder="Rechercher nom, code, localité..."
         searchAriaLabel="Rechercher un patrimoine"
         [resultsLabel]="totalElements() + ' fiche(s)'"
-        [hasActiveFilters]="Boolean(q.trim() || categorieFilter || zoneFilter || statutFilter)"
+        [hasActiveFilters]="!!(q.trim() || categorieFilter || zoneFilter || statutFilter)"
         (searchChange)="q = $event; loadPage(0)"
         (reset)="q = ''; categorieFilter = ''; zoneFilter = ''; statutFilter = ''; loadPage(0)"
       >

@@ -163,7 +163,7 @@ import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
           searchPlaceholder="Nom, prénom, email..."
           searchAriaLabel="Rechercher un utilisateur"
           [resultsLabel]="userTotal() + ' compte(s)'"
-          [hasActiveFilters]="Boolean(userQ.trim() || userRoleFilter || userActifFilter)"
+          [hasActiveFilters]="!!(userQ.trim() || userRoleFilter || userActifFilter)"
           (searchChange)="userQ = $event; loadUsers(0)"
           (reset)="userQ = ''; userRoleFilter = ''; userActifFilter = ''; loadUsers(0)"
         >
@@ -267,7 +267,7 @@ import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
           searchPlaceholder="Email, IP, détails..."
           searchAriaLabel="Rechercher dans les logs"
           [resultsLabel]="auditTotal() + ' entrée(s)'"
-          [hasActiveFilters]="Boolean(auditQ.trim() || auditEventType)"
+          [hasActiveFilters]="!!(auditQ.trim() || auditEventType)"
           (searchChange)="auditQ = $event; loadAudit(0)"
           (reset)="auditQ = ''; auditEventType = ''; loadAudit(0)"
         >

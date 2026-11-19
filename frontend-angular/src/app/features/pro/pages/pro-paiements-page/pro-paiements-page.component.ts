@@ -99,7 +99,7 @@ import { PaiementApiService } from '../../../paiements/data-access/paiement-api.
         searchPlaceholder="Référence PAY-SIM..., corrélation..."
         searchAriaLabel="Rechercher un paiement"
         [resultsLabel]="totalElements() + ' transaction(s)'"
-        [hasActiveFilters]="Boolean(q.trim() || statutFilter || modeFilter || reservationIdFilter)"
+        [hasActiveFilters]="!!(q.trim() || statutFilter || modeFilter || reservationIdFilter)"
         (searchChange)="q = $event; loadPage(0)"
         (reset)="q = ''; statutFilter = ''; modeFilter = ''; reservationIdFilter = null; loadPage(0)"
       >
@@ -254,13 +254,13 @@ export class ProPaiementsPageComponent implements OnInit {
   protected readonly statusPills = computed<FilterStatusPill[]>(() => {
     const s = this.stats();
     return [
-      { id: 'ALL', label: 'Tous', count: s?.total },
-      { id: 'ACCEPTE', label: 'Acceptés', count: s?.acceptes },
+      { id: 'ALL', label: 'Tous', count: s?.totalTransactions },
+      { id: 'ACCEPTE', label: 'Acceptés', count: s?.acceptees },
       { id: 'EN_COURS', label: 'En cours', count: s?.enCours },
       { id: 'INITIE', label: 'Initiés' },
-      { id: 'REFUSE', label: 'Refusés', count: s?.refuses },
-      { id: 'REMBOURSE', label: 'Remboursés', count: s?.rembourses },
-      { id: 'EXPIRE', label: 'Expirés' },
+      { id: 'REFUSE', label: 'Refusés', count: s?.refusees },
+      { id: 'REMBOURSE', label: 'Remboursés', count: s?.remboursees },
+      { id: 'EXPIRE', label: 'Expirés', count: s?.expirees },
     ];
   });
   protected readonly items = signal<Paiement[]>([]);

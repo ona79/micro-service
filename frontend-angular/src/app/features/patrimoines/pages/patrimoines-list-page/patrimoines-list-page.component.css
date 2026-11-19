@@ -167,14 +167,14 @@
 
 .patrimoines-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
-  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: 16px;
 }
 
 .pat-card {
   background-color: var(--surface-elevated);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
+  border-radius: 12px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -192,11 +192,11 @@
 }
 
 .pat-card__media {
-  height: 215px;
+  height: 140px;
 }
 
 .pat-card__body {
-  padding: var(--space-5);
+  padding: 14px;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -205,8 +205,8 @@
 .pat-card__badges {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
+  gap: 6px;
+  margin-bottom: 6px;
 }
 
 .pat-card__title {

@@ -283,7 +283,7 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
           searchPlaceholder="Rechercher nom, point de départ..."
           searchAriaLabel="Rechercher un circuit"
           [resultsLabel]="totalElements() + ' circuit(s)'"
-          [hasActiveFilters]="Boolean(q.trim() || statutFilter || diffFilter)"
+          [hasActiveFilters]="!!(q.trim() || statutFilter || diffFilter)"
           (searchChange)="q = $event; loadPage(0)"
           (reset)="q = ''; statutFilter = ''; diffFilter = ''; loadPage(0)"
         >

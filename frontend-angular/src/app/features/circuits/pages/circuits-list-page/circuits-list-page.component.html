@@ -130,29 +130,23 @@
         (action)="resetFilters()"
       />
     } @else {
-      <div class="routes-list">
+      <div class="catalog-grid">
         @for (circuit of publishedCircuits(); track circuit.id) {
           @let stops = getOrderedStops(circuit);
           @let firstPat = getFirstPatrimoine(circuit);
-          <app-ui-card [interactive]="true" class="route-card">
-            <div slot="media">
-              <a [routerLink]="['/circuits', circuit.id]" class="route-card__media">
-                <app-ui-patrimoine-image
-                  [codePatrimoine]="firstPat?.codePatrimoine"
-                  [nomPatrimoine]="firstPat?.nomPatrimoine ?? circuit.nomCircuit"
-                  [imageUrl]="circuit.imageUrl || firstPat?.imageUrl"
-                />
-              </a>
-            </div>
+          <article class="cir-card">
+            <a [routerLink]="['/circuits', circuit.id]" class="cir-card__media">
+              <app-ui-patrimoine-image
+                [codePatrimoine]="firstPat?.codePatrimoine"
+                [nomPatrimoine]="firstPat?.nomPatrimoine ?? circuit.nomCircuit"
+                [imageUrl]="circuit.imageUrl || firstPat?.imageUrl"
+              />
+            </a>
 
-            <div slot="header" class="route-card__top">
-              <div class="route-card__badges">
-                <span class="ui-badge ui-badge--ochre">
-                  {{ circuit.difficulte | difficulteLabel }}
-                </span>
-                <span class="ui-badge tabular-nums">
-                  {{ stops.length }} étape{{ stops.length > 1 ? 's' : '' }}
-                </span>
+            <div class="cir-card__body">
+              <div class="cir-card__badges">
+                <span class="ui-badge ui-badge--ochre">{{ circuit.difficulte | difficulteLabel }}</span>
+                <span class="ui-badge tabular-nums">{{ stops.length }} étape{{ stops.length > 1 ? 's' : '' }}</span>
                 @if (circuit.moyenTransport) {
                   <span class="ui-badge">{{ circuit.moyenTransport }}</span>
                 }
@@ -165,69 +159,39 @@
                   }
                 }
               </div>
-              <span class="route-card__price tabular-nums">
-                {{ circuit.prix | fcfaPrice }}
-              </span>
-            </div>
 
-            <h2 class="route-card__title">
-              <a [routerLink]="['/circuits', circuit.id]">{{ circuit.nomCircuit }}</a>
-            </h2>
+              <h2 class="cir-card__title">
+                <a [routerLink]="['/circuits', circuit.id]">{{ circuit.nomCircuit }}</a>
+              </h2>
 
-            <p class="route-card__desc">
-              {{
-                circuit.presentationTouristique ||
-                  circuit.descriptionCircuit ||
-                  'Parcours touristique reliant plusieurs sites patrimoniaux majeurs de Casamance.'
-              }}
-            </p>
-
-            @if (stops.length > 0) {
-              <ol class="stop-chain" aria-label="Aperçu des étapes">
-                @for (stop of stops; track stop.id || stop.ordre) {
-                  <li class="stop-chain__item">
-                    <span class="stop-chain__num">{{ stop.ordre }}</span>
-                    <span>{{ getStopLabel(stop.patrimoineId, stop.patrimoine) }}</span>
-                  </li>
-                }
-              </ol>
-            }
-
-            <div slot="footer" class="route-card__footer">
-              <div class="route-metrics tabular-nums">
+              <p class="cir-card__meta tabular-nums">
                 <span>
-                  <svg lucideClock [size]="15" aria-hidden="true"></svg>
+                  <svg lucideClock [size]="13" aria-hidden="true"></svg>
                   {{ circuit.dureeEstimee | durationMinutes }}
                 </span>
                 <span title="Estimation orthodromique indicative à vol d’oiseau entre étapes">
-                  <svg lucideRoute [size]="15" aria-hidden="true"></svg>
+                  <svg lucideRoute [size]="13" aria-hidden="true"></svg>
                   ~{{ circuit.distanceTotale || 0 }} km (vol d’oiseau · indicatif)
                 </span>
                 <span>
-                  <svg lucideUsers [size]="15" aria-hidden="true"></svg>
-                  {{ circuit.placesMax }} places max
+                  <svg lucideUsers [size]="13" aria-hidden="true"></svg>
+                  {{ circuit.placesMax }} pl.
                 </span>
-              </div>
+              </p>
 
-              <div class="route-actions">
-                <a
-                  [routerLink]="['/circuits', circuit.id]"
-                  class="route-btn route-btn--secondary"
-                >
-                  <span>Voir l’itinéraire</span>
-                  <svg lucideArrowRight [size]="15" aria-hidden="true"></svg>
-                </a>
+              <div class="cir-card__footer">
+                <span class="cir-card__price tabular-nums">{{ circuit.prix | fcfaPrice }}</span>
                 <a
                   routerLink="/reserver"
                   [queryParams]="{ type: 'CIRCUIT', circuitId: circuit.id }"
-                  class="route-btn route-btn--primary"
+                  class="cir-card__btn"
                 >
-                  <svg lucideTicket [size]="15" aria-hidden="true"></svg>
+                  <svg lucideTicket [size]="14" aria-hidden="true"></svg>
                   <span>Réserver</span>
                 </a>
               </div>
             </div>
-          </app-ui-card>
+          </article>
         }
       </div>
 

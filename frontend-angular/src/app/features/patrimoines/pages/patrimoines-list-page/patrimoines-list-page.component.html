@@ -47,7 +47,7 @@
       searchPlaceholder="Rechercher un site, une localité..."
       searchAriaLabel="Rechercher un patrimoine"
       [resultsLabel]="totalElements() + (totalElements() > 1 ? ' sites' : ' site')"
-      [hasActiveFilters]="hasActiveFilters() || Boolean(gpsLocation())"
+      [hasActiveFilters]="hasActiveFilters() || !!gpsLocation()"
       [activeChips]="activeFilterChips()"
       (searchChange)="onSearchChange($event)"
       (removeChip)="removeFilterChip($event)"

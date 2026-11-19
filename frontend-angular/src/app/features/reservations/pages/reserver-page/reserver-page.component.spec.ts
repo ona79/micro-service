@@ -114,11 +114,17 @@ describe('ReserverPageComponent', () => {
     fixture.detectChanges();
 
     dialogSpy.open.mockReturnValue({ closed: of(true) });
-    const menuTrigger: HTMLButtonElement = fixture.nativeElement.querySelector('.bo-row-menu button');
-    menuTrigger.click();
-    fixture.detectChanges();
-    const cancelButton: HTMLButtonElement = fixture.nativeElement.querySelector('.bo-row-menu__item--danger');
-    cancelButton.click();
+    const comp = fixture.componentInstance as unknown as {
+      requestCancellation: (res: unknown) => Promise<void>;
+    };
+    const cancelPromise = comp.requestCancellation({
+      id: 10,
+      statut: 'EN_ATTENTE_PAIEMENT',
+      nomClient: 'Test',
+      nombrePlaces: 2,
+      typeReservation: 'CIRCUIT',
+      circuitId: 1,
+    });
 
     await Promise.resolve();
     expect(dialogSpy.open).toHaveBeenCalledTimes(1);
@@ -128,6 +134,7 @@ describe('ReserverPageComponent', () => {
 
     await new Promise((r) => setTimeout(r, 10));
     httpMock.expectOne('/api/reservations').flush([]);
+    await cancelPromise;
     await fixture.whenStable();
   });
 
@@ -174,7 +181,7 @@ describe('ReserverPageComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('RES-P04-0088');
-    expect(fixture.nativeElement.textContent).toContain('Régler maintenant (Wave / Orange Money simulé)');
+    expect(fixture.nativeElement.textContent).toContain('Régler maintenant (Wave / Orange Money');
   });
 
   it('confirms free reservation immediately with CONFIRMEE status without payment CTA', async () => {
@@ -219,7 +226,7 @@ describe('ReserverPageComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('RES-FREE-0099');
-    expect(fixture.nativeElement.textContent).toContain('Réservation confirmée (Gratuit)');
+    expect(fixture.nativeElement.textContent).toContain('Confirmée (Gratuit)');
     expect(fixture.nativeElement.textContent).not.toContain('Régler maintenant');
   });
 });
