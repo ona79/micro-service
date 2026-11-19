@@ -178,6 +178,7 @@ interface ScanHistoryEntry {
                   [ngModel]="selectedCameraId()"
                   (ngModelChange)="onCameraChange($event)"
                   [disabled]="isCameraRunning()"
+                  aria-label="Sélectionner la caméra vidéo pour le scan QR"
                 >
                   @for (cam of cameras(); track cam.id) {
                     <option [value]="cam.id">{{ cam.label || 'Caméra ' + cam.id }}</option>

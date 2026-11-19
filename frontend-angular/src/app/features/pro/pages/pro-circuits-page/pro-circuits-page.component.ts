@@ -223,7 +223,7 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
                   <div class="bo-form-grid">
                     <div class="bo-field">
                       <label class="bo-label">Patrimoine *</label>
-                      <select class="bo-select" formControlName="patrimoineId">
+                      <select class="bo-select" formControlName="patrimoineId" [attr.aria-label]="'Patrimoine de l étape ' + ($index + 1)">
                         <option [ngValue]="0">-- Choisir un patrimoine --</option>
                         @for (pat of patrimoinesDisponibles(); track pat.id) {
                           <option [ngValue]="pat.id">{{ pat.codePatrimoine }} — {{ pat.nomPatrimoine }}</option>
@@ -232,11 +232,11 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
                     </div>
                     <div class="bo-field">
                       <label class="bo-label">Durée visite (min) *</label>
-                      <input type="number" min="5" class="bo-input" formControlName="dureeVisite" />
+                      <input type="number" min="5" class="bo-input" formControlName="dureeVisite" [attr.aria-label]="'Durée de visite en minutes pour l étape ' + ($index + 1)" />
                     </div>
                     <div class="bo-field">
                       <label class="bo-label">Transport étape</label>
-                      <select class="bo-select" formControlName="moyenTransport">
+                      <select class="bo-select" formControlName="moyenTransport" [attr.aria-label]="'Moyen de transport pour l étape ' + ($index + 1)">
                         <option value="PIED">PIED</option>
                         <option value="PIROGUE">PIROGUE</option>
                         <option value="VELO">VELO</option>
@@ -247,7 +247,7 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
                     </div>
                     <div class="bo-field">
                       <label class="bo-label">Description étape</label>
-                      <input type="text" class="bo-input" formControlName="descriptionEtape" placeholder="Accueil et médiation culturelle..." />
+                      <input type="text" class="bo-input" formControlName="descriptionEtape" [attr.aria-label]="'Consignes et description pour l étape ' + ($index + 1)" placeholder="Accueil et médiation culturelle..." />
                     </div>
                   </div>
                 </div>

@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { LucideCheckCircle2, LucideEye, LucideMoreHorizontal, LucideRefreshCw } from '@lucide/angular';
 import { firstValueFrom } from 'rxjs';
 import { toast } from 'ngx-sonner';
+import { AuthStore } from '../../../../core/auth/auth.store';
 import { PermissionService } from '../../../../core/auth/permissions';
 import { extractErrorMessage } from '../../../../core/models/api-error.model';
 import {
@@ -169,28 +170,34 @@ import { GuideApiService } from '../../../guides/data-access/guide-api.service';
         </dl>
 
         <div class="bo-panel" style="margin: 0;">
-          <label for="guide-motif-input" class="bo-label">Motif de décision (obligatoire pour rejet / suspension)</label>
-          <textarea id="guide-motif-input" class="bo-textarea" rows="2" [(ngModel)]="decisionMotif"></textarea>
-          @if (motifError()) {
-            <p class="bo-error">{{ motifError() }}</p>
+          @if (isSelfDossier(g)) {
+            <p class="bo-notice" style="margin: 0;">
+              Interdiction déontologique : vous ne pouvez pas instruire, valider ou rejeter votre propre dossier guide.
+            </p>
+          } @else {
+            <label for="guide-motif-input" class="bo-label">Motif de décision (obligatoire pour rejet / suspension)</label>
+            <textarea id="guide-motif-input" class="bo-textarea" rows="2" [(ngModel)]="decisionMotif"></textarea>
+            @if (motifError()) {
+              <p class="bo-error">{{ motifError() }}</p>
+            }
+            <div class="bo-actions-cell" style="margin-top: var(--space-3);">
+              @if (permissions.has('GUIDE:VALIDER') && (g.statutValidation === 'EN_ATTENTE_VALIDATION' || g.statutValidation === 'REJETE')) {
+                <button type="button" class="bo-btn bo-btn--primary" (click)="valider(g)" [disabled]="busy()">Valider dossier</button>
+              }
+              @if (permissions.has('GUIDE:VALIDER') && g.statutValidation === 'EN_ATTENTE_VALIDATION') {
+                <button type="button" class="bo-btn bo-btn--danger" (click)="rejeter(g)" [disabled]="busy()">Rejeter (motif requis)</button>
+              }
+              @if (permissions.has('GUIDE:SUSPENDRE') && g.statutValidation === 'VALIDE') {
+                <button type="button" class="bo-btn bo-btn--terracotta" (click)="suspendre(g)" [disabled]="busy()">Suspendre</button>
+              }
+              @if (permissions.has('GUIDE:VALIDER') && (g.statutValidation === 'SUSPENDU' || g.statutValidation === 'DESACTIVE')) {
+                <button type="button" class="bo-btn bo-btn--primary" (click)="reactiver(g)" [disabled]="busy()">Réactiver</button>
+              }
+              @if (permissions.has('GUIDE:SUSPENDRE') && g.statutValidation !== 'DESACTIVE') {
+                <button type="button" class="bo-btn bo-btn--danger" (click)="desactiver(g)" [disabled]="busy()">Désactiver</button>
+              }
+            </div>
           }
-          <div class="bo-actions-cell" style="margin-top: var(--space-3);">
-            @if (permissions.has('GUIDE:VALIDER') && (g.statutValidation === 'EN_ATTENTE_VALIDATION' || g.statutValidation === 'REJETE')) {
-              <button type="button" class="bo-btn bo-btn--primary" (click)="valider(g)" [disabled]="busy()">Valider dossier</button>
-            }
-            @if (permissions.has('GUIDE:VALIDER') && g.statutValidation === 'EN_ATTENTE_VALIDATION') {
-              <button type="button" class="bo-btn bo-btn--danger" (click)="rejeter(g)" [disabled]="busy()">Rejeter (motif requis)</button>
-            }
-            @if (permissions.has('GUIDE:SUSPENDRE') && g.statutValidation === 'VALIDE') {
-              <button type="button" class="bo-btn bo-btn--terracotta" (click)="suspendre(g)" [disabled]="busy()">Suspendre</button>
-            }
-            @if (permissions.has('GUIDE:VALIDER') && (g.statutValidation === 'SUSPENDU' || g.statutValidation === 'DESACTIVE')) {
-              <button type="button" class="bo-btn bo-btn--primary" (click)="reactiver(g)" [disabled]="busy()">Réactiver</button>
-            }
-            @if (permissions.has('GUIDE:SUSPENDRE') && g.statutValidation !== 'DESACTIVE') {
-              <button type="button" class="bo-btn bo-btn--danger" (click)="desactiver(g)" [disabled]="busy()">Désactiver</button>
-            }
-          </div>
         </div>
 
         <section>
@@ -218,7 +225,12 @@ import { GuideApiService } from '../../../guides/data-access/guide-api.service';
 export class ProGuidesAdminPageComponent implements OnInit {
   private readonly dialog = inject(Dialog);
   protected readonly permissions = inject(PermissionService);
+  protected readonly authStore = inject(AuthStore);
   private readonly api = inject(GuideApiService);
+
+  protected isSelfDossier(g: GuideProfil): boolean {
+    return Boolean(this.authStore.user()?.id && g.utilisateurId === this.authStore.user()?.id);
+  }
 
   protected readonly loading = signal(true);
   protected readonly busy = signal(false);
@@ -305,6 +317,10 @@ export class ProGuidesAdminPageComponent implements OnInit {
   }
 
   async valider(g: GuideProfil): Promise<void> {
+    if (this.isSelfDossier(g)) {
+      this.actionError.set('Interdiction déontologique : vous ne pouvez pas valider votre propre dossier guide.');
+      return;
+    }
     this.busy.set(true);
     this.actionError.set(null);
     try {

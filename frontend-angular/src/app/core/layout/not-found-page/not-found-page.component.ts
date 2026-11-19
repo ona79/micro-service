@@ -9,6 +9,7 @@ import { UiEmptyStateComponent } from '../../../shared/components/ui-empty-state
   template: `
     <div class="page-section">
       <div class="container">
+        <h1 class="sr-only">Page introuvable (Erreur 404)</h1>
         <app-ui-empty-state
           title="Page introuvable (404)"
           description="La page que vous recherchez n'existe pas ou a été déplacée."
