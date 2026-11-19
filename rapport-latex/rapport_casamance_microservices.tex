@@ -112,17 +112,17 @@ Le système repose sur une architecture distribuée orientée microservices resp
 \section{Collaboration Git et consolidation des branches}
 Le développement collaboratif entre \textbf{Ibrahima DIALLO} et \textbf{Matar NDOUR} a été structuré autour de branches thématiques par lots fonctionnels et correctifs (\texttt{feature/p01-*} à \texttt{feature/p07-8-*}, \texttt{fix/*}) sur le dépôt GitHub \texttt{ona79/micro-service}.
 
-Lors de la phase de consolidation finale :
+Lors de la phase de consolidation finale et d'intégration continue (CI/CD GitHub Actions) :
 \begin{itemize}
-    \item Toutes les branches fonctionnelles ont été intégrées et consolidées sur \texttt{develop}, puis alignées sur \texttt{main} et \texttt{deploy} au commit \texttt{041c989} (89 commits, 22 branches).
-    \item La branche \texttt{feature/p07-5-functional-audit} a été fusionnée proprement sans conflit pour intégrer l'ensemble des livrables d'audit fonctionnel.
-    \item La branche \texttt{develop} a été conservée comme branche de travail active.
+    \item Toutes les branches fonctionnelles et de refonte UI/UX ont été intégrées et consolidées sur \texttt{develop} et \texttt{main} (23 branches actives, plus de 95 commits).
+    \item La chaîne CI/CD GitHub Actions (\emph{CI/CD \& Verification Pull Request (UASZ Microservices)}) valide automatiquement chaque service Back-End (\texttt{api-gateway}, \texttt{discovery-server}, \texttt{ms-circuit}, \texttt{ms-evenement}, \texttt{ms-notification}, \texttt{ms-paiement}, \texttt{ms-patrimoine}, \texttt{ms-reservation}, \texttt{ms-utilisateur}) ainsi que le Front-End (\texttt{frontend-angular}) avec \textbf{13 vérifications réussies sur 13 exécutées} (\emph{All checks have passed}).
+    \item Les deux contributeurs (\texttt{ona79} -- Ibrahima DIALLO et \texttt{Mahou-Dev} -- Matar NDOUR) apparaissent sur le tableau de bord du dépôt \texttt{ona79/micro-service}.
 \end{itemize}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.92\textwidth]{images/github_branches_contributors.jpg}
-    \caption{Preuve de consolidation GitHub sur \texttt{ona79/micro-service} : 22 branches, 89 commits, commit \texttt{041c989} et contributeurs.}
+    \includegraphics[width=0.95\textwidth]{images/github_branches_contributors.jpg}
+    \caption{Preuve de travail et de validation CI/CD GitHub sur \texttt{ona79/micro-service} : 23 branches, 13 checks CI/CD validés avec succès (\emph{All checks have passed}) et les 2 contributeurs (\texttt{ona79} et \texttt{Mahou-Dev}).}
     \label{fig:github-repo}
 \end{figure}
 
@@ -192,98 +192,127 @@ Le système définit 5 rôles strictement cloisonnés et 48 permissions granulai
 % =============================================================================
 % CHAPITRE 4 : FONCTIONNALITÉS MÉTIER ET PREUVES VISUELLES
 % =============================================================================
-\chapter{Fonctionnalités Métier et Preuves Visuelles}
+\chapter{Fonctionnalités Métier, Refonte UI/UX et Preuves Visuelles}
+
+\section{Refonte Ergonomique et Composant Unifié \texttt{ui-filter-bar}}
+L'interface utilisateur Angular~22 a fait l'objet d'une refonte ergonomique complète afin de maximiser la densité d'information utile et l'homogénéité visuelle sur les 16 vues de catalogue et de gestion :
+\begin{itemize}
+    \item \textbf{Identité visuelle officielle (\texttt{logo\_casa})} : intégration de l'emblème officiel de la Casamance dans l'en-tête public (barre compacte de 60\,px avec menu avatar regroupant profil, réservations et déconnexion), le back-office professionnel, les écrans d'authentification et le favicon du navigateur.
+    \item \textbf{Barre de filtres unifiée (\texttt{ui-filter-bar})} : barre \emph{sticky} sur une seule ligne (\textasciitilde 52\,px, champs de 36\,px sans labels superflus) combinant recherche instantanée (\emph{debounce} 300\,ms), filtres principaux, tiroir déroulant pour les filtres secondaires (avec support \emph{bottom-sheet} mobile et fermeture \texttt{Échap}), pastilles de statut avec compteurs dynamiques et pastilles de filtres actifs retirables.
+    \item \textbf{Grilles responsives et cartes compactes} : affichage en grille adaptative de 3 à 4 colonnes sur grand écran (\texttt{repeat(auto-fill, minmax(min(100\%, 260px), 1fr))}), vignettes de 140\,px, pagination par lots de 24 résultats et suppression des bordures englobantes superflues (premier résultat affiché à moins de 160\,px sous la navigation).
+\end{itemize}
 
 \section{Expérience touristique publique et cartographie}
-L'interface publique permet aux visiteurs de découvrir les sites patrimoniaux de la Casamance, de filtrer le catalogue, de localiser les sites sur une carte interactive Leaflet (calcul de distance Haversine) et de consulter les fiches détaillées avec avis modérés.
+L'interface publique permet aux visiteurs de découvrir les sites patrimoniaux, circuits et événements culturels de la Casamance, de filtrer instantanément les catalogues via \texttt{ui-filter-bar}, de localiser les sites sur une carte interactive Leaflet (calcul de distance Haversine) et de consulter les fiches détaillées avec carte tarifaire latérale repensée.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{images/PUB-001_accueil.png}
-    \caption{Page d'accueil publique de la plateforme Casamance Patrimoine.}
+    \caption{Page d'accueil publique de la plateforme Casamance Tourisme avec nouvelle barre de navigation compacte (60\,px) et emblème officiel \texttt{logo\_casa}.}
     \label{fig:pub-accueil}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{images/PUB-002_patrimoines-carte.png}
-    \caption{Vue cartographique interactive (Leaflet / OpenStreetMap) des sites patrimoniaux.}
+    \caption{Catalogue des patrimoines avec barre de filtres unifiée \texttt{ui-filter-bar} et vue cartographique interactive (Leaflet / OpenStreetMap).}
     \label{fig:pub-carte}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{images/PUB-003_patrimoine-detail.png}
-    \caption{Fiche détaillée d'un site patrimonial avec informations géographiques et avis.}
+    \caption{Fiche détaillée d'un site patrimonial avec informations géographiques, itinéraires associés et avis vérifiés.}
     \label{fig:pub-detail}
 \end{figure}
 
-\section{Authentification, Réservation, E-Billet QR et Paiement}
-Les touristes disposent d'un parcours complet allant de la connexion sécurisée jusqu'au paiement simulé et à l'obtention d'un billet électronique muni d'un QR Code vérifiable sur site.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{images/PUB-004_circuits-filter-bar.png}
+    \caption{Catalogue des circuits touristiques : barre \texttt{ui-filter-bar} sur une ligne, compteur intégré (90 circuits) et grille compacte à 4 colonnes.}
+    \label{fig:pub-circuits}
+\end{figure}
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.88\textwidth]{images/AUTH-001_connexion.png}
-    \caption{Interface de connexion sécurisée (session cookie \texttt{HttpOnly}).}
+    \includegraphics[width=0.92\textwidth]{images/PUB-005_evenement-detail-tarif.png}
+    \caption{Fiche détaillée d'un événement culturel avec le nouveau bloc latéral « Tarif d'entrée », jauge de capacité et vérification des places en direct.}
+    \label{fig:pub-evenement-tarif}
+\end{figure}
+
+\section{Authentification, Réservation en direct, E-Billet QR et Paiement}
+Les pages de connexion et d'inscription adoptent une mise en page \emph{split-screen} moderne avec accès rapide aux 5 comptes de démonstration pré-configurés (Visiteur, Guide, Gestionnaire, Conservateur, Administrateur). Le parcours \texttt{/reserver} offre un formulaire compact associé à un récapitulatif en temps réel.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{images/AUTH-001_connexion.png}
+    \caption{Interface de connexion \emph{split-screen} avec logo officiel, session cookie \texttt{HttpOnly} et sélecteur des 5 comptes de démonstration.}
     \label{fig:auth-login}
 \end{figure}
 
 \begin{figure}[H]
     \centering
+    \includegraphics[width=0.92\textwidth]{images/PUB-006_reserver-recap.png}
+    \caption{Parcours de réservation repensé (\texttt{/reserver}) : formulaire compact en 2 colonnes, vérification immédiate des disponibilités et récapitulatif dynamique.}
+    \label{fig:pub-reserver}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
     \includegraphics[width=0.92\textwidth]{images/TOUR-001_mon-espace-reservations.png}
-    \caption{Espace personnel du touriste : suivi des réservations et statuts.}
+    \caption{Espace personnel du touriste (\texttt{/mon-espace}) : suivi des réservations, barre d'outils sur une ligne et menu d'actions secondaires.}
     \label{fig:tour-espace}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{images/TOUR-004_paiement-checkout-simule.png}
-    \caption{Interface de paiement simulé avec gestion d'idempotence.}
+    \caption{Interface de paiement avec gestion d'idempotence et récapitulatif de transaction.}
     \label{fig:tour-paiement}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{images/TOUR-003_reservation-detail-qr.png}
-    \caption{E-billet électronique avec QR Code généré pour le contrôle d'accès.}
+    \caption{E-billet électronique avec QR Code généré pour le contrôle d'accès sur site.}
     \label{fig:tour-qr}
 \end{figure}
 
 \section{Espaces professionnels et Administration}
-Chaque rôle professionnel dispose d'un back-office dédié : tableau de bord Guide, validation des guides par le Conservateur, scanner de contrôle d'accès QR pour les visites, et cockpit d'audit pour l'Administrateur.
+Chaque rôle professionnel dispose d'un back-office dédié utilisant le composant \texttt{ui-filter-bar} avec pastilles de statut et compteurs intégrés : tableau de bord Guide, validation des guides par le Conservateur, scanner de contrôle d'accès QR pour le Gestionnaire de site, et cockpit d'audit pour l'Administrateur.
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{images/GUIDE-001_tableau-de-bord.png}
-    \caption{Tableau de bord du Guide certifié.}
+    \caption{Tableau de bord du Guide certifié (\texttt{alassane.badji@zig.univ.sn}).}
     \label{fig:guide-dash}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{images/CONS-003_guides-validation.png}
-    \caption{Interface Conservateur : validation et suivi des profils guides.}
+    \caption{Interface Conservateur : filtrage par pastilles de statut et validation des profils guides.}
     \label{fig:cons-guides}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{images/GEST-006_controle-acces-scanner.png}
-    \caption{Scanner professionnel de contrôle d'accès des e-billets QR.}
+    \caption{Scanner professionnel de contrôle d'accès des e-billets QR (Gestionnaire de site).}
     \label{fig:gest-scanner}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{images/ADMIN-001_cockpit-global.png}
-    \caption{Cockpit global d'administration de la plateforme.}
+    \caption{Cockpit global d'administration et de supervision de la plateforme.}
     \label{fig:admin-cockpit}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{images/ADMIN-003_audit-securite.png}
-    \caption{Journal d'audit de sécurité et supervision des événements critiques.}
+    \caption{Journal d'audit de sécurité avec filtrage instantané par pastilles d'événements critiques.}
     \label{fig:admin-audit}
 \end{figure}
 
@@ -321,16 +350,16 @@ L'exécution complète de \texttt{./mvnw -B clean test} sur les 9 services Java~
 \section{Tests automatisés Front-End Angular 22 (Vitest)}
 L'exécution de \texttt{ng test --no-watch} dans \texttt{frontend-angular/} a validé :
 \begin{itemize}
-    \item \textbf{26 fichiers de test sur 26 réussis} ;
-    \item \textbf{88 tests unitaires sur 88 réussis} (0 échec), couvrant les services API, les composants UI, le lecteur/générateur de QR Code, et les gardes RBAC P06/P07.
+    \item \textbf{31 fichiers de test sur 31 réussis} ;
+    \item \textbf{104 tests unitaires sur 104 réussis} (0 échec), couvrant les services API, le composant unifié \texttt{ui-filter-bar}, les cartes et pages publiques/professionnelles, le lecteur/générateur de QR Code, et les gardes RBAC P06/P07.
 \end{itemize}
 
-\section{Validation fonctionnelle en direct dans Google Chrome (\texttt{http://localhost})}
-La stack complète (11 conteneurs Docker actifs) a été testée de bout en bout dans Google Chrome :
+\section{Validation fonctionnelle et Responsive en direct dans Google Chrome (\texttt{http://localhost})}
+La stack complète (11 conteneurs Docker actifs) a été testée de bout en bout dans Google Chrome aux résolutions \texttt{360px}, \texttt{768px}, \texttt{1024px} et \texttt{1440px} :
 \begin{itemize}
-    \item \textbf{Accueil et catalogue public} : chargement de \texttt{http://localhost/} (HTTP~\texttt{200}), affichage des 8 sites patrimoniaux (\texttt{/api/patrimoines/recherche}~\texttt{200}), fiche détaillée \texttt{/patrimoines/5} avec carte Leaflet, 2 circuits, 3 événements et 1 guide certifié.
-    \item \textbf{Parcours d'inscription et session} : création d'un compte touriste (\texttt{POST /api/utilisateurs} $\rightarrow$ HTTP~\texttt{201}), redirection vers \texttt{/mon-espace} avec session \texttt{HttpOnly} active, chargement des réservations, paiements, notifications et avis en HTTP~\texttt{200}.
-    \item \textbf{Contrôle d'accès et déconnexion} : accès admin refusé à un touriste (\texttt{GET /api/utilisateurs} $\rightarrow$ HTTP~\texttt{403}), puis déconnexion effective (\texttt{POST /api/utilisateurs/deconnexion} $\rightarrow$ HTTP~\texttt{204}).
+    \item \textbf{Accueil, ergonomie et catalogue public} : chargement de \texttt{http://localhost/} (HTTP~\texttt{200}), barre de navigation compacte à 60\,px avec \texttt{logo\_casa}, premier résultat à moins de 160\,px sous la navigation et absence totale de défilement horizontal (\texttt{scrollWidth <= clientWidth}) sur les 16 vues dotées de \texttt{ui-filter-bar}.
+    \item \textbf{Parcours d'authentification et session} : connexion instantanée via les 5 comptes de démonstration (\texttt{TOURISTE}, \texttt{GUIDE}, \texttt{GESTIONNAIRE\_SITE}, \texttt{CONSERVATEUR}, \texttt{ADMINISTRATEUR}) avec session cookie \texttt{HttpOnly} active, chargement des réservations, paiements, notifications et avis en HTTP~\texttt{200}.
+    \item \textbf{Contrôle d'accès RBAC/BOLA et déconnexion} : accès admin refusé à un touriste (\texttt{GET /api/utilisateurs} $\rightarrow$ HTTP~\texttt{403}), puis déconnexion effective via le menu avatar (\texttt{POST /api/utilisateurs/deconnexion} $\rightarrow$ HTTP~\texttt{204}).
 \end{itemize}
 
 % =============================================================================
