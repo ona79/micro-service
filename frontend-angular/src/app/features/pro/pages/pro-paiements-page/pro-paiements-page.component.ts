@@ -38,16 +38,13 @@ import { PaiementApiService } from '../../../paiements/data-access/paiement-api.
     FormsModule,
     DateFrPipe,
     FcfaPricePipe,
-    UiKpiCardComponent,
     UiPaginationComponent,
     UiDetailDrawerComponent,
     UiEmptyStateComponent,
     UiErrorBannerComponent,
     UiFilterBarComponent,
-    LucideEye,
     LucideMoreHorizontal,
     LucideRefreshCw,
-    LucideXCircle,
   ],
   template: `
     <header class="bo-header">

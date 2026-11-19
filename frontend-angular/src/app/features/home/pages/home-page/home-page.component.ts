@@ -6,21 +6,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
-import {
-  LucideArrowRight,
-  LucideAward,
-  LucideCalendar,
-  LucideCompass,
-  LucideMapPin,
-  LucideRoute,
-  LucideSearch,
-  LucideShieldCheck,
-  LucideStar,
-  LucideTicket,
-  LucideUsers,
-} from '@lucide/angular';
+import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { AvisResume } from '../../../../core/models/avis.model';
 import { Circuit } from '../../../../core/models/circuit.model';
@@ -28,29 +14,21 @@ import { Evenement } from '../../../../core/models/evenement.model';
 import { GuideProfil } from '../../../../core/models/guide.model';
 import { Patrimoine } from '../../../../core/models/patrimoine.model';
 import { SeoService } from '../../../../core/services/seo.service';
-import { UiCardComponent } from '../../../../shared/components/ui-card/ui-card.component';
-import { UiLoadingStateComponent } from '../../../../shared/components/ui-loading-state/ui-loading-state.component';
-import { UiEmptyStateComponent } from '../../../../shared/components/ui-empty-state/ui-empty-state.component';
-import { UiErrorBannerComponent } from '../../../../shared/components/ui-error-banner/ui-error-banner.component';
-import { UiPatrimoineImageComponent } from '../../../../shared/components/ui-patrimoine-image/ui-patrimoine-image.component';
-import { DateFrPipe } from '../../../../shared/pipes/date-fr.pipe';
-import { DifficulteLabelPipe } from '../../../../shared/pipes/difficulte-label.pipe';
-import { DurationMinutesPipe } from '../../../../shared/pipes/duration-minutes.pipe';
-import { EvenementTypePipe } from '../../../../shared/pipes/evenement-type.pipe';
-import { FcfaPricePipe } from '../../../../shared/pipes/fcfa-price.pipe';
-import { isLieuDeMemoire } from '../../../../shared/utils/patrimoine.utils';
 import { AvisApiService } from '../../../avis/data-access/avis-api.service';
 import { CircuitStore } from '../../../circuits/data-access/circuit.store';
 import { EvenementStore } from '../../../evenements/data-access/evenement.store';
 import { GuideApiService } from '../../../guides/data-access/guide-api.service';
 import { PatrimoineStore } from '../../../patrimoines/data-access/patrimoine.store';
-
-interface ZoneCasamanceCard {
-  code: string;
-  titre: string;
-  sousTitre: string;
-  description: string;
-}
+import { HomeCircuitsSectionComponent } from '../../components/home-circuits-section/home-circuits-section.component';
+import { HomeCtaBannerSectionComponent } from '../../components/home-cta-banner-section/home-cta-banner-section.component';
+import { HomeEvenementsSectionComponent } from '../../components/home-evenements-section/home-evenements-section.component';
+import { HomeGuidesSectionComponent } from '../../components/home-guides-section/home-guides-section.component';
+import { HomeHeroSectionComponent } from '../../components/home-hero-section/home-hero-section.component';
+import { HomePatrimoinesSectionComponent } from '../../components/home-patrimoines-section/home-patrimoines-section.component';
+import {
+  HomeTerroirsSectionComponent,
+  ZoneCasamanceCard,
+} from '../../components/home-terroirs-section/home-terroirs-section.component';
 
 const ZONES_CASAMANCE: readonly ZoneCasamanceCard[] = [
   {
@@ -58,18 +36,21 @@ const ZONES_CASAMANCE: readonly ZoneCasamanceCard[] = [
     titre: 'Basse-Casamance',
     sousTitre: 'Ziguinchor · Oussouye · Carabane · Enampore',
     description: 'Cases à impluvium diolas, bois sacrés, bolongs de mangrove et îles estuariennes.',
+    image: '/images/patrimoines/PAT-CAS-005.webp',
   },
   {
     code: 'MOYENNE_CASAMANCE',
     titre: 'Moyenne-Casamance',
     sousTitre: 'Sédhiou · Pakao · berges du fleuve',
     description: 'Forts historiques, mémoires mandingues et traversées fluviales paisibles.',
+    image: '/images/patrimoines/PAT-CRB-002.webp',
   },
   {
     code: 'HAUTE_CASAMANCE',
     titre: 'Haute-Casamance',
     sousTitre: 'Kolda · Vélingara · Fouladou',
     description: 'Réserves naturelles, traditions pastorales du Fouladou et festivals vivants.',
+    image: '/images/patrimoines/PAT-KOL-008.webp',
   },
 ];
 
@@ -78,29 +59,13 @@ const ZONES_CASAMANCE: readonly ZoneCasamanceCard[] = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    FormsModule,
-    RouterLink,
-    LucideArrowRight,
-    LucideAward,
-    LucideCalendar,
-    LucideCompass,
-    LucideMapPin,
-    LucideRoute,
-    LucideSearch,
-    LucideShieldCheck,
-    LucideStar,
-    LucideTicket,
-    LucideUsers,
-    UiCardComponent,
-    UiLoadingStateComponent,
-    UiPatrimoineImageComponent,
-    UiErrorBannerComponent,
-    UiEmptyStateComponent,
-    DateFrPipe,
-    DifficulteLabelPipe,
-    DurationMinutesPipe,
-    EvenementTypePipe,
-    FcfaPricePipe,
+    HomeHeroSectionComponent,
+    HomeTerroirsSectionComponent,
+    HomePatrimoinesSectionComponent,
+    HomeCircuitsSectionComponent,
+    HomeEvenementsSectionComponent,
+    HomeGuidesSectionComponent,
+    HomeCtaBannerSectionComponent,
   ],
   templateUrl: './home-page.component.html',
   styleUrl: './home-page.component.css',
@@ -114,7 +79,6 @@ export class HomePageComponent implements OnInit {
   private readonly seo = inject(SeoService);
   private readonly router = inject(Router);
 
-  protected readonly heroQuery = signal('');
   protected readonly guides = signal<GuideProfil[]>([]);
   protected readonly patrimoineAvisMap = signal<Map<number, AvisResume>>(new Map());
   protected readonly circuitAvisMap = signal<Map<number, AvisResume>>(new Map());
@@ -127,7 +91,7 @@ export class HomePageComponent implements OnInit {
   );
 
   protected readonly featuredPatrimoines = computed<Patrimoine[]>(() =>
-    this.publishedPatrimoines().slice(0, 4)
+    this.publishedPatrimoines().slice(0, 3)
   );
 
   protected readonly publishedCircuits = computed<Circuit[]>(() =>
@@ -137,7 +101,7 @@ export class HomePageComponent implements OnInit {
   );
 
   protected readonly featuredCircuits = computed<Circuit[]>(() =>
-    this.publishedCircuits().slice(0, 3)
+    this.publishedCircuits().slice(0, 6)
   );
 
   protected readonly upcomingEvenements = computed<Evenement[]>(() => {
@@ -148,13 +112,17 @@ export class HomePageComponent implements OnInit {
   });
 
   protected readonly featuredEvenements = computed<Evenement[]>(() =>
-    this.upcomingEvenements().slice(0, 3)
+    this.upcomingEvenements().slice(0, 4)
   );
 
   protected readonly featuredGuides = computed<GuideProfil[]>(() =>
     this.guides()
       .filter((g) => g.statutValidation === 'VALIDE' && g.visibilitePublique)
       .slice(0, 3)
+  );
+
+  protected readonly totalGuidesCount = computed<number>(() =>
+    this.featuredGuides().length > 0 || this.guides().length > 0 ? this.guides().length : 0
   );
 
   ngOnInit(): void {
@@ -167,40 +135,15 @@ export class HomePageComponent implements OnInit {
     void this.loadAllData();
   }
 
-  protected submitHeroSearch(): void {
-    const q = this.heroQuery().trim();
+  protected submitHeroSearch(q: string): void {
+    const trimmed = q.trim();
     void this.router.navigate(['/patrimoines'], {
-      queryParams: q ? { q } : {},
+      queryParams: trimmed ? { q: trimmed } : {},
     });
   }
 
   protected reloadPatrimoines(): void {
     void this.patrimoineStore.reload().then(() => this.loadPatrimoineAvis());
-  }
-
-  protected isMemorial(patrimoine: Patrimoine): boolean {
-    return isLieuDeMemoire(patrimoine);
-  }
-
-  protected formatZoneLabel(zone?: string | null): string {
-    switch (zone) {
-      case 'BASSE_CASAMANCE':
-        return 'Basse-Casamance';
-      case 'MOYENNE_CASAMANCE':
-        return 'Moyenne-Casamance';
-      case 'HAUTE_CASAMANCE':
-        return 'Haute-Casamance';
-      default:
-        return 'Casamance';
-    }
-  }
-
-  protected getPatrimoineResume(id: number): AvisResume | null {
-    return this.patrimoineAvisMap().get(id) ?? null;
-  }
-
-  protected getCircuitResume(id: number): AvisResume | null {
-    return this.circuitAvisMap().get(id) ?? null;
   }
 
   private async loadAllData(): Promise<void> {

@@ -38,16 +38,13 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
     RouterLink,
     DateFrPipe,
     FcfaPricePipe,
-    UiKpiCardComponent,
     UiPaginationComponent,
     UiDetailDrawerComponent,
     UiEmptyStateComponent,
     UiErrorBannerComponent,
     UiFilterBarComponent,
-    LucideEye,
     LucideMoreHorizontal,
     LucideRefreshCw,
-    LucideXCircle,
   ],
   template: `
     <header class="bo-header">

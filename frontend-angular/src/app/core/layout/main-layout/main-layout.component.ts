@@ -32,7 +32,6 @@ interface NavItem {
     RouterLink,
     RouterLinkActive,
     RouterOutlet,
-    LucideCompass,
     LucideMenu,
     LucideSearch,
     LucideTicket,

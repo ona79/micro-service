@@ -192,7 +192,6 @@ export const PRO_NAV_ITEMS: readonly ProNavItem[] = [
     RouterLink,
     RouterLinkActive,
     RouterOutlet,
-    LucideCompass,
     LucideLayoutDashboard,
     LucideBarChart3,
     LucideLandmark,

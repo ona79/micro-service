@@ -33,12 +33,10 @@ import { AvisApiService } from '../../../avis/data-access/avis-api.service';
   imports: [
     FormsModule,
     DateFrPipe,
-    UiKpiCardComponent,
     UiDetailDrawerComponent,
     UiEmptyStateComponent,
     UiErrorBannerComponent,
     UiFilterBarComponent,
-    LucideEye,
     LucideMoreHorizontal,
     LucideRefreshCw,
   ],

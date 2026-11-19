@@ -60,7 +60,6 @@ type ViewMode = 'grid' | 'map';
     RouterLink,
     Toolbar,
     ToolbarWidget,
-    LucideSearch,
     LucideGrid,
     LucideMap,
     LucideMapPin,

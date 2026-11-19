@@ -47,11 +47,7 @@ import { EvenementApiService } from '../../data-access/evenement-api.service';
   imports: [
     FormsModule,
     RouterLink,
-    LucideSearch,
-    LucideCalendar,
     LucideMapPin,
-    LucideStar,
-    LucideUsers,
     LucideArrowRight,
     LucideTicket,
     UiLoadingStateComponent,

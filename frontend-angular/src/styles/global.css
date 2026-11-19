@@ -378,3 +378,48 @@ h2 {
   gap: 16px;
   align-items: stretch;
 }
+
+/* =========================================================================
+   Scroll Reveal Utility Classes (transform & opacity only)
+   ========================================================================= */
+.sr-reveal {
+  opacity: 0;
+  will-change: transform, opacity;
+  transition:
+    opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1) var(--sr-delay, 0ms),
+    transform 0.65s cubic-bezier(0.22, 1, 0.36, 1) var(--sr-delay, 0ms);
+}
+
+.sr-reveal[data-sr-variant='fade-up'] {
+  transform: translate3d(0, 26px, 0);
+}
+
+.sr-reveal[data-sr-variant='slide-left'] {
+  transform: translate3d(-32px, 0, 0);
+}
+
+.sr-reveal[data-sr-variant='slide-right'] {
+  transform: translate3d(36px, 0, 0);
+}
+
+.sr-reveal[data-sr-variant='zoom-in'] {
+  transform: scale(0.94) translate3d(0, 14px, 0);
+}
+
+.sr-reveal[data-sr-variant='clip-reveal'] {
+  transform: translate3d(-24px, 12px, 0) scale(0.98);
+}
+
+.sr-reveal.sr-reveal--visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sr-reveal,
+  .sr-reveal[data-sr-variant] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}

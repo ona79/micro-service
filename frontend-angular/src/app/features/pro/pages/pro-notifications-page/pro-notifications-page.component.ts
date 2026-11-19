@@ -35,7 +35,6 @@ import { NotificationStore } from '../../../notifications/data-access/notificati
     FormsModule,
     RouterLink,
     DateFrPipe,
-    UiKpiCardComponent,
     UiPaginationComponent,
     UiDetailDrawerComponent,
     UiEmptyStateComponent,
@@ -44,7 +43,6 @@ import { NotificationStore } from '../../../notifications/data-access/notificati
     LucideCheck,
     LucideCheckCheck,
     LucideRefreshCw,
-    LucideEye,
     LucideMoreHorizontal,
   ],
   template: `

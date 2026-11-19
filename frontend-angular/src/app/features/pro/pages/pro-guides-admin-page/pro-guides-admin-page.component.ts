@@ -36,15 +36,12 @@ import { GuideApiService } from '../../../guides/data-access/guide-api.service';
     FormsModule,
     DateFrPipe,
     FcfaPricePipe,
-    UiKpiCardComponent,
     UiDetailDrawerComponent,
     UiEmptyStateComponent,
     UiErrorBannerComponent,
     UiFilterBarComponent,
-    LucideEye,
     LucideMoreHorizontal,
     LucideRefreshCw,
-    LucideCheckCircle2,
   ],
   template: `
     <header class="bo-header">
