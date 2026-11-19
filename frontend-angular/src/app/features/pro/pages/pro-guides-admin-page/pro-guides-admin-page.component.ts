@@ -47,28 +47,12 @@ import { GuideApiService } from '../../../guides/data-access/guide-api.service';
   ],
   template: `
     <header class="bo-header">
-      <div>
-        <p class="bo-header__eyebrow">Guides</p>
-        <h1 class="bo-header__title">Instruction &amp; validation des guides touristiques</h1>
-        <p class="bo-header__lead">
-          Examinez les pièces justificatives, validez les dossiers complets ou appliquez des mesures
-          motivées de rejet, suspension ou réactivation.
-        </p>
-      </div>
+      <h1 class="bo-header__title">Guides</h1>
       <button type="button" class="bo-btn" (click)="loadAll()" [disabled]="loading()">
         <svg lucideRefreshCw [size]="14" aria-hidden="true"></svg>
         <span>Actualiser</span>
       </button>
     </header>
-
-    @if (stats(); as s) {
-      <div class="bo-kpi-grid">
-        <app-ui-kpi-card label="Total dossiers" [value]="s.total" />
-        <app-ui-kpi-card label="En attente validation" [value]="s.enAttenteValidation" tone="ochre" />
-        <app-ui-kpi-card label="Validés" [value]="s.valides" tone="success" subtitle="Disponibles : {{ s.disponiblesEtValides }}" />
-        <app-ui-kpi-card label="Rejetés / Suspendus" [value]="s.rejetes + ' / ' + s.suspendus" tone="danger" />
-      </div>
-    }
 
     @if (actionError()) {
       <app-ui-error-banner [message]="actionError()!" [showRetry]="false" />

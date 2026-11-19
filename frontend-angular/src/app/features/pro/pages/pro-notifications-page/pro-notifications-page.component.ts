@@ -49,16 +49,7 @@ import { NotificationStore } from '../../../notifications/data-access/notificati
   ],
   template: `
     <header class="bo-header">
-      <div>
-        <p class="bo-header__eyebrow">Notifications</p>
-        <h1 class="bo-header__title">Centre des notifications</h1>
-        <p class="bo-header__lead">
-          Consultez vos alertes métier personnelles
-          @if (permissions.has('NOTIFICATION:LIRE_TOUT')) {
-            et supervisez l’ensemble des livraisons EMAIL / SMS / IN_APP de la plateforme.
-          }
-        </p>
-      </div>
+      <h1 class="bo-header__title">Notifications</h1>
       <div class="bo-header__actions">
         <button type="button" class="bo-btn" (click)="refreshCurrent()">
           <svg lucideRefreshCw [size]="14" aria-hidden="true"></svg>
@@ -192,15 +183,6 @@ import { NotificationStore } from '../../../notifications/data-access/notificati
         }
       </section>
     } @else {
-      @if (adminStats(); as s) {
-        <div class="bo-kpi-grid">
-          <app-ui-kpi-card label="Total émises" [value]="s.total" />
-          <app-ui-kpi-card label="Envoyées" [value]="s.envoyees" tone="success" />
-          <app-ui-kpi-card label="Échecs temporaires" [value]="s.echecsTemporaires" tone="ochre" />
-          <app-ui-kpi-card label="Échecs définitifs" [value]="s.echecsDefinitifs" [tone]="s.echecsDefinitifs > 0 ? 'danger' : 'neutral'" />
-        </div>
-      }
-
       <section class="bo-panel">
         <app-ui-filter-bar
           [statusPills]="adminStatusPills()"

@@ -104,15 +104,6 @@ function dateRangeValidator(group: AbstractControl): ValidationErrors | null {
       </div>
     </app-ui-page-header>
 
-    @if (stats(); as s) {
-      <div class="bo-kpi-grid">
-        <app-ui-kpi-card label="Total événements" [value]="s.total" />
-        <app-ui-kpi-card label="À venir publiés" [value]="s.aVenirPublies" tone="success" />
-        <app-ui-kpi-card label="Ouverts résa" [value]="s.ouvertsReservation" tone="ochre" />
-        <app-ui-kpi-card label="Annulés / Archivés" [value]="s.annules + ' / ' + s.archives" tone="neutral" />
-      </div>
-    }
-
     @if (actionError()) {
       <app-ui-error-banner [message]="actionError()!" [showRetry]="false" />
     }

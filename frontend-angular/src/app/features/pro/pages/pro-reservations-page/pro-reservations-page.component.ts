@@ -51,33 +51,12 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
   ],
   template: `
     <header class="bo-header">
-      <div>
-        <p class="bo-header__eyebrow">Réservations</p>
-        <h1 class="bo-header__title">Gestion des réservations</h1>
-        <p class="bo-header__lead">
-          Suivez l’ensemble des réservations clients, consultez leurs transitions d’état, synchronisez
-          un dossier ou annulez une réservation autorisée.
-        </p>
-      </div>
+      <h1 class="bo-header__title">Réservations</h1>
       <button type="button" class="bo-btn" (click)="loadAll(page())" [disabled]="loading()">
         <svg lucideRefreshCw [size]="14" aria-hidden="true"></svg>
         <span>Actualiser</span>
       </button>
     </header>
-
-    <p class="bo-notice" style="margin-bottom: var(--space-4);">
-      Règle métier P04 : une réservation n'est confirmée qu'à réception d'un événement de paiement
-      accepté.
-    </p>
-
-    @if (stats(); as s) {
-      <div class="bo-kpi-grid">
-        <app-ui-kpi-card label="Total réservations" [value]="s.totalReservations" />
-        <app-ui-kpi-card label="Confirmées" [value]="s.confirmees" tone="success" subtitle="{{ s.placesReserveesActives }} places actives" />
-        <app-ui-kpi-card label="En attente paiement" [value]="s.enAttentePaiement" tone="ochre" subtitle="{{ s.montantTotalEnAttente | fcfaPrice }}" />
-        <app-ui-kpi-card label="Montant confirmé" [value]="s.montantTotalConfirme | fcfaPrice" tone="terracotta" subtitle="Annulées : {{ s.annulees }} · Exp : {{ s.expirees }}" />
-      </div>
-    }
 
     @if (actionError()) {
       <app-ui-error-banner [message]="actionError()!" [showRetry]="false" />

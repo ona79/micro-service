@@ -32,13 +32,7 @@ import { ReservationApiService } from '../../../reservations/data-access/reserva
   ],
   template: `
     <header class="bo-header">
-      <div>
-        <p class="bo-header__eyebrow">Opérations terrain · Données non financières</p>
-        <h1 class="bo-header__title">Manifestes des participants par circuit</h1>
-        <p class="bo-header__lead">
-          Liste opérationnelle des voyageurs inscrits par circuit (aucune donnée financière affichée).
-        </p>
-      </div>
+      <h1 class="bo-header__title">Manifestes des participants</h1>
       <button type="button" class="bo-btn" (click)="loadCircuits()" [disabled]="loading()">
         <svg lucideRefreshCw [size]="15" aria-hidden="true"></svg>
         <span>Actualiser</span>

@@ -51,14 +51,7 @@ import { PaiementApiService } from '../../../paiements/data-access/paiement-api.
   ],
   template: `
     <header class="bo-header">
-      <div>
-        <p class="bo-header__eyebrow">Supervision financière simulée · Administrateur uniquement</p>
-        <h1 class="bo-header__title">Paiements</h1>
-        <p class="bo-header__lead">
-          Supervisez les transactions pédagogiques simulées, exécutez des remboursements simulés et
-          rejouez les événements outbox en échec.
-        </p>
-      </div>
+      <h1 class="bo-header__title">Paiements</h1>
       <div class="bo-header__actions">
         <button type="button" class="bo-btn" (click)="loadAll(page())" [disabled]="loading()">
           <svg lucideRefreshCw [size]="14" aria-hidden="true"></svg>
@@ -71,20 +64,6 @@ import { PaiementApiService } from '../../../paiements/data-access/paiement-api.
         }
       </div>
     </header>
-
-    <p class="bo-notice" style="margin-bottom: var(--space-4);">
-      Environnement simulé académique (Wave / Orange Money Sénégal) : aucune transaction bancaire
-      réelle et aucune modification directe de statut n'est autorisée hors machine à états P04.
-    </p>
-
-    @if (stats(); as s) {
-      <div class="bo-kpi-grid">
-        <app-ui-kpi-card label="Transactions totales" [value]="s.totalTransactions" subtitle="Acceptées : {{ s.acceptees }} · Remboursées : {{ s.remboursees }}" />
-        <app-ui-kpi-card label="Volume accepté (simulé)" [value]="s.montantTotalAccepteSimule | fcfaPrice" tone="success" />
-        <app-ui-kpi-card label="Wave / Orange Money" [value]="(s.montantWaveSimule | fcfaPrice) + ' / ' + (s.montantOrangeMoneySimule | fcfaPrice)" tone="ochre" />
-        <app-ui-kpi-card label="Outbox en attente" [value]="s.outboxEnAttente" [tone]="s.outboxEnAttente > 0 ? 'danger' : 'neutral'" subtitle="Remboursé : {{ s.montantTotalRembourseSimule | fcfaPrice }}" />
-      </div>
-    }
 
     @if (actionError()) {
       <app-ui-error-banner [message]="actionError()!" [showRetry]="false" />

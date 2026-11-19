@@ -94,15 +94,6 @@ import { PatrimoineApiService } from '../../../patrimoines/data-access/patrimoin
       </div>
     </app-ui-page-header>
 
-    @if (stats(); as s) {
-      <div class="bo-kpi-grid">
-        <app-ui-kpi-card label="Circuits ({{ s.scope }})" [value]="s.total" />
-        <app-ui-kpi-card label="Publiés" [value]="s.publies" tone="success" />
-        <app-ui-kpi-card label="Brouillons / Soumis" [value]="s.brouillons + s.soumis" tone="ochre" />
-        <app-ui-kpi-card label="Avec guide / Sans guide" [value]="s.avecGuideAffecte + ' / ' + s.sansGuide" tone="terracotta" />
-      </div>
-    }
-
     @if (actionError()) {
       <app-ui-error-banner [message]="actionError()!" [showRetry]="false" />
     }

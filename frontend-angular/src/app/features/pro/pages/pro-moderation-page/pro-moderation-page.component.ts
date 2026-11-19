@@ -44,28 +44,12 @@ import { AvisApiService } from '../../../avis/data-access/avis-api.service';
   ],
   template: `
     <header class="bo-header">
-      <div>
-        <p class="bo-header__eyebrow">Modération</p>
-        <h1 class="bo-header__title">Modération</h1>
-        <p class="bo-header__lead">
-          Traitez les signalements ouverts et modérez les avis avec justification obligatoire (5
-          caractères min.) et journalisation immuable.
-        </p>
-      </div>
+      <h1 class="bo-header__title">Modération</h1>
       <button type="button" class="bo-btn" (click)="loadAll()" [disabled]="loading()">
         <svg lucideRefreshCw [size]="14" aria-hidden="true"></svg>
         <span>Actualiser</span>
       </button>
     </header>
-
-    @if (stats(); as s) {
-      <div class="bo-kpi-grid">
-        <app-ui-kpi-card label="Signalements ouverts" [value]="s.signalementsOuverts" [tone]="s.signalementsOuverts > 0 ? 'danger' : 'success'" subtitle="Total signalements : {{ s.totalSignalements }}" />
-        <app-ui-kpi-card label="Avis approuvés" [value]="s.approuves" tone="success" subtitle="Note moy. : {{ s.noteMoyenneApprouves }} / 5" />
-        <app-ui-kpi-card label="Avis masqués / rejetés" [value]="s.masques + ' / ' + s.rejetes" tone="ochre" />
-        <app-ui-kpi-card label="Total avis vérifiés" [value]="s.totalAvis" />
-      </div>
-    }
 
     <div class="bo-tabs" role="tablist">
       <button type="button" role="tab" class="bo-tab" [class.bo-tab--active]="activeTab() === 'signalements'" (click)="activeTab.set('signalements')">
