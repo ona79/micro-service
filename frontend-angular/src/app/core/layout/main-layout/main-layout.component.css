@@ -452,3 +452,9 @@
     gap: var(--space-6);
   }
 }
+
+@media (max-width: 480px) {
+  .brand__tagline {
+    display: none;
+  }
+}

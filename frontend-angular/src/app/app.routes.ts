@@ -220,6 +220,11 @@ export const routes: Routes = [
             (m) => m.ForbiddenPageComponent
           ),
       },
+      {
+        path: 'interdit',
+        redirectTo: 'acces-refuse',
+        pathMatch: 'full',
+      },
     ],
   },
   {
