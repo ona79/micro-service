@@ -1,7 +1,7 @@
 import {
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
-  computed,
   effect,
   inject,
   input,
@@ -22,25 +22,28 @@ interface BilletWithQr extends Billet {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommonModule],
   template: `
-    <div class="ticket-view-container">
+    <div
+      class="ticket-view-container"
+      [class.ticket-view-container--printing]="isPrinting()"
+    >
       <div class="ticket-view-header no-print">
         <div class="ticket-view-header__info">
           <h2 class="ticket-view-header__title">
             <span class="ticket-view-header__badge">E-Billetterie</span>
-            Billets Électroniques d'Accès
+            Billets Électroniques d'Accès ({{ billetsWithQr().length }})
           </h2>
           <p class="ticket-view-header__sub">
-            Présentez ces QR codes à l'entrée des sites touristiques ou auprès du guide responsable.
+            Présentez ce QR code à l'entrée du site touristique ou auprès du guide responsable.
           </p>
         </div>
         <div class="ticket-view-header__actions">
-          @if (showPrintButton()) {
+          @if (showPrintButton() && billetsWithQr().length > 0) {
             <button type="button" class="btn-print" (click)="imprimer()">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
                 <rect x="6" y="14" width="12" height="8"/>
               </svg>
-              Imprimer / PDF
+              <span>{{ billetsWithQr().length > 1 ? 'Imprimer les ' + billetsWithQr().length + ' billets' : 'Imprimer le billet' }}</span>
             </button>
           }
           @if (showCloseButton()) {
@@ -62,18 +65,37 @@ interface BilletWithQr extends Billet {
         </div>
       } @else {
         <div class="tickets-grid">
-          @for (billet of billetsWithQr(); track billet.id) {
-            <article class="ticket-card" [class.ticket-card--consomme]="billet.statut === 'CONSOMME'" [class.ticket-card--annule]="billet.statut === 'ANNULE'">
+          @for (billet of billetsWithQr(); track billet.numeroBillet || billet.tokenQr || billet.id) {
+            <article
+              class="ticket-card"
+              [class.ticket-card--consomme]="billet.statut === 'CONSOMME'"
+              [class.ticket-card--annule]="billet.statut === 'ANNULE'"
+              [class.ticket-card--hide-on-print]="printingTicketKey() !== null && printingTicketKey() !== getTicketKey(billet)"
+            >
               <!-- En-tête officiel du billet -->
               <div class="ticket-card__header">
                 <div class="ticket-brand">
                   <span class="ticket-brand__logo">🌿 CASAMANCE PATRIMOINE</span>
                   <span class="ticket-brand__inst">UASZ — Licence 3 Informatique</span>
                 </div>
-                <div class="ticket-badge">
+                <div class="ticket-card__header-right">
                   <span [class]="getBadgeClass(billet.statut)">
                     {{ getStatusLabel(billet.statut) }}
                   </span>
+                  @if (showPrintButton() && billetsWithQr().length > 1) {
+                    <button
+                      type="button"
+                      class="btn-print-single no-print"
+                      (click)="imprimerUnSeul(billet)"
+                      title="Imprimer uniquement ce billet"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                        <rect x="6" y="14" width="12" height="8"/>
+                      </svg>
+                      <span>Imprimer ce billet</span>
+                    </button>
+                  }
                 </div>
               </div>
 
@@ -82,7 +104,7 @@ interface BilletWithQr extends Billet {
                 <!-- Zone QR Code -->
                 <div class="ticket-qr-zone">
                   @if (billet.qrDataUrl) {
-                    <img [src]="billet.qrDataUrl" [alt]="'QR Code ' + billet.numeroBillet" class="ticket-qr-img" />
+                    <img [src]="billet.qrDataUrl" [alt]="'QR Code ' + cleanHash(billet.numeroBillet)" class="ticket-qr-img" />
                   } @else {
                     <div class="ticket-qr-placeholder">Génération QR...</div>
                   }
@@ -93,12 +115,12 @@ interface BilletWithQr extends Billet {
                 <div class="ticket-info-zone">
                   <div class="ticket-info-field">
                     <span class="field-label">Bénéficiaire / Porteur</span>
-                    <span class="field-value field-value--highlight">{{ billet.nomBeneficiaire }}</span>
+                    <span class="field-value field-value--highlight">{{ cleanHash(billet.nomBeneficiaire) }}</span>
                   </div>
 
                   <div class="ticket-info-field">
                     <span class="field-label">Visite / Prestation</span>
-                    <span class="field-value field-value--prestation">{{ billet.nomPrestation || 'Visite Touristique Casamance' }}</span>
+                    <span class="field-value field-value--prestation">{{ formatPrestationName(billet.nomPrestation) }}</span>
                   </div>
 
                   <div class="ticket-info-row">
@@ -109,7 +131,7 @@ interface BilletWithQr extends Billet {
                     @if (billet.creneauPrestation) {
                       <div class="ticket-info-field">
                         <span class="field-label">Créneau horaire</span>
-                        <span class="field-value">{{ billet.creneauPrestation }}</span>
+                        <span class="field-value">{{ cleanHash(billet.creneauPrestation) }}</span>
                       </div>
                     }
                   </div>
@@ -117,11 +139,11 @@ interface BilletWithQr extends Billet {
                   <div class="ticket-info-row">
                     <div class="ticket-info-field">
                       <span class="field-label">N° de Billet</span>
-                      <span class="field-code">{{ billet.numeroBillet }}</span>
+                      <span class="field-code">{{ cleanHash(billet.numeroBillet) }}</span>
                     </div>
                     <div class="ticket-info-field">
                       <span class="field-label">Réf. Réservation</span>
-                      <span class="field-code">{{ billet.referenceReservation }}</span>
+                      <span class="field-code">{{ cleanHash(billet.referenceReservation) }}</span>
                     </div>
                   </div>
 
@@ -214,6 +236,25 @@ interface BilletWithQr extends Billet {
       background-color: var(--color-brand-forest-hover, #1e4e3a);
     }
 
+    .btn-print-single {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 11px;
+      border-radius: 999px;
+      border: 1px solid var(--border-strong, #cbd5e1);
+      background-color: #ffffff;
+      color: var(--brand-primary, #245b45);
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .btn-print-single:hover {
+      background-color: var(--brand-soft, #e4efe9);
+      border-color: var(--brand-primary, #245b45);
+    }
+
     .btn-close {
       background-color: transparent;
       border: 1px solid var(--border-strong, #cbd5e1);
@@ -279,6 +320,14 @@ interface BilletWithQr extends Billet {
       padding: 12px 20px;
       background-color: #f8fafc;
       border-bottom: 1px dashed #cbd5e1;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .ticket-card__header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .ticket-brand {
@@ -438,35 +487,29 @@ interface BilletWithQr extends Billet {
 
     /* Styles d'impression */
     @media print {
-      body * {
-        visibility: hidden;
-      }
-      .ticket-view-container, .ticket-view-container * {
-        visibility: visible;
-      }
       .ticket-view-container {
-        position: absolute;
-        left: 0;
-        top: 0;
         width: 100%;
         padding: 0;
         background: transparent;
       }
-      .no-print {
+      .no-print,
+      .ticket-card--hide-on-print {
         display: none !important;
       }
       .ticket-card {
+        break-inside: avoid;
         page-break-inside: avoid;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
         box-shadow: none !important;
         border: 1px solid #000000 !important;
-        border-left: 6px solid #000000 !important;
+        border-left: 6px solid #153d30 !important;
       }
     }
   `,
 })
 export class UiTicketViewComponent {
   private readonly billetApi = inject(BilletApiService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   readonly billets = input<Billet[]>([]);
   readonly loading = input<boolean>(false);
@@ -475,6 +518,8 @@ export class UiTicketViewComponent {
   readonly close = output<void>();
 
   readonly billetsWithQr = signal<BilletWithQr[]>([]);
+  protected readonly isPrinting = signal<boolean>(false);
+  protected readonly printingTicketKey = signal<string | null>(null);
 
   constructor() {
     effect(
@@ -485,9 +530,20 @@ export class UiTicketViewComponent {
           return;
         }
 
-        // Génération asynchrone des QR codes pour chaque billet
+        // Déduplication stricte des billets par numeroBillet ou tokenQr ou id
+        const seen = new Set<string>();
+        const uniqueBillets: Billet[] = [];
+        for (const b of rawBillets) {
+          const key = this.getTicketKey(b);
+          if (!seen.has(key)) {
+            seen.add(key);
+            uniqueBillets.push(b);
+          }
+        }
+
+        // Génération asynchrone des QR codes pour chaque billet unique
         Promise.all(
-          rawBillets.map(async (b) => {
+          uniqueBillets.map(async (b) => {
             const qrDataUrl = await this.billetApi.generateQrCodeDataUrl(b.tokenQr);
             return { ...b, qrDataUrl };
           })
@@ -499,8 +555,55 @@ export class UiTicketViewComponent {
     );
   }
 
+  protected getTicketKey(billet: Billet): string {
+    return String(billet.numeroBillet || billet.tokenQr || billet.id);
+  }
+
+  protected cleanHash(value?: string | null): string {
+    if (!value) return '';
+    return value
+      .replace(/#\s*(\d+)/g, 'n° $1')
+      .replace(/#/g, '');
+  }
+
+  protected formatPrestationName(raw?: string | null): string {
+    if (!raw) return 'Visite Touristique Casamance';
+    return raw
+      .replace(/\bCIRCUIT\s*#\s*(\d+)/gi, 'Circuit n° $1')
+      .replace(/\bEVENEMENT\s*#\s*(\d+)/gi, 'Événement n° $1')
+      .replace(/\bÉVÉNEMENT\s*#\s*(\d+)/gi, 'Événement n° $1')
+      .replace(/\bPATRIMOINE\s*#\s*(\d+)/gi, 'Patrimoine n° $1')
+      .replace(/#\s*(\d+)/g, 'n° $1')
+      .replace(/#/g, '');
+  }
+
   imprimer(): void {
-    window.print();
+    this.printingTicketKey.set(null);
+    this.triggerPrint();
+  }
+
+  imprimerUnSeul(billet: Billet): void {
+    this.printingTicketKey.set(this.getTicketKey(billet));
+    this.triggerPrint();
+  }
+
+  private triggerPrint(): void {
+    this.isPrinting.set(true);
+    if (typeof document !== 'undefined') {
+      document.body.classList.add('is-printing-tickets');
+    }
+    this.cdr.detectChanges();
+
+    try {
+      window.print();
+    } finally {
+      this.isPrinting.set(false);
+      this.printingTicketKey.set(null);
+      if (typeof document !== 'undefined') {
+        document.body.classList.remove('is-printing-tickets');
+      }
+      this.cdr.markForCheck();
+    }
   }
 
   getBadgeClass(statut: Billet['statut']): string {

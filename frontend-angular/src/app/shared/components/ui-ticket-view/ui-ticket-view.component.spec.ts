@@ -90,4 +90,31 @@ describe('UiTicketViewComponent', () => {
     expect(printSpy).toHaveBeenCalled();
     printSpy.mockRestore();
   });
+
+  it('devrait dédupliquer les billets identiques et supprimer les # dans les numéros de circuit', async () => {
+    const duplicatedWithHash: Billet[] = [
+      {
+        ...mockBillets[0],
+        nomPrestation: 'CIRCUIT #1',
+      },
+      {
+        ...mockBillets[0],
+        nomPrestation: 'CIRCUIT #1',
+      },
+    ];
+    fixture.componentRef.setInput('billets', duplicatedWithHash);
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    for (let i = 0; i < 25; i++) {
+      if (component.billetsWithQr().length > 0) break;
+      await new Promise((resolve) => setTimeout(resolve, 40));
+    }
+    fixture.detectChanges();
+
+    expect(component.billetsWithQr().length).toBe(1);
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.textContent).toContain('Circuit n° 1');
+    expect(el.textContent).not.toContain('CIRCUIT #1');
+  });
 });

@@ -449,3 +449,44 @@ h2 {
     transition: none !important;
   }
 }
+
+/* =========================================================================
+   Isolate Ticket Printing (hide all non-ticket UI when body.is-printing-tickets)
+   ========================================================================= */
+@media print {
+  body.is-printing-tickets .topbar,
+  body.is-printing-tickets .site-footer,
+  body.is-printing-tickets .pro-sidebar,
+  body.is-printing-tickets .pro-topbar,
+  body.is-printing-tickets .account-hero,
+  body.is-printing-tickets .account-tabs,
+  body.is-printing-tickets .account-card__header,
+  body.is-printing-tickets .ticket-group-header,
+  body.is-printing-tickets .detail-header,
+  body.is-printing-tickets .detail-grid,
+  body.is-printing-tickets .no-print {
+    display: none !important;
+  }
+
+  body.is-printing-tickets .account-page,
+  body.is-printing-tickets .account-shell,
+  body.is-printing-tickets .account-card,
+  body.is-printing-tickets .tickets-accordion,
+  body.is-printing-tickets .ticket-group-card,
+  body.is-printing-tickets .ticket-group-body,
+  body.is-printing-tickets .tickets-wrapper {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  body.is-printing-tickets .ticket-group-card:not(:has(.ticket-view-container--printing)) {
+    display: none !important;
+  }
+
+  body.is-printing-tickets .ticket-card--hide-on-print {
+    display: none !important;
+  }
+}
